@@ -1,0 +1,10 @@
+* text=auto
+*.bat text eol=crlf
+*.cpp text eol=crlf
+*.hpp text eol=crlf
+*.h text eol=crlf
+*.hlsl text eol=crlf
+*.hlsli text eol=crlf
+LightD3D12/** whitespace=-blank-at-eof
+LightD3D12/src/d3dx12.h whitespace=-trailing-space,-blank-at-eof
+samples/Triangle/main.cpp whitespace=-blank-at-eof
