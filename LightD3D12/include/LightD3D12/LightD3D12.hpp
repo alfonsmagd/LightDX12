@@ -5,7 +5,6 @@
 #include <memory>
 #include <string>
 #include <string_view>
-#include <vector>
 
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -27,6 +26,11 @@ namespace lightd3d12
 {
 	using Microsoft::WRL::ComPtr;
 	static constexpr uint32_t ourMaxColorAttachments = D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT;
+	static constexpr uint32_t ourMaxShaderIncludeDirectories = 8;
+	static constexpr uint32_t ourMaxVertexInputElements = 16;
+	static constexpr uint32_t ourMaxBindlessDescriptors = 4096;
+	static constexpr uint32_t ourMaxRtvDescriptors = 256;
+	static constexpr uint32_t ourMaxDsvDescriptors = 64;
 
 	struct BufferResource;
 	struct TextureResource;
@@ -194,7 +198,7 @@ namespace lightd3d12
 		const char* entryPoint = "main";
 		const char* profile = nullptr;
 		std::string sourceName;
-		std::vector<std::string> includeDirectories;
+		std::array<std::string, ourMaxShaderIncludeDirectories> includeDirectories = {};
 	};
 
 	struct RenderPipelineDesc
@@ -202,7 +206,7 @@ namespace lightd3d12
 		RenderPipelineDesc() noexcept;
 
 		std::array<RenderPipelineColorAttachmentDesc, ourMaxColorAttachments> color = {};
-		std::vector<VertexInputElementDesc> inputElements;
+		std::array<VertexInputElementDesc, ourMaxVertexInputElements> inputElements = {};
 		ShaderStageSource vertexShader = {};
 		ShaderStageSource fragmentShader = {};
 		D3D12_BLEND_DESC blendState = {};
@@ -308,9 +312,9 @@ namespace lightd3d12
 		bool allowTearing = true;
 		bool enablePixGpuCapture = false;
 		uint32_t framesInFlight = 3;
-		uint32_t bindlessCapacity = 4096;
-		uint32_t rtvCapacity = 256;
-		uint32_t dsvCapacity = 64;
+		uint32_t bindlessCapacity = ourMaxBindlessDescriptors;
+		uint32_t rtvCapacity = ourMaxRtvDescriptors;
+		uint32_t dsvCapacity = ourMaxDsvDescriptors;
 		uint32_t swapchainBufferCount = 3;
 		DXGI_FORMAT swapchainFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
 		D3D_FEATURE_LEVEL minimumFeatureLevel = D3D_FEATURE_LEVEL_12_0;

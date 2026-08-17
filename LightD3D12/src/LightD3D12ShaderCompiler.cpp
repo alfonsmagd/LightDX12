@@ -6,10 +6,10 @@
 #include <cwctype>
 #include <filesystem>
 #include <fstream>
+#include <optional>
 #include <string_view>
 #include <system_error>
 #include <utility>
-#include <vector>
 
 namespace lightd3d12
 {
@@ -143,9 +143,12 @@ namespace lightd3d12
 			return std::filesystem::exists( compilerPath.parent_path() / "dxil.dll", error );
 		}
 
-		std::vector<uint32_t> ParseDottedVersion( std::wstring_view versionText )
+		using VersionParts = std::array<uint32_t, 4>;
+
+		std::optional<VersionParts> ParseDottedVersion( std::wstring_view versionText )
 		{
-			std::vector<uint32_t> parts;
+			VersionParts parts = {};
+			uint32_t partCount = 0;
 			uint32_t current = 0;
 			bool hasDigits = false;
 
@@ -160,30 +163,37 @@ namespace lightd3d12
 
 				if( character == L'.' )
 				{
-					parts.push_back( hasDigits ? current : 0u );
+					if( partCount == parts.size() )
+					{
+						return std::nullopt;
+					}
+					parts[ partCount++ ] = hasDigits ? current : 0u;
 					current = 0;
 					hasDigits = false;
 					continue;
 				}
 
-				return {};
+				return std::nullopt;
 			}
 
 			if( hasDigits )
 			{
-				parts.push_back( current );
+				if( partCount == parts.size() )
+				{
+					return std::nullopt;
+				}
+				parts[ partCount++ ] = current;
 			}
 
-			return parts;
+			return partCount > 0 ? std::optional<VersionParts>( parts ) : std::nullopt;
 		}
 
-		bool IsVersionGreater( const std::vector<uint32_t>& left, const std::vector<uint32_t>& right )
+		bool IsVersionGreater( const VersionParts& left, const VersionParts& right )
 		{
-			const size_t partCount = std::max( left.size(), right.size() );
-			for( size_t index = 0; index < partCount; ++index )
+			for( size_t index = 0; index < left.size(); ++index )
 			{
-				const uint32_t leftPart = index < left.size() ? left[ index ] : 0u;
-				const uint32_t rightPart = index < right.size() ? right[ index ] : 0u;
+				const uint32_t leftPart = left[ index ];
+				const uint32_t rightPart = right[ index ];
 				if( leftPart != rightPart )
 				{
 					return leftPart > rightPart;
@@ -212,7 +222,7 @@ namespace lightd3d12
 			}
 
 			std::filesystem::path bestCompilerPath;
-			std::vector<uint32_t> bestVersionParts;
+			VersionParts bestVersionParts = {};
 			for( const auto& entry : std::filesystem::directory_iterator( sdkBinDirectory, error ) )
 			{
 				if( error || !entry.is_directory( error ) )
@@ -220,11 +230,13 @@ namespace lightd3d12
 					continue;
 				}
 
-				const std::vector<uint32_t> versionParts = ParseDottedVersion( entry.path().filename().wstring() );
-				if( versionParts.empty() )
+				const std::optional<VersionParts> parsedVersion =
+					ParseDottedVersion( entry.path().filename().wstring() );
+				if( !parsedVersion.has_value() )
 				{
 					continue;
 				}
+				const VersionParts& versionParts = *parsedVersion;
 
 				const std::filesystem::path candidateCompiler = entry.path() / "x64" / "dxcompiler.dll";
 				if( !HasSiblingDxil( candidateCompiler ) )
@@ -267,20 +279,21 @@ namespace lightd3d12
 			const std::filesystem::path currentDirectory = std::filesystem::current_path();
 			const std::filesystem::path sdkCompiler = FindLatestWindowsSdkDxCompiler();
 
-			std::vector<std::filesystem::path> candidates;
-			candidates.reserve( 3 );
-			candidates.push_back( executableDirectory / "dxcompiler.dll" );
+			std::array<std::filesystem::path, 3> candidates = {};
+			uint32_t candidateCount = 0;
+			candidates[ candidateCount++ ] = executableDirectory / "dxcompiler.dll";
 			if( currentDirectory != executableDirectory )
 			{
-				candidates.push_back( currentDirectory / "dxcompiler.dll" );
+				candidates[ candidateCount++ ] = currentDirectory / "dxcompiler.dll";
 			}
 			if( !sdkCompiler.empty() )
 			{
-				candidates.push_back( sdkCompiler );
+				candidates[ candidateCount++ ] = sdkCompiler;
 			}
 
-			for( const auto& candidate : candidates )
+			for( uint32_t candidateIndex = 0; candidateIndex < candidateCount; ++candidateIndex )
 			{
+				const std::filesystem::path& candidate = candidates[ candidateIndex ];
 				if( HMODULE module = TryLoadDxCompilerFromPath( candidate ); module != nullptr )
 				{
 					return module;
@@ -365,18 +378,19 @@ namespace lightd3d12
 			( sanitizedEntryPoint + L"_" + sanitizedProfile + L"_" + std::to_wstring( shaderHash ) + L".pdb" );
 		const std::wstring pdbPathWide = pdbPath.wstring();
 
-		std::vector<std::wstring> ownedArguments;
-		ownedArguments.reserve( stage.includeDirectories.size() + 1u );
-		std::vector<LPCWSTR> arguments;
-		arguments.reserve( 12u + stage.includeDirectories.size() * 2u );
-		const auto pushArgument = [ &arguments ]( LPCWSTR argument )
+		std::array<std::wstring, ourMaxShaderIncludeDirectories> ownedArguments = {};
+		uint32_t ownedArgumentCount = 0;
+		std::array<LPCWSTR, 12u + ourMaxShaderIncludeDirectories * 2u> arguments = {};
+		uint32_t argumentCount = 0;
+		const auto pushArgument = [ &arguments, &argumentCount ]( LPCWSTR argument )
 		{
-			arguments.push_back( argument );
+			arguments[ argumentCount++ ] = argument;
 		};
-		const auto pushOwnedArgument = [ &ownedArguments, &arguments ]( std::wstring argument )
+		const auto pushOwnedArgument =
+			[ &ownedArguments, &ownedArgumentCount, &arguments, &argumentCount ]( std::wstring argument )
 		{
-			ownedArguments.push_back( std::move( argument ) );
-			arguments.push_back( ownedArguments.back().c_str() );
+			ownedArguments[ ownedArgumentCount ] = std::move( argument );
+			arguments[ argumentCount++ ] = ownedArguments[ ownedArgumentCount++ ].c_str();
 		};
 
 		pushArgument( L"-E" );
@@ -412,7 +426,7 @@ namespace lightd3d12
 			compiler->Compile(
 				&sourceBuffer,
 				arguments.data(),
-				static_cast<UINT32>( arguments.size() ),
+				argumentCount,
 				includeHandler.Get(),
 				__uuidof( IDxcResult ),
 				reinterpret_cast<void**>( result.GetAddressOf() ) ),

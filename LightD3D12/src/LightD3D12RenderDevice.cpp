@@ -1,5 +1,4 @@
 #include <algorithm>
-#include <vector>
 
 #include "LightD3D12BaseMips.hpp"
 #include "LightD3D12ManagerImpl.hpp"
@@ -717,14 +716,13 @@ namespace lightd3d12
 		psoDesc.SampleMask = UINT_MAX;
 		psoDesc.PrimitiveTopologyType = desc.primitiveType;
 
-		std::vector<D3D12_INPUT_ELEMENT_DESC> nativeInputElements;
-		nativeInputElements.reserve( desc.inputElements.size() );
+		std::array<D3D12_INPUT_ELEMENT_DESC, ourMaxVertexInputElements> nativeInputElements = {};
+		uint32_t nativeInputElementCount = 0;
 		for( const VertexInputElementDesc& inputElement : desc.inputElements )
 		{
 			if( inputElement.semanticName.empty() )
 			{
-				throw std::runtime_error(
-					"RenderPipelineDesc input elements require a semantic name." );
+				continue;
 			}
 
 			D3D12_INPUT_ELEMENT_DESC nativeInputElement{};
@@ -735,11 +733,10 @@ namespace lightd3d12
 			nativeInputElement.AlignedByteOffset = inputElement.alignedByteOffset;
 			nativeInputElement.InputSlotClass = inputElement.inputClassification;
 			nativeInputElement.InstanceDataStepRate = inputElement.instanceDataStepRate;
-			nativeInputElements.push_back( nativeInputElement );
+			nativeInputElements[ nativeInputElementCount++ ] = nativeInputElement;
 		}
 		psoDesc.InputLayout.pInputElementDescs = nativeInputElements.data();
-		psoDesc.InputLayout.NumElements =
-			static_cast< UINT >(nativeInputElements.size());
+		psoDesc.InputLayout.NumElements = nativeInputElementCount;
 
 		uint32_t numRenderTargets = 0;
 		for( uint32_t index = 0; index < desc.color.size(); ++index )

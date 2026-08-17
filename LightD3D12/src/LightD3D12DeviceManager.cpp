@@ -8,7 +8,6 @@
 #include <cstdlib>
 #include <filesystem>
 #include <mutex>
-#include <vector>
 
 namespace lightd3d12
 {
@@ -54,22 +53,18 @@ namespace lightd3d12
 		}
 
 #if defined( LIGHTD3D12_ENABLE_PIX )
-		std::vector<uint32_t> ParseVersionComponents( const std::wstring& versionText )
+		std::array<uint32_t, 4> ParseVersionComponents( const std::wstring& versionText )
 		{
-			std::vector<uint32_t> components;
+			std::array<uint32_t, 4> components = {};
+			uint32_t componentIndex = 0;
 			size_t start = 0;
-			while( start < versionText.size() )
+			while( start < versionText.size() && componentIndex < components.size() )
 			{
 				const size_t end = versionText.find( L'.', start );
 				const std::wstring token = versionText.substr( start, end == std::wstring::npos ? std::wstring::npos : end - start );
-				if( token.empty() )
-				{
-					components.push_back( 0 );
-				}
-				else
-				{
-					components.push_back( static_cast<uint32_t>( std::wcstoul( token.c_str(), nullptr, 10 ) ) );
-				}
+				components[ componentIndex++ ] = token.empty()
+					? 0u
+					: static_cast<uint32_t>( std::wcstoul( token.c_str(), nullptr, 10 ) );
 
 				if( end == std::wstring::npos )
 				{
@@ -82,13 +77,12 @@ namespace lightd3d12
 			return components;
 		}
 
-		bool IsVersionGreater( const std::vector<uint32_t>& left, const std::vector<uint32_t>& right )
+		bool IsVersionGreater( const std::array<uint32_t, 4>& left, const std::array<uint32_t, 4>& right )
 		{
-			const size_t count = std::max( left.size(), right.size() );
-			for( size_t index = 0; index < count; ++index )
+			for( size_t index = 0; index < left.size(); ++index )
 			{
-				const uint32_t leftValue = index < left.size() ? left[ index ] : 0u;
-				const uint32_t rightValue = index < right.size() ? right[ index ] : 0u;
+				const uint32_t leftValue = left[ index ];
+				const uint32_t rightValue = right[ index ];
 				if( leftValue != rightValue )
 				{
 					return leftValue > rightValue;
@@ -134,7 +128,7 @@ namespace lightd3d12
 			}
 
 			std::filesystem::path latestCapturerPath;
-			std::vector<uint32_t> latestVersion;
+			std::array<uint32_t, 4> latestVersion = {};
 
 			for( const auto& entry : std::filesystem::directory_iterator( pixInstallRoot ) )
 			{
@@ -149,7 +143,7 @@ namespace lightd3d12
 					continue;
 				}
 
-				const std::vector<uint32_t> candidateVersion = ParseVersionComponents( entry.path().filename().wstring() );
+				const std::array<uint32_t, 4> candidateVersion = ParseVersionComponents( entry.path().filename().wstring() );
 				if( latestCapturerPath.empty() || IsVersionGreater( candidateVersion, latestVersion ) )
 				{
 					latestCapturerPath = candidateDll;
@@ -392,6 +386,13 @@ namespace lightd3d12
 		{
 			throw std::runtime_error( "Bindless descriptor capacity must include LightD3D12 fixed binding slots." );
 		}
+		if( desc_.bindlessCapacity > ourMaxBindlessDescriptors ||
+			desc_.rtvCapacity > ourMaxRtvDescriptors ||
+			desc_.dsvCapacity > ourMaxDsvDescriptors )
+		{
+			throw std::length_error(
+				"Descriptor capacities exceed the fixed LightD3D12 array limits." );
+		}
 
 		D3D12_DESCRIPTOR_HEAP_DESC bindlessDesc{};
 		bindlessDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
@@ -413,25 +414,26 @@ namespace lightd3d12
 		rtvDescriptorSize_ = device_->GetDescriptorHandleIncrementSize( D3D12_DESCRIPTOR_HEAP_TYPE_RTV );
 		dsvDescriptorSize_ = device_->GetDescriptorHandleIncrementSize( D3D12_DESCRIPTOR_HEAP_TYPE_DSV );
 
-		freeBindlessRanges_.clear();
+		freeBindlessRangeCount_ = 0;
 		const uint32_t dynamicDescriptorCount =
 			desc_.bindlessCapacity - LIGHTD3D12_BINDLESS_DYNAMIC_SLOT_FIRST;
 		if( dynamicDescriptorCount > 0 )
 		{
-			freeBindlessRanges_.push_back( DescriptorRange{ .start_ = LIGHTD3D12_BINDLESS_DYNAMIC_SLOT_FIRST, .count_ = dynamicDescriptorCount } );
+			freeBindlessRanges_[ freeBindlessRangeCount_++ ] =
+				DescriptorRange{ .start_ = LIGHTD3D12_BINDLESS_DYNAMIC_SLOT_FIRST, .count_ = dynamicDescriptorCount };
 		}
-		fixedBindlessDescriptorUsed_.assign( LIGHTD3D12_BINDLESS_DYNAMIC_SLOT_FIRST, 0u );
+		fixedBindlessDescriptorUsed_.fill( 0u );
 
-		freeRtvDescriptors_.reserve( desc_.rtvCapacity );
+		freeRtvDescriptorCount_ = desc_.rtvCapacity;
 		for( uint32_t index = desc_.rtvCapacity; index > 0; --index )
 		{
-			freeRtvDescriptors_.push_back( index - 1u );
+			freeRtvDescriptors_[ desc_.rtvCapacity - index ] = index - 1u;
 		}
 
-		freeDsvDescriptors_.reserve( desc_.dsvCapacity );
+		freeDsvDescriptorCount_ = desc_.dsvCapacity;
 		for( uint32_t index = desc_.dsvCapacity; index > 0; --index )
 		{
-			freeDsvDescriptors_.push_back( index - 1u );
+			freeDsvDescriptors_[ desc_.dsvCapacity - index ] = index - 1u;
 		}
 	}
 
@@ -511,7 +513,7 @@ namespace lightd3d12
 			throw std::runtime_error( "Bindless descriptor allocation count must be greater than zero." );
 		}
 
-		for( size_t rangeIndex = 0; rangeIndex < freeBindlessRanges_.size(); ++rangeIndex )
+		for( uint32_t rangeIndex = 0; rangeIndex < freeBindlessRangeCount_; ++rangeIndex )
 		{
 			DescriptorRange& range = freeBindlessRanges_[ rangeIndex ];
 			if( range.count_ < count )
@@ -524,7 +526,7 @@ namespace lightd3d12
 			range.count_ -= count;
 			if( range.count_ == 0 )
 			{
-				freeBindlessRanges_.erase( freeBindlessRanges_.begin() + static_cast<ptrdiff_t>( rangeIndex ) );
+				EraseFreeBindlessRange( rangeIndex );
 			}
 
 			return start;
@@ -553,26 +555,22 @@ namespace lightd3d12
 
 	uint32_t DeviceManager::Impl::AllocateRtvDescriptor()
 	{
-		if( freeRtvDescriptors_.empty() )
+		if( freeRtvDescriptorCount_ == 0 )
 		{
 			throw std::runtime_error( "RTV descriptor heap is exhausted." );
 		}
 
-		const uint32_t index = freeRtvDescriptors_.back();
-		freeRtvDescriptors_.pop_back();
-		return index;
+		return freeRtvDescriptors_[ --freeRtvDescriptorCount_ ];
 	}
 
 	uint32_t DeviceManager::Impl::AllocateDsvDescriptor()
 	{
-		if( freeDsvDescriptors_.empty() )
+		if( freeDsvDescriptorCount_ == 0 )
 		{
 			throw std::runtime_error( "DSV descriptor heap is exhausted." );
 		}
 
-		const uint32_t index = freeDsvDescriptors_.back();
-		freeDsvDescriptors_.pop_back();
-		return index;
+		return freeDsvDescriptors_[ --freeDsvDescriptorCount_ ];
 	}
 
 	void DeviceManager::Impl::FreeBindlessDescriptor( uint32_t index )
@@ -596,39 +594,67 @@ namespace lightd3d12
 			return;
 		}
 
-		DescriptorRange mergedRange{ .start_ = index, .count_ = count };
-		auto insertIt = freeBindlessRanges_.begin();
-		while( insertIt != freeBindlessRanges_.end() && insertIt->start_ < mergedRange.start_ )
+		if( freeBindlessRangeCount_ == freeBindlessRanges_.size() )
 		{
-			++insertIt;
+			throw std::length_error( "Bindless free-range array is exhausted." );
 		}
 
-		insertIt = freeBindlessRanges_.insert( insertIt, mergedRange );
-
-		if( insertIt != freeBindlessRanges_.begin() )
+		DescriptorRange mergedRange{ .start_ = index, .count_ = count };
+		uint32_t insertIndex = 0;
+		while( insertIndex < freeBindlessRangeCount_ &&
+			freeBindlessRanges_[ insertIndex ].start_ < mergedRange.start_ )
 		{
-			auto previous = insertIt - 1;
-			if( previous->start_ + previous->count_ == insertIt->start_ )
+			++insertIndex;
+		}
+		for( uint32_t moveIndex = freeBindlessRangeCount_; moveIndex > insertIndex; --moveIndex )
+		{
+			freeBindlessRanges_[ moveIndex ] = freeBindlessRanges_[ moveIndex - 1u ];
+		}
+		freeBindlessRanges_[ insertIndex ] = mergedRange;
+		++freeBindlessRangeCount_;
+
+		if( insertIndex > 0 )
+		{
+			DescriptorRange& previous = freeBindlessRanges_[ insertIndex - 1u ];
+			DescriptorRange& inserted = freeBindlessRanges_[ insertIndex ];
+			if( previous.start_ + previous.count_ == inserted.start_ )
 			{
-				previous->count_ += insertIt->count_;
-				insertIt = freeBindlessRanges_.erase( insertIt );
-				insertIt = previous;
+				previous.count_ += inserted.count_;
+				EraseFreeBindlessRange( insertIndex );
+				--insertIndex;
 			}
 		}
 
-		auto next = insertIt + 1;
-		if( next != freeBindlessRanges_.end() && insertIt->start_ + insertIt->count_ == next->start_ )
+		if( insertIndex + 1u < freeBindlessRangeCount_ )
 		{
-			insertIt->count_ += next->count_;
-			freeBindlessRanges_.erase( next );
+			DescriptorRange& inserted = freeBindlessRanges_[ insertIndex ];
+			const DescriptorRange& next = freeBindlessRanges_[ insertIndex + 1u ];
+			if( inserted.start_ + inserted.count_ == next.start_ )
+			{
+				inserted.count_ += next.count_;
+				EraseFreeBindlessRange( insertIndex + 1u );
+			}
 		}
+	}
+
+	void DeviceManager::Impl::EraseFreeBindlessRange( uint32_t rangeIndex ) noexcept
+	{
+		assert( rangeIndex < freeBindlessRangeCount_ );
+		for( uint32_t moveIndex = rangeIndex + 1u;
+			moveIndex < freeBindlessRangeCount_; ++moveIndex )
+		{
+			freeBindlessRanges_[ moveIndex - 1u ] = freeBindlessRanges_[ moveIndex ];
+		}
+		--freeBindlessRangeCount_;
+		freeBindlessRanges_[ freeBindlessRangeCount_ ] = {};
 	}
 
 	void DeviceManager::Impl::FreeRtvDescriptor( uint32_t index )
 	{
 		if( index != UINT32_MAX )
 		{
-			freeRtvDescriptors_.push_back( index );
+			assert( freeRtvDescriptorCount_ < freeRtvDescriptors_.size() );
+			freeRtvDescriptors_[ freeRtvDescriptorCount_++ ] = index;
 		}
 	}
 
@@ -636,7 +662,8 @@ namespace lightd3d12
 	{
 		if( index != UINT32_MAX )
 		{
-			freeDsvDescriptors_.push_back( index );
+			assert( freeDsvDescriptorCount_ < freeDsvDescriptors_.size() );
+			freeDsvDescriptors_[ freeDsvDescriptorCount_++ ] = index;
 		}
 	}
 
@@ -782,25 +809,25 @@ namespace lightd3d12
 #endif
 		baseMips_.reset();
 
-		for( auto* buffer : slotMapBuffers_.GetAll() )
-		{
-			if( buffer != nullptr && buffer->mappedPtr_ != nullptr && buffer->resource_ != nullptr )
+		slotMapBuffers_.ForEach( []( BufferResource& buffer )
 			{
-				buffer->resource_->Unmap( 0, nullptr );
-				buffer->mappedPtr_ = nullptr;
-			}
-		}
-
-		for( auto* swapchainResource : slotMapSwapchains_.GetAll() )
-		{
-			if( swapchainResource == nullptr || swapchainResource->swapchain_ == nullptr )
+			if( buffer.mappedPtr_ != nullptr && buffer.resource_ != nullptr )
 			{
-				continue;
+				buffer.resource_->Unmap( 0, nullptr );
+				buffer.mappedPtr_ = nullptr;
+			}
+			} );
+
+		slotMapSwapchains_.ForEach( [this]( SwapchainResource& swapchainResource )
+			{
+			if( swapchainResource.swapchain_ == nullptr )
+			{
+				return;
 			}
 
-			const HWND hwnd = detail::GetHwnd( swapchainResource->desc_.window );
+			const HWND hwnd = detail::GetHwnd( swapchainResource.desc_.window );
 			const bool hasLiveWindow = hwnd != nullptr && IsWindow( hwnd ) != FALSE;
-			IDXGISwapChain4* nativeSwapchain = swapchainResource->swapchain_->GetSwapchain();
+			IDXGISwapChain4* nativeSwapchain = swapchainResource.swapchain_->GetSwapchain();
 			if( factory_ != nullptr && hasLiveWindow )
 			{
 				factory_->MakeWindowAssociation( hwnd, 0 );
@@ -813,7 +840,7 @@ namespace lightd3d12
 					nativeSwapchain->SetFullscreenState( FALSE, nullptr );
 				}
 			}
-		}
+			} );
 		slotMapSwapchains_.Clear();
 
 		slotMapTextures_.Clear();

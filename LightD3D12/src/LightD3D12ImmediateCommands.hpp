@@ -2,13 +2,16 @@
 
 #include "LightD3D12Internal.hpp"
 
-#include <vector>
+#include <array>
+#include <span>
 
 namespace lightd3d12
 {
 	class ImmediateCommands final
 	{
 	public:
+		static constexpr uint32_t ourMaxCommandBuffers = 64;
+
 		struct CommandListWrapper
 		{
 			ComPtr<ID3D12CommandAllocator> allocator_;
@@ -35,6 +38,16 @@ namespace lightd3d12
 		void WaitAll();
 
 	private:
+		std::span<CommandListWrapper> Buffers() noexcept
+		{
+			return { buffers_.data(), bufferCount_ };
+		}
+
+		std::span<const CommandListWrapper> Buffers() const noexcept
+		{
+			return { buffers_.data(), bufferCount_ };
+		}
+
 		CommandListWrapper* FindOldestSubmittedBuffer() noexcept;
 		void WaitForFirstAvailable();
 		void Purge();
@@ -42,7 +55,8 @@ namespace lightd3d12
 	private:
 		ID3D12Device* device_ = nullptr;
 		ID3D12CommandQueue* queue_ = nullptr;
-		std::vector<CommandListWrapper> buffers_;
+		std::array<CommandListWrapper, ourMaxCommandBuffers> buffers_ = {};
+		uint32_t bufferCount_ = 0;
 		SubmitHandle lastSubmitHandle_ = {};
 		SubmitHandle nextSubmitHandle_ = {};
 		uint32_t numAvailableCommandBuffers_ = 0;

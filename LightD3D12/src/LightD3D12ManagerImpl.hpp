@@ -9,7 +9,6 @@
 #include <deque>
 #include <functional>
 #include <memory>
-#include <vector>
 
 namespace lightd3d12
 {
@@ -26,6 +25,9 @@ namespace lightd3d12
 	{
 	public:
 		static constexpr uint32_t ourMaxActiveCommandBuffers = 64;
+		static constexpr std::size_t ourMaxSwapchains = 16;
+		static constexpr std::size_t ourMaxBuffers = 4096;
+		static constexpr std::size_t ourMaxTextures = 4096;
 
 		struct DeferredRelease final
 		{
@@ -82,6 +84,7 @@ namespace lightd3d12
 		uint32_t AllocateDsvDescriptor();
 		void FreeBindlessDescriptor( uint32_t index );
 		void FreeBindlessDescriptorRange( uint32_t index, uint32_t count );
+		void EraseFreeBindlessRange( uint32_t rangeIndex ) noexcept;
 		void FreeRtvDescriptor( uint32_t index );
 		void FreeDsvDescriptor( uint32_t index );
 
@@ -126,15 +129,18 @@ namespace lightd3d12
 			uint32_t shaderResource_ = 0;
 			uint32_t readWriteResource_ = 0;
 		};
-		std::vector<DescriptorRange> freeBindlessRanges_;
-		std::vector<uint8_t> fixedBindlessDescriptorUsed_;
-		std::vector<uint32_t> freeRtvDescriptors_;
-		std::vector<uint32_t> freeDsvDescriptors_;
+		std::array<DescriptorRange, ourMaxBindlessDescriptors> freeBindlessRanges_ = {};
+		std::array<uint8_t, LIGHTD3D12_BINDLESS_DYNAMIC_SLOT_FIRST> fixedBindlessDescriptorUsed_ = {};
+		std::array<uint32_t, ourMaxRtvDescriptors> freeRtvDescriptors_ = {};
+		std::array<uint32_t, ourMaxDsvDescriptors> freeDsvDescriptors_ = {};
+		uint32_t freeBindlessRangeCount_ = 0;
+		uint32_t freeRtvDescriptorCount_ = 0;
+		uint32_t freeDsvDescriptorCount_ = 0;
 		ComPtr<ID3D12RootSignature> rootSignature_;
 		ComPtr<ID3D12CommandSignature> commandSignature_;
-		SlotMap<SwapchainResource> slotMapSwapchains_;
-		SlotMap<BufferResource> slotMapBuffers_;
-		SlotMap<TextureResource> slotMapTextures_;
+		SlotMap<SwapchainResource, ourMaxSwapchains> slotMapSwapchains_;
+		SlotMap<BufferResource, ourMaxBuffers> slotMapBuffers_;
+		SlotMap<TextureResource, ourMaxTextures> slotMapTextures_;
 		std::unique_ptr<StagingDevice> stagingDevice_;
 		std::unique_ptr<BaseMips> baseMips_;
 		BindingSlotMasks allocatedFreeBindingSlots_;

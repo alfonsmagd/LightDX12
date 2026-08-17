@@ -3,7 +3,8 @@
 #include "LightD3D12Internal.hpp"
 #include "LightD3D12ImmediateCommands.hpp"
 
-#include <vector>
+#include <array>
+#include <span>
 
 namespace lightd3d12
 {
@@ -12,6 +13,8 @@ namespace lightd3d12
 	class CommandBufferImpl final: public ICommandBuffer
 	{
 	public:
+		static constexpr uint32_t ourMaxTrackedTextures = 256;
+
 		CommandBufferImpl( DeviceManager::Impl& manager, ImmediateCommands::CommandListWrapper& wrapper );
 
 		void CmdBeginRendering( const RenderPass& renderPass, const Framebuffer& framebuffer ) override;
@@ -58,9 +61,9 @@ namespace lightd3d12
 			return isRendering_;
 		}
 
-		const std::vector<TrackedTextureState>& GetTrackedTextures() const noexcept
+		std::span<const TrackedTextureState> GetTrackedTextures() const noexcept
 		{
-			return trackedTextures_;
+			return { trackedTextures_.data(), trackedTextureCount_ };
 		}
 
 		SubmitFixupResources BuildSubmitFixup();
@@ -74,7 +77,8 @@ namespace lightd3d12
 		ImmediateCommands::CommandListWrapper& wrapper_;
 		bool isRendering_ = false;
 		uint32_t debugGroupDepth_ = 0;
-		std::vector<TrackedTextureState> trackedTextures_;
+		std::array<TrackedTextureState, ourMaxTrackedTextures> trackedTextures_ = {};
+		uint32_t trackedTextureCount_ = 0;
 	};
 }
 

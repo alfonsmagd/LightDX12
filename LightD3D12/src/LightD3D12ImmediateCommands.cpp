@@ -7,15 +7,20 @@ namespace lightd3d12
 	ImmediateCommands::ImmediateCommands( ID3D12Device* device, ID3D12CommandQueue* queue, uint32_t numContexts ):
 		device_( device ),
 		queue_( queue ),
-		buffers_( numContexts ),
+		bufferCount_( numContexts ),
 		numAvailableCommandBuffers_( numContexts )
 	{
 		if( device_ == nullptr || queue_ == nullptr )
 		{
 			throw std::runtime_error( "ImmediateCommands requires a valid device and queue." );
 		}
+		if( numContexts == 0 || numContexts > buffers_.size() )
+		{
+			throw std::length_error(
+				"ImmediateCommands supports between 1 and 64 command buffers." );
+		}
 
-		for( uint32_t i = 0; i < buffers_.size(); ++i )
+		for( uint32_t i = 0; i < bufferCount_; ++i )
 		{
 			CommandListWrapper& buffer = buffers_[ i ];
 
@@ -50,7 +55,7 @@ namespace lightd3d12
 
 	ImmediateCommands::~ImmediateCommands()
 	{
-		for( CommandListWrapper& buffer : buffers_ )
+		for( CommandListWrapper& buffer : Buffers() )
 		{
 			if( buffer.fence_ && buffer.fence_->GetCompletedValue() < buffer.fenceValue_ )
 			{
@@ -94,7 +99,7 @@ namespace lightd3d12
 		}
 
 		CommandListWrapper* current = nullptr;
-		for( CommandListWrapper& buffer : buffers_ )
+		for( CommandListWrapper& buffer : Buffers() )
 		{
 			if( !buffer.isEncoding_ && buffer.fenceValue_ == 0 )
 			{
@@ -169,7 +174,7 @@ namespace lightd3d12
 			return true;
 		}
 
-		assert( handle.bufferIndex_ < buffers_.size() );
+		assert( handle.bufferIndex_ < bufferCount_ );
 		const CommandListWrapper& buffer = buffers_[ handle.bufferIndex_ ];
 
 		if( buffer.handle_.submitId_ != handle.submitId_ )
@@ -197,7 +202,7 @@ namespace lightd3d12
 			return;
 		}
 
-		assert( handle.bufferIndex_ < buffers_.size() );
+		assert( handle.bufferIndex_ < bufferCount_ );
 		CommandListWrapper& buffer = buffers_[ handle.bufferIndex_ ];
 		if( buffer.isEncoding_ )
 		{
@@ -213,7 +218,7 @@ namespace lightd3d12
 
 	void ImmediateCommands::WaitAll()
 	{
-		for( CommandListWrapper& buffer : buffers_ )
+		for( CommandListWrapper& buffer : Buffers() )
 		{
 			if( buffer.fenceValue_ == 0 || buffer.isEncoding_ )
 			{
@@ -232,14 +237,14 @@ namespace lightd3d12
 
 	ImmediateCommands::CommandListWrapper* ImmediateCommands::FindOldestSubmittedBuffer() noexcept
 	{
-		if( buffers_.empty() )
+		if( bufferCount_ == 0 )
 		{
 			return nullptr;
 		}
 
-		for( uint32_t i = 0; i < buffers_.size(); ++i )
+		for( uint32_t i = 0; i < bufferCount_; ++i )
 		{
-			CommandListWrapper& buffer = buffers_[ ( i + lastSubmitHandle_.bufferIndex_ + 1u ) % buffers_.size() ];
+			CommandListWrapper& buffer = buffers_[ ( i + lastSubmitHandle_.bufferIndex_ + 1u ) % bufferCount_ ];
 			if( buffer.fenceValue_ != 0 && !buffer.isEncoding_ )
 			{
 				return &buffer;
@@ -274,14 +279,14 @@ namespace lightd3d12
 
 	void ImmediateCommands::Purge()
 	{
-		if( buffers_.empty() )
+		if( bufferCount_ == 0 )
 		{
 			return;
 		}
 
-		for( uint32_t i = 0; i < buffers_.size(); ++i )
+		for( uint32_t i = 0; i < bufferCount_; ++i )
 		{
-			CommandListWrapper& buffer = buffers_[ ( i + lastSubmitHandle_.bufferIndex_ + 1u ) % buffers_.size() ];
+			CommandListWrapper& buffer = buffers_[ ( i + lastSubmitHandle_.bufferIndex_ + 1u ) % bufferCount_ ];
 			if( buffer.fenceValue_ == 0 )
 			{
 				continue;

@@ -6,7 +6,6 @@
 #include <cstring>
 #include <filesystem>
 #include <mutex>
-#include <vector>
 
 #if defined( LIGHTD3D12_ENABLE_PIX )
 	#define LIGHTD3D12_INTERNAL_PIX_ENABLED 1
@@ -19,22 +18,18 @@ namespace lightd3d12
 	namespace
 	{
 #if LIGHTD3D12_INTERNAL_PIX_ENABLED
-		std::vector<uint32_t> ParseVersionComponents( const std::wstring& versionText )
+		std::array<uint32_t, 4> ParseVersionComponents( const std::wstring& versionText )
 		{
-			std::vector<uint32_t> components;
+			std::array<uint32_t, 4> components = {};
+			uint32_t componentIndex = 0;
 			size_t start = 0;
-			while( start < versionText.size() )
+			while( start < versionText.size() && componentIndex < components.size() )
 			{
 				const size_t end = versionText.find( L'.', start );
 				const std::wstring token = versionText.substr( start, end == std::wstring::npos ? std::wstring::npos : end - start );
-				if( token.empty() )
-				{
-					components.push_back( 0 );
-				}
-				else
-				{
-					components.push_back( static_cast<uint32_t>( std::wcstoul( token.c_str(), nullptr, 10 ) ) );
-				}
+				components[ componentIndex++ ] = token.empty()
+					? 0u
+					: static_cast<uint32_t>( std::wcstoul( token.c_str(), nullptr, 10 ) );
 
 				if( end == std::wstring::npos )
 				{
@@ -47,13 +42,12 @@ namespace lightd3d12
 			return components;
 		}
 
-		bool IsVersionGreater( const std::vector<uint32_t>& left, const std::vector<uint32_t>& right )
+		bool IsVersionGreater( const std::array<uint32_t, 4>& left, const std::array<uint32_t, 4>& right )
 		{
-			const size_t count = std::max( left.size(), right.size() );
-			for( size_t index = 0; index < count; ++index )
+			for( size_t index = 0; index < left.size(); ++index )
 			{
-				const uint32_t leftValue = index < left.size() ? left[ index ] : 0u;
-				const uint32_t rightValue = index < right.size() ? right[ index ] : 0u;
+				const uint32_t leftValue = left[ index ];
+				const uint32_t rightValue = right[ index ];
 				if( leftValue != rightValue )
 				{
 					return leftValue > rightValue;
@@ -84,7 +78,7 @@ namespace lightd3d12
 				if( std::filesystem::exists( runtimeRoot ) )
 				{
 					std::filesystem::path latestRuntimePath;
-					std::vector<uint32_t> latestVersion;
+					std::array<uint32_t, 4> latestVersion = {};
 					for( const auto& entry : std::filesystem::directory_iterator( runtimeRoot ) )
 					{
 						if( !entry.is_directory() )
@@ -98,7 +92,7 @@ namespace lightd3d12
 							continue;
 						}
 
-						const std::vector<uint32_t> candidateVersion = ParseVersionComponents( entry.path().filename().wstring() );
+						const std::array<uint32_t, 4> candidateVersion = ParseVersionComponents( entry.path().filename().wstring() );
 						if( latestRuntimePath.empty() || IsVersionGreater( candidateVersion, latestVersion ) )
 						{
 							latestRuntimePath = candidateDll;
@@ -299,7 +293,8 @@ namespace lightd3d12
 
 	CommandBufferImpl::TrackedTextureState& CommandBufferImpl::GetTrackedTextureState( TextureHandle texture )
 	{
-		for( auto& trackedTexture : trackedTextures_ )
+		for( TrackedTextureState& trackedTexture :
+			std::span( trackedTextures_.data(), trackedTextureCount_ ) )
 		{
 			if( trackedTexture.handle_ == texture )
 			{
@@ -312,8 +307,14 @@ namespace lightd3d12
 		trackedTexture.handle_ = texture;
 		trackedTexture.initialState_ = resource.currentState_;
 		trackedTexture.currentState_ = resource.currentState_;
-		trackedTextures_.push_back( trackedTexture );
-		return trackedTextures_.back();
+		if( trackedTextureCount_ == trackedTextures_.size() )
+		{
+			throw std::length_error(
+				"A command buffer cannot track more than 256 textures." );
+		}
+
+		trackedTextures_[ trackedTextureCount_ ] = trackedTexture;
+		return trackedTextures_[ trackedTextureCount_++ ];
 	}
 
 	void CommandBufferImpl::TransitionTexture( TextureHandle texture, TextureResource& resource, D3D12_RESOURCE_STATES newState )
@@ -335,7 +336,7 @@ namespace lightd3d12
 	CommandBufferImpl::SubmitFixupResources CommandBufferImpl::BuildSubmitFixup()
 	{
 		bool requiresFixup = false;
-		for( const auto& trackedTexture : trackedTextures_ )
+		for( const TrackedTextureState& trackedTexture : GetTrackedTextures() )
 		{
 			const TextureResource& resource = manager_.GetTextureResource( trackedTexture.handle_ );
 			if( resource.currentState_ != trackedTexture.initialState_ )
@@ -363,7 +364,7 @@ namespace lightd3d12
 				IID_PPV_ARGS( fixup.commandList_.GetAddressOf() ) ),
 			"Failed to create command list for submit fixup." );
 
-		for( const auto& trackedTexture : trackedTextures_ )
+		for( const TrackedTextureState& trackedTexture : GetTrackedTextures() )
 		{
 			const TextureResource& resource = manager_.GetTextureResource( trackedTexture.handle_ );
 			if( resource.currentState_ == trackedTexture.initialState_ )
@@ -384,7 +385,7 @@ namespace lightd3d12
 
 	void CommandBufferImpl::CommitSubmittedTextureStates()
 	{
-		for( const auto& trackedTexture : trackedTextures_ )
+		for( const TrackedTextureState& trackedTexture : GetTrackedTextures() )
 		{
 			TextureResource& resource = manager_.GetTextureResource( trackedTexture.handle_ );
 			resource.currentState_ = trackedTexture.currentState_;

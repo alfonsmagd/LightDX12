@@ -107,8 +107,8 @@ namespace lightd3d12
 		stage.entryPoint = entryPoint;
 		stage.profile = profile;
 		stage.sourceName = resolvedPath.string();
-		stage.includeDirectories.push_back( resolvedPath.parent_path().string() );
-		stage.includeDirectories.push_back( GetInternalShaderIncludeDirectory().string() );
+		stage.includeDirectories[ 0 ] = resolvedPath.parent_path().string();
+		stage.includeDirectories[ 1 ] = GetInternalShaderIncludeDirectory().string();
 		return stage;
 	}
 

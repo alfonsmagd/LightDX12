@@ -1,9 +1,12 @@
 #pragma once
 
+#include <array>
 #include <cassert>
+#include <cstddef>
 #include <cstdint>
-#include <span>
-#include <vector>
+#include <limits>
+#include <stdexcept>
+#include <utility>
 
 namespace lightd3d12
 {
@@ -13,6 +16,8 @@ namespace lightd3d12
 	public:
 		Handle() = default;
 
+		// Reports whether this is a non-empty handle token. Use SlotMap::Contains()
+		// when the current lifetime/generation must also be validated.
 		bool Valid() const noexcept
 		{
 			return gen_ != 0;
@@ -56,16 +61,19 @@ namespace lightd3d12
 	private:
 		Handle( uint32_t index, uint32_t gen ) noexcept: index_( index ), gen_( gen ) {}
 
-		template<typename T>
+		template<typename T, std::size_t Capacity>
 		friend class SlotMap;
 
 		uint32_t index_ = 0;
 		uint32_t gen_ = 0;
 	};
 
-	template<typename ObjectType>
+	template<typename ObjectType, std::size_t Capacity>
 	class SlotMap final
 	{
+		static_assert( Capacity > 0 );
+		static_assert( Capacity <= std::numeric_limits<uint32_t>::max() );
+
 		struct Slot
 		{
 			ObjectType obj = {};
@@ -77,87 +85,77 @@ namespace lightd3d12
 		Handle<ObjectType> Create( ObjectType&& obj )
 		{
 			uint32_t index = 0;
-			if( !freeList_.empty() )
+			if( freeCount_ > 0 )
 			{
-				index = freeList_.back();
-				freeList_.pop_back();
+				index = freeList_[ freeCount_ - 1 ];
 				slots_[ index ].obj = std::move( obj );
+				--freeCount_;
 				slots_[ index ].occupied = true;
 			}
 			else
 			{
-				index = static_cast< uint32_t >( slots_.size() );
-				slots_.push_back( { std::move( obj ), 1u, true } );
+				if( slotCount_ == Capacity )
+				{
+					throw std::length_error( "LightD3D12 SlotMap capacity exhausted." );
+				}
+
+				index = slotCount_;
+				slots_[ index ].obj = std::move( obj );
+				slots_[ index ].occupied = true;
+				++slotCount_;
 			}
 
+			++objectCount_;
 			return Handle<ObjectType>( index, slots_[ index ].gen );
 		}
 
-		std::span<const ObjectType> GetSlotsSpan() const
-		{
-			static thread_local std::vector<ObjectType> ourBuffer;
-			ourBuffer.clear();
-			ourBuffer.reserve( slots_.size() );
-
-			for( const auto& slot : slots_ )
-			{
-				if( slot.occupied )
-				{
-					ourBuffer.push_back( slot.obj );
-				}
-			}
-
-			return std::span<const ObjectType>( ourBuffer.data(), ourBuffer.size() );
-		}
-
-		void Destroy( Handle<ObjectType> handle )
+		bool Contains( Handle<ObjectType> handle ) const noexcept
 		{
 			if( !handle.Valid() )
 			{
-				return;
+				return false;
 			}
 
 			const uint32_t index = handle.Index();
-			assert( index < slots_.size() );
-			assert( handle.Gen() == slots_[ index ].gen );
+			if( index >= slotCount_ )
+			{
+				return false;
+			}
 
-			slots_[ index ].obj = {};
-			slots_[ index ].gen++;
-			slots_[ index ].occupied = false;
-			freeList_.push_back( index );
+			const Slot& slot = slots_[ index ];
+			return slot.occupied && handle.Gen() == slot.gen;
+		}
+
+		bool Destroy( Handle<ObjectType> handle )
+		{
+			if( !Contains( handle ) )
+			{
+				return false;
+			}
+
+			const uint32_t index = handle.Index();
+			Slot& slot = slots_[ index ];
+			slot.obj = {};
+			IncrementGeneration( slot );
+			slot.occupied = false;
+			freeList_[ freeCount_++ ] = index;
+			--objectCount_;
+			return true;
 		}
 
 		ObjectType* Get( Handle<ObjectType> handle )
 		{
-			if( !handle.Valid() )
-			{
-				return nullptr;
-			}
-
-			const uint32_t index = handle.Index();
-			assert( index < slots_.size() );
-			assert( handle.Gen() == slots_[ index ].gen );
-			assert( slots_[ index ].occupied );
-			return &slots_[ index ].obj;
+			return Contains( handle ) ? &slots_[ handle.Index() ].obj : nullptr;
 		}
 
 		const ObjectType* Get( Handle<ObjectType> handle ) const
 		{
-			if( !handle.Valid() )
-			{
-				return nullptr;
-			}
-
-			const uint32_t index = handle.Index();
-			assert( index < slots_.size() );
-			assert( handle.Gen() == slots_[ index ].gen );
-			assert( slots_[ index ].occupied );
-			return &slots_[ index ].obj;
+			return Contains( handle ) ? &slots_[ handle.Index() ].obj : nullptr;
 		}
 
 		ObjectType* GetByIndex( uint32_t index )
 		{
-			if( index >= slots_.size() )
+			if( index >= slotCount_ )
 			{
 				return nullptr;
 			}
@@ -173,7 +171,7 @@ namespace lightd3d12
 
 		const ObjectType* GetByIndex( uint32_t index ) const
 		{
-			if( index >= slots_.size() )
+			if( index >= slotCount_ )
 			{
 				return nullptr;
 			}
@@ -194,7 +192,7 @@ namespace lightd3d12
 				return {};
 			}
 
-			for( uint32_t i = 0; i < slots_.size(); ++i )
+			for( uint32_t i = 0; i < slotCount_; ++i )
 			{
 				if( slots_[ i ].occupied && &slots_[ i ].obj == obj )
 				{
@@ -207,39 +205,83 @@ namespace lightd3d12
 
 		uint32_t NumObjects() const noexcept
 		{
-			return static_cast< uint32_t >( slots_.size() - freeList_.size() );
+			return objectCount_;
 		}
 
 		void Clear()
 		{
-			slots_.clear();
-			freeList_.clear();
-		}
-
-		std::vector<ObjectType*> GetAll()
-		{
-			std::vector<ObjectType*> result;
-			result.reserve( slots_.size() );
-
-			for( auto& slot : slots_ )
+			for( uint32_t i = 0; i < slotCount_; ++i )
 			{
+				Slot& slot = slots_[ i ];
 				if( slot.occupied )
 				{
-					result.push_back( &slot.obj );
+					slot.obj = {};
+					IncrementGeneration( slot );
+					slot.occupied = false;
 				}
 			}
 
-			return result;
+			slotCount_ = 0;
+			freeCount_ = 0;
+			objectCount_ = 0;
+		}
+
+		template<typename Function>
+		void ForEach( Function&& function )
+		{
+			for( uint32_t i = 0; i < slotCount_; ++i )
+			{
+				Slot& slot = slots_[ i ];
+				if( slot.occupied )
+				{
+					std::forward<Function>( function )( slot.obj );
+				}
+			}
+		}
+
+		template<typename Function>
+		void ForEach( Function&& function ) const
+		{
+			for( uint32_t i = 0; i < slotCount_; ++i )
+			{
+				const Slot& slot = slots_[ i ];
+				if( slot.occupied )
+				{
+					std::forward<Function>( function )( slot.obj );
+				}
+			}
 		}
 
 		uint32_t Size() const noexcept
 		{
-			return static_cast< uint32_t >( slots_.size() - freeList_.size() );
+			return objectCount_;
+		}
+
+		bool Empty() const noexcept
+		{
+			return objectCount_ == 0;
+		}
+
+		static constexpr std::size_t MaxSize() noexcept
+		{
+			return Capacity;
 		}
 
 	private:
-		std::vector<Slot> slots_;
-		std::vector<uint32_t> freeList_;
+		static void IncrementGeneration( Slot& slot ) noexcept
+		{
+			++slot.gen;
+			if( slot.gen == 0 )
+			{
+				slot.gen = 1;
+			}
+		}
+
+		std::array<Slot, Capacity> slots_ = {};
+		std::array<uint32_t, Capacity> freeList_ = {};
+		uint32_t slotCount_ = 0;
+		uint32_t freeCount_ = 0;
+		uint32_t objectCount_ = 0;
 	};
 
 	static_assert( sizeof( Handle<class SlotMapTestTag> ) == sizeof( uint64_t ) );

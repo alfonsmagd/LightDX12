@@ -2,7 +2,7 @@
 
 **A small, explicit and bindless-oriented Direct3D 12 abstraction for learning, experimentation and rapid renderer prototyping.**
 
-`LightDX12` is the repository; `LightD3D12` is the graphics library inside it. The project deliberately keeps its surface area compact: one library, two focused samples and one batch file that generates a Visual Studio solution.
+`LightDX12` is the repository; `LightD3D12` is the graphics library inside it. The renderer stays compact, while optional application facilities live in the separate `App` target.
 
 ## Origin
 
@@ -77,6 +77,7 @@ Under that interface, LightD3D12 manages the Direct3D 12 device, swapchains, des
 | --- | --- |
 | `Triangle` | Win32 setup, device and swapchain creation, runtime HLSL compilation, pipeline creation, command recording and presentation. |
 | `CBSRVCubes` | Instanced procedural cubes, a structured buffer exposed through an SRV, constant-buffer data exposed through a CBV, fixed bindless slots, push constants and depth rendering. |
+| `ImGuiNodeEditor` | Typed visual node graph implemented with ImGui: constants, arithmetic, `Vector3(X,Y,Z)`, links, cycle validation and live evaluation. |
 
 The small sample count is intentional: each example is meant to explain one rendering path without bringing unrelated systems into the repository.
 
@@ -101,7 +102,7 @@ The script creates:
 build\LightDX12.sln
 ```
 
-The generated solution contains the `LightD3D12`, `Triangle` and `CBSRVCubes` targets. You can also build from the command line:
+The generated solution contains the renderer, application layer, and sample targets. `Triangle` is the startup project. You can also build from the command line:
 
 ```bat
 cmake --build build --config Debug --parallel
@@ -111,10 +112,13 @@ cmake --build build --config Debug --parallel
 
 ```text
 LightDX12/
+|-- App/                 Optional high-level jobs, HTTP, OBJ, UI and camera layer
 |-- LightD3D12/          Core library, public headers and internal shaders
 |-- samples/
 |   |-- Triangle/        Minimal draw-and-present path
-|   `-- CBSRVCubes/      Bindless CBV/SRV resource example
+|   |-- CBSRVCubes/      Bindless CBV/SRV resource example
+|   `-- ImGuiNodeEditor/ Typed visual node graph example
+|-- third_party/imgui/   Dear ImGui core and Win32/DX12 backends
 |-- CMakeLists.txt
 `-- GenerateSolution.bat
 ```
