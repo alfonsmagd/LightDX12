@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(LightDX12 LANGUAGES CXX)
+project(LightDX12 LANGUAGES C CXX)
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 option(BUILD_TESTING "Build the LightDX12 test projects" ON)
@@ -27,6 +27,23 @@ FetchContent_Declare(
     GIT_SHALLOW FALSE
 )
 FetchContent_MakeAvailable(enkiTS)
+
+set(MINIAUDIO_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(MINIAUDIO_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(MINIAUDIO_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
+set(MINIAUDIO_INSTALL OFF CACHE BOOL "" FORCE)
+set(MINIAUDIO_NO_EXTRA_NODES ON CACHE BOOL "" FORCE)
+set(MINIAUDIO_NO_LIBVORBIS ON CACHE BOOL "" FORCE)
+set(MINIAUDIO_NO_LIBOPUS ON CACHE BOOL "" FORCE)
+set(MINIAUDIO_ENABLE_ONLY_SPECIFIC_BACKENDS ON CACHE BOOL "" FORCE)
+set(MINIAUDIO_ENABLE_WASAPI ON CACHE BOOL "" FORCE)
+FetchContent_Declare(
+    miniaudio
+    GIT_REPOSITORY https://github.com/mackron/miniaudio.git
+    GIT_TAG 0.11.25
+    GIT_SHALLOW TRUE
+)
+FetchContent_MakeAvailable(miniaudio)
 
 set(LIGHTD3D12_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/LightD3D12")
 
@@ -193,6 +210,79 @@ if(MSVC)
     target_compile_options(ImGuiNodeEditor PRIVATE /W4 /EHsc /permissive- /MP)
 endif()
 
+set(FRONTIER_RIDERS_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/samples/FrontierRiders2D")
+set(FRONTIER_RIDERS_SHADER "${FRONTIER_RIDERS_ROOT}/shaders/Sprite2D.hlsl")
+set(FRONTIER_RIDERS_SPRITES "${FRONTIER_RIDERS_ROOT}/assets/cowboy_sheet.png")
+set(FRONTIER_RIDERS_BACKGROUND "${FRONTIER_RIDERS_ROOT}/assets/western_level_background_v2.png")
+set(FRONTIER_RIDERS_MIDGROUND "${FRONTIER_RIDERS_ROOT}/assets/western_midground_v3.png")
+set(FRONTIER_RIDERS_FOREGROUND "${FRONTIER_RIDERS_ROOT}/assets/western_ground_foreground_v2.png")
+set(FRONTIER_RIDERS_ART_PROMPTS "${FRONTIER_RIDERS_ROOT}/assets/ART_PROMPTS.md")
+set_source_files_properties(
+    "${FRONTIER_RIDERS_SHADER}"
+    "${FRONTIER_RIDERS_SPRITES}"
+    "${FRONTIER_RIDERS_BACKGROUND}"
+    "${FRONTIER_RIDERS_MIDGROUND}"
+    "${FRONTIER_RIDERS_FOREGROUND}"
+    "${FRONTIER_RIDERS_ART_PROMPTS}"
+    PROPERTIES HEADER_FILE_ONLY TRUE
+)
+add_executable(FrontierRiders2D WIN32
+    "${FRONTIER_RIDERS_ROOT}/main.cpp"
+    "${FRONTIER_RIDERS_ROOT}/AudioManager2D.hpp"
+    "${FRONTIER_RIDERS_ROOT}/AudioManager2D.cpp"
+    "${FRONTIER_RIDERS_ROOT}/FrontierApplication.hpp"
+    "${FRONTIER_RIDERS_ROOT}/FrontierApplication.cpp"
+    "${FRONTIER_RIDERS_ROOT}/FrontierEvents.hpp"
+    "${FRONTIER_RIDERS_ROOT}/FrontierWorld.hpp"
+    "${FRONTIER_RIDERS_ROOT}/FrontierPhysics.hpp"
+    "${FRONTIER_RIDERS_ROOT}/FrontierPhysics.cpp"
+    "${FRONTIER_RIDERS_ROOT}/FrontierRenderQueue.hpp"
+    "${FRONTIER_RIDERS_ROOT}/FrontierRenderQueue.cpp"
+    "${FRONTIER_RIDERS_ROOT}/FrontierRun.hpp"
+    "${FRONTIER_RIDERS_ROOT}/FrontierRun.cpp"
+    "${FRONTIER_RIDERS_ROOT}/FrontierRenderer.hpp"
+    "${FRONTIER_RIDERS_ROOT}/FrontierRenderer.cpp"
+    "${FRONTIER_RIDERS_ROOT}/README.md"
+    "${FRONTIER_RIDERS_SHADER}"
+    "${FRONTIER_RIDERS_SPRITES}"
+    "${FRONTIER_RIDERS_BACKGROUND}"
+    "${FRONTIER_RIDERS_MIDGROUND}"
+    "${FRONTIER_RIDERS_FOREGROUND}"
+    "${FRONTIER_RIDERS_ART_PROMPTS}"
+)
+target_compile_features(FrontierRiders2D PRIVATE cxx_std_20)
+target_compile_definitions(FrontierRiders2D
+    PRIVATE
+        MA_ENABLE_ONLY_SPECIFIC_BACKENDS
+        MA_ENABLE_WASAPI
+)
+target_link_libraries(FrontierRiders2D PRIVATE LightDX12::App miniaudio windowscodecs ole32)
+if(MSVC)
+    target_compile_options(FrontierRiders2D PRIVATE /W4 /EHsc /permissive- /MP)
+endif()
+add_custom_command(TARGET FrontierRiders2D POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:FrontierRiders2D>/assets"
+    COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:FrontierRiders2D>/shaders"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${FRONTIER_RIDERS_SPRITES}"
+        "$<TARGET_FILE_DIR:FrontierRiders2D>/assets/cowboy_sheet.png"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${FRONTIER_RIDERS_SHADER}"
+        "$<TARGET_FILE_DIR:FrontierRiders2D>/shaders/Sprite2D.hlsl"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${FRONTIER_RIDERS_BACKGROUND}"
+        "$<TARGET_FILE_DIR:FrontierRiders2D>/assets/western_level_background_v2.png"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${FRONTIER_RIDERS_MIDGROUND}"
+        "$<TARGET_FILE_DIR:FrontierRiders2D>/assets/western_midground_v3.png"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${FRONTIER_RIDERS_FOREGROUND}"
+        "$<TARGET_FILE_DIR:FrontierRiders2D>/assets/western_ground_foreground_v2.png"
+)
+set_target_properties(FrontierRiders2D PROPERTIES
+    VS_DEBUGGER_WORKING_DIRECTORY "$<TARGET_FILE_DIR:FrontierRiders2D>"
+)
+
 if(BUILD_TESTING)
 	add_executable(LightDX12Tests
 		"${CMAKE_CURRENT_SOURCE_DIR}/tests/LightDX12Tests.cpp"
@@ -222,7 +312,10 @@ endif()
 
 set_target_properties(LightD3D12 PROPERTIES FOLDER "API")
 set_target_properties(App PROPERTIES FOLDER "App")
-set_target_properties(Triangle CBSRVCubes ImGuiNodeEditor PROPERTIES
+if(TARGET miniaudio)
+    set_target_properties(miniaudio PROPERTIES FOLDER "third_party")
+endif()
+set_target_properties(Triangle CBSRVCubes ImGuiNodeEditor FrontierRiders2D PROPERTIES
 	FOLDER "examples"
 )
 
@@ -241,6 +334,28 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES
     ${APP_SOURCES}
     "${CMAKE_CURRENT_SOURCE_DIR}/samples/ImGuiNodeEditor/main.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/samples/ImGuiNodeEditor/README.md"
+    "${FRONTIER_RIDERS_ROOT}/main.cpp"
+    "${FRONTIER_RIDERS_ROOT}/AudioManager2D.hpp"
+    "${FRONTIER_RIDERS_ROOT}/AudioManager2D.cpp"
+    "${FRONTIER_RIDERS_ROOT}/FrontierApplication.hpp"
+    "${FRONTIER_RIDERS_ROOT}/FrontierApplication.cpp"
+    "${FRONTIER_RIDERS_ROOT}/FrontierEvents.hpp"
+    "${FRONTIER_RIDERS_ROOT}/FrontierWorld.hpp"
+    "${FRONTIER_RIDERS_ROOT}/FrontierPhysics.hpp"
+    "${FRONTIER_RIDERS_ROOT}/FrontierPhysics.cpp"
+    "${FRONTIER_RIDERS_ROOT}/FrontierRenderQueue.hpp"
+    "${FRONTIER_RIDERS_ROOT}/FrontierRenderQueue.cpp"
+    "${FRONTIER_RIDERS_ROOT}/FrontierRun.hpp"
+    "${FRONTIER_RIDERS_ROOT}/FrontierRun.cpp"
+    "${FRONTIER_RIDERS_ROOT}/FrontierRenderer.hpp"
+    "${FRONTIER_RIDERS_ROOT}/FrontierRenderer.cpp"
+    "${FRONTIER_RIDERS_ROOT}/README.md"
+    "${FRONTIER_RIDERS_SHADER}"
+    "${FRONTIER_RIDERS_SPRITES}"
+    "${FRONTIER_RIDERS_BACKGROUND}"
+    "${FRONTIER_RIDERS_MIDGROUND}"
+    "${FRONTIER_RIDERS_FOREGROUND}"
+    "${FRONTIER_RIDERS_ART_PROMPTS}"
 	"${CMAKE_CURRENT_SOURCE_DIR}/tests/LightDX12Tests.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/tests/AppSmokeTests.cpp"
 )

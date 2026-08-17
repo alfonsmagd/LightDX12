@@ -78,6 +78,7 @@ Under that interface, LightD3D12 manages the Direct3D 12 device, swapchains, des
 | `Triangle` | Win32 setup, device and swapchain creation, runtime HLSL compilation, pipeline creation, command recording and presentation. |
 | `CBSRVCubes` | Instanced procedural cubes, a structured buffer exposed through an SRV, constant-buffer data exposed through a CBV, fixed bindless slots, push constants and depth rendering. |
 | `ImGuiNodeEditor` | Typed visual node graph implemented with ImGui: constants, arithmetic, `Vector3(X,Y,Z)`, links, cycle validation and live evaluation. |
+| `FrontierRiders2D` | Playable western 2D vertical slice with sprite rendering, physics, particles, HUD and fire-and-forget audio. |
 
 The small sample count is intentional: each example is meant to explain one rendering path without bringing unrelated systems into the repository.
 
@@ -117,7 +118,8 @@ LightDX12/
 |-- samples/
 |   |-- Triangle/        Minimal draw-and-present path
 |   |-- CBSRVCubes/      Bindless CBV/SRV resource example
-|   `-- ImGuiNodeEditor/ Typed visual node graph example
+|   |-- ImGuiNodeEditor/ Typed visual node graph example
+|   `-- FrontierRiders2D/ Playable 2D game branch
 |-- third_party/imgui/   Dear ImGui core and Win32/DX12 backends
 |-- CMakeLists.txt
 `-- GenerateSolution.bat
