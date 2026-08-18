@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cstdio>
 
 #include "LightD3D12BaseMips.hpp"
 #include "LightD3D12ManagerImpl.hpp"
@@ -11,6 +12,28 @@ namespace lightd3d12
 {
 	namespace
 	{
+		void ReportInvalidDestroy(
+			const char* resourceType,
+			uint32_t index,
+			uint32_t generation ) noexcept
+		{
+#if defined( _DEBUG )
+			char message[ 192 ]{};
+			std::snprintf(
+				message,
+				sizeof( message ),
+				"LightD3D12 warning: ignored Destroy(%s) for an invalid or stale handle [index=%u, generation=%u].\n",
+				resourceType,
+				index,
+				generation );
+			OutputDebugStringA( message );
+#else
+			static_cast<void>( resourceType );
+			static_cast<void>( index );
+			static_cast<void>( generation );
+#endif
+		}
+
 		struct TextureCreationPlan final
 		{
 			uint16_t mipLevels_ = 1;
@@ -1118,15 +1141,28 @@ namespace lightd3d12
 		return manager_->impl_->bindlessSupported_;
 	}
 
+	bool RenderDevice::IsAlive( BufferHandle buffer ) const noexcept
+	{
+		return manager_ != nullptr && manager_->impl_ != nullptr &&
+			manager_->impl_->slotMapBuffers_.Contains( buffer );
+	}
+
+	bool RenderDevice::IsAlive( TextureHandle texture ) const noexcept
+	{
+		return manager_ != nullptr && manager_->impl_ != nullptr &&
+			manager_->impl_->slotMapTextures_.Contains( texture );
+	}
+
 	void RenderDevice::WaitIdle() { manager_->impl_->WaitIdle(); }
 
-	void RenderDevice::Destroy( BufferHandle buffer )
+	bool RenderDevice::Destroy( BufferHandle buffer )
 	{
 		DeviceManager::Impl& impl = *manager_->impl_;
 		BufferResource* resource = impl.slotMapBuffers_.Get( buffer );
 		if( resource == nullptr )
 		{
-			return;
+			ReportInvalidDestroy( "BufferHandle", buffer.Index(), buffer.Gen() );
+			return false;
 		}
 
 		DeviceManager::Impl::QueueContext& graphicsQueue =
@@ -1167,15 +1203,18 @@ namespace lightd3d12
 		{
 			impl.AddDeferredRelease( releaseHandle, std::move( release ) );
 		}
+
+		return true;
 	}
 
-	void RenderDevice::Destroy( TextureHandle texture )
+	bool RenderDevice::Destroy( TextureHandle texture )
 	{
 		DeviceManager::Impl& impl = *manager_->impl_;
 		TextureResource* resource = impl.slotMapTextures_.Get( texture );
 		if( resource == nullptr )
 		{
-			return;
+			ReportInvalidDestroy( "TextureHandle", texture.Index(), texture.Gen() );
+			return false;
 		}
 		if( resource->isSwapchainImage_ )
 			throw std::runtime_error(
@@ -1222,5 +1261,7 @@ namespace lightd3d12
 		{
 			impl.AddDeferredRelease( releaseHandle, std::move( release ) );
 		}
+
+		return true;
 	}
 } // namespace lightd3d12

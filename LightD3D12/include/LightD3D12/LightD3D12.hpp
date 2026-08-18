@@ -462,9 +462,11 @@ namespace lightd3d12
 		ID3D12CommandQueue* GetNativeCommandQueue() const noexcept;
 		ID3D12Resource* GetNativeTextureResource( TextureHandle texture ) const;
 		bool BindlessSupported() const noexcept;
+		bool IsAlive( BufferHandle buffer ) const noexcept;
+		bool IsAlive( TextureHandle texture ) const noexcept;
 		void WaitIdle();
-		void Destroy( BufferHandle buffer );
-		void Destroy( TextureHandle texture );
+		bool Destroy( BufferHandle buffer );
+		bool Destroy( TextureHandle texture );
 
 	private:
 		friend class DeviceManager;
