@@ -713,6 +713,21 @@ namespace lightd3d12
 
 	}
 
+	bool RenderDevice::IsReady( SubmitHandle submission ) const
+	{
+		DeviceManager::Impl::QueueContext& graphicsQueue =
+			manager_->impl_->GetGraphicsQueueContext();
+		return graphicsQueue.immediateCommands_->IsReady( submission );
+	}
+
+	void RenderDevice::Wait( SubmitHandle submission ) const
+	{
+		DeviceManager::Impl::QueueContext& graphicsQueue =
+			manager_->impl_->GetGraphicsQueueContext();
+		graphicsQueue.immediateCommands_->Wait( submission );
+		manager_->impl_->ProcessDeferredReleases( graphicsQueue );
+	}
+
 	RenderPipelineState
 		RenderDevice::CreateRenderPipeline( const RenderPipelineDesc& desc )
 	{

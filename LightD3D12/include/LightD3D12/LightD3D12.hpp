@@ -438,6 +438,8 @@ namespace lightd3d12
 		SubmitHandle Submit( ICommandBuffer& buffer ) const;
 		SubmitHandle SubmitAndPresent( ICommandBuffer& buffer, SwapchainHandle swapchain );
 		void Present( SwapchainHandle swapchain ) const;
+		bool IsReady( SubmitHandle submission ) const;
+		void Wait( SubmitHandle submission ) const;
 
 		RenderPipelineState CreateRenderPipeline( const RenderPipelineDesc& desc );
 		ComputePipelineState CreateComputePipeline( const ComputePipelineDesc& desc );
