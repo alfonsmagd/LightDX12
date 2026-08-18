@@ -193,10 +193,23 @@ if(MSVC)
     target_compile_options(ImGuiNodeEditor PRIVATE /W4 /EHsc /permissive- /MP)
 endif()
 
+set(LIGHTDX12_CORE_TEST_SOURCES
+	"${CMAKE_CURRENT_SOURCE_DIR}/tests/LightDX12Tests.cpp"
+	"${CMAKE_CURRENT_SOURCE_DIR}/tests/LightDX12/TestTemplate.hpp"
+	"${CMAKE_CURRENT_SOURCE_DIR}/tests/LightDX12/SlotMapCreationTest.cpp"
+	"${CMAKE_CURRENT_SOURCE_DIR}/tests/LightDX12/SlotMapDestroyTest.cpp"
+	"${CMAKE_CURRENT_SOURCE_DIR}/tests/LightDX12/SlotMapStaleHandleTest.cpp"
+	"${CMAKE_CURRENT_SOURCE_DIR}/tests/LightDX12/SlotMapCapacityTest.cpp"
+	"${CMAKE_CURRENT_SOURCE_DIR}/tests/LightDX12/SlotMapVirtualObjectTest.cpp"
+	"${CMAKE_CURRENT_SOURCE_DIR}/tests/LightDX12/PublicArrayTest.cpp"
+	"${CMAKE_CURRENT_SOURCE_DIR}/tests/LightDX12/GpuResourceLifecycleTest.cpp"
+	"${CMAKE_CURRENT_SOURCE_DIR}/tests/LightDX12/GpuInvalidHandleTest.cpp"
+	"${CMAKE_CURRENT_SOURCE_DIR}/tests/LightDX12/GpuSubmissionTest.cpp"
+	"${CMAKE_CURRENT_SOURCE_DIR}/tests/LightDX12/GpuDescriptorRecyclingTest.cpp"
+)
+
 if(BUILD_TESTING)
-	add_executable(LightDX12Tests
-		"${CMAKE_CURRENT_SOURCE_DIR}/tests/LightDX12Tests.cpp"
-	)
+	add_executable(LightDX12Tests ${LIGHTDX12_CORE_TEST_SOURCES})
 	target_compile_features(LightDX12Tests PRIVATE cxx_std_20)
 	target_link_libraries(LightDX12Tests PRIVATE LightD3D12::LightD3D12)
 	if(MSVC)
@@ -241,6 +254,6 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES
     ${APP_SOURCES}
     "${CMAKE_CURRENT_SOURCE_DIR}/samples/ImGuiNodeEditor/main.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/samples/ImGuiNodeEditor/README.md"
-	"${CMAKE_CURRENT_SOURCE_DIR}/tests/LightDX12Tests.cpp"
+	${LIGHTDX12_CORE_TEST_SOURCES}
     "${CMAKE_CURRENT_SOURCE_DIR}/tests/AppSmokeTests.cpp"
 )
