@@ -23,12 +23,6 @@ namespace lightd3d12
 			bool isEncoding_ = false;
 		};
 
-		struct CommandBufferSubmission final
-		{
-			CommandListWrapper* commandBuffer_ = nullptr;
-			ID3D12CommandList* stateFixupCommandList_ = nullptr;
-		};
-
 		ImmediateCommands( ID3D12Device* device, ID3D12CommandQueue* queue, uint32_t numContexts );
 		~ImmediateCommands();
 		ImmediateCommands( const ImmediateCommands& ) = delete;
@@ -36,8 +30,7 @@ namespace lightd3d12
 
 		CommandListWrapper& Acquire();
 		SubmitHandle Submit( CommandListWrapper& wrapper );
-		SubmitHandle Submit( CommandListWrapper& wrapper, ID3D12CommandList* stateFixupCommandList );
-		SubmitHandle SubmitBatch( std::span<const CommandBufferSubmission> commandBuffers );
+		SubmitHandle Submit( CommandListWrapper& wrapper, ID3D12CommandList* submitPrologue );
 		SubmitHandle GetLastSubmitHandle() const noexcept;
 		SubmitHandle GetNextSubmitHandle() const noexcept;
 		bool IsReady( SubmitHandle handle, bool fastCheckNoD3D12 = false ) const;

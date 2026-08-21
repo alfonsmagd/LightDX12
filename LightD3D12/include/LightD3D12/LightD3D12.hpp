@@ -3,7 +3,6 @@
 #include <array>
 #include <cstdint>
 #include <memory>
-#include <span>
 #include <string>
 #include <string_view>
 
@@ -437,7 +436,6 @@ namespace lightd3d12
 		TextureHandle GetCurrentSwapchainTexture( SwapchainHandle swapchain = {} ) const;
 		SubmitHandle Submit( ICommandBuffer& buffer, TextureHandle presentTexture );
 		SubmitHandle Submit( ICommandBuffer& buffer ) const;
-		SubmitHandle SubmitBatch( std::span<ICommandBuffer* const> commandBuffers ) const;
 		SubmitHandle SubmitAndPresent( ICommandBuffer& buffer, SwapchainHandle swapchain );
 		void Present( SwapchainHandle swapchain ) const;
 		bool IsReady( SubmitHandle submission ) const;

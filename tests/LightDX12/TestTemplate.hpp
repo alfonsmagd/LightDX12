@@ -101,6 +101,5 @@ namespace lightd3d12::tests
 	void TestGpuResourceLifecycleAndProperties();
 	void TestGpuInvalidHandleSafety();
 	void TestGpuSubmissionSynchronization();
-	void TestGpuBatchSubmission();
 	void TestGpuDescriptorRecycling();
 }

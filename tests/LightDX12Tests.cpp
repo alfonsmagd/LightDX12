@@ -8,7 +8,7 @@ using namespace lightd3d12::tests;
 
 int main()
 {
-	const std::array<TestCase, 11> tests = {
+	const std::array<TestCase, 10> tests = {
 		TestCase{ "SlotMap creation and properties", TestSlotMapCreationAndProperties },
 		TestCase{ "SlotMap destruction and reuse", TestSlotMapDestroyAndReuse },
 		TestCase{ "SlotMap stale-handle safety", TestSlotMapStaleHandleSafety },
@@ -18,7 +18,6 @@ int main()
 		TestCase{ "GPU resource lifecycle and properties", TestGpuResourceLifecycleAndProperties },
 		TestCase{ "GPU invalid-handle safety", TestGpuInvalidHandleSafety },
 		TestCase{ "GPU submission synchronization", TestGpuSubmissionSynchronization },
-		TestCase{ "GPU batch submission", TestGpuBatchSubmission },
 		TestCase{ "GPU descriptor recycling", TestGpuDescriptorRecycling }
 	};
 
