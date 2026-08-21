@@ -205,6 +205,7 @@ set(LIGHTDX12_CORE_TEST_SOURCES
 	"${CMAKE_CURRENT_SOURCE_DIR}/tests/LightDX12/GpuResourceLifecycleTest.cpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/tests/LightDX12/GpuInvalidHandleTest.cpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/tests/LightDX12/GpuSubmissionTest.cpp"
+	"${CMAKE_CURRENT_SOURCE_DIR}/tests/LightDX12/GpuBatchSubmissionTest.cpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/tests/LightDX12/GpuDescriptorRecyclingTest.cpp"
 )
 

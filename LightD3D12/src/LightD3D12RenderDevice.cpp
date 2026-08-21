@@ -681,6 +681,94 @@ namespace lightd3d12
 		return handle;
 
 	}
+
+	SubmitHandle RenderDevice::SubmitBatch( std::span<ICommandBuffer* const> commandBuffers ) const
+	{
+		if( commandBuffers.empty() )
+		{
+			return {};
+		}
+		if( commandBuffers.size() > DeviceManager::Impl::ourMaxActiveCommandBuffers )
+		{
+			throw std::length_error( "RenderDevice supports batches of up to 64 command buffers." );
+		}
+
+		DeviceManager::Impl& impl = *manager_->impl_;
+		DeviceManager::Impl::QueueContext& graphicsQueue = impl.GetGraphicsQueueContext();
+		std::array<CommandBufferImpl*, DeviceManager::Impl::ourMaxActiveCommandBuffers> buffers{};
+		std::array<std::unique_ptr<CommandBufferImpl>*, DeviceManager::Impl::ourMaxActiveCommandBuffers> activeSlots{};
+		const uint32_t commandBufferCount = static_cast<uint32_t>( commandBuffers.size() );
+
+		for( uint32_t index = 0; index < commandBufferCount; ++index )
+		{
+			ICommandBuffer* buffer = commandBuffers[ index ];
+			if( buffer == nullptr )
+			{
+				throw std::invalid_argument( "SubmitBatch received a null command buffer." );
+			}
+
+			CommandBufferImpl* commandBuffer = dynamic_cast<CommandBufferImpl*>( buffer );
+			if( commandBuffer == nullptr )
+			{
+				throw std::runtime_error( "A command buffer does not belong to this render device." );
+			}
+			for( uint32_t previous = 0; previous < index; ++previous )
+			{
+				if( buffers[ previous ] == commandBuffer )
+				{
+					throw std::invalid_argument( "SubmitBatch cannot submit the same command buffer twice." );
+				}
+			}
+
+			for( std::unique_ptr<CommandBufferImpl>& activeCommandBuffer : graphicsQueue.activeCommandBuffers_ )
+			{
+				if( activeCommandBuffer.get() == commandBuffer )
+				{
+					activeSlots[ index ] = &activeCommandBuffer;
+					break;
+				}
+			}
+			if( activeSlots[ index ] == nullptr )
+			{
+				throw std::runtime_error( "A command buffer does not belong to this render device." );
+			}
+			if( commandBuffer->IsRendering() )
+			{
+				throw std::runtime_error( "Cannot submit a command buffer while a render pass is still active." );
+			}
+
+			buffers[ index ] = commandBuffer;
+		}
+
+		std::array<CommandBufferImpl::SubmitFixupResources, DeviceManager::Impl::ourMaxActiveCommandBuffers> stateFixups{};
+		std::array<ImmediateCommands::CommandBufferSubmission, DeviceManager::Impl::ourMaxActiveCommandBuffers> submissions{};
+		for( uint32_t index = 0; index < commandBufferCount; ++index )
+		{
+			stateFixups[ index ] = buffers[ index ]->BuildSubmitFixup();
+			submissions[ index ].commandBuffer_ = &buffers[ index ]->Wrapper();
+			submissions[ index ].stateFixupCommandList_ = stateFixups[ index ].commandList_.Get();
+			buffers[ index ]->CommitSubmittedTextureStates();
+		}
+
+		const SubmitHandle handle = graphicsQueue.immediateCommands_->SubmitBatch(
+			std::span<const ImmediateCommands::CommandBufferSubmission>( submissions.data(), commandBufferCount ) );
+		for( uint32_t index = 0; index < commandBufferCount; ++index )
+		{
+			if( stateFixups[ index ].Valid() )
+			{
+				impl.AddDeferredRelease( handle, [ allocator = std::move( stateFixups[ index ].allocator_ ),
+					commandList = std::move( stateFixups[ index ].commandList_ ) ]() mutable
+				{
+					commandList.Reset();
+					allocator.Reset();
+				} );
+			}
+			activeSlots[ index ]->reset();
+		}
+
+		return handle;
+	}
+
 	SubmitHandle RenderDevice::SubmitAndPresent( ICommandBuffer& buffer, SwapchainHandle swapchain )
 	{
 		const TextureHandle presentTexture = GetCurrentSwapchainTexture( swapchain );

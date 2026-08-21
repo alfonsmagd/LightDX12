@@ -126,7 +126,7 @@ namespace lightd3d12
 		return Submit( wrapper, nullptr );
 	}
 
-	SubmitHandle ImmediateCommands::Submit( CommandListWrapper& wrapper, ID3D12CommandList* submitPrologue )
+	SubmitHandle ImmediateCommands::Submit( CommandListWrapper& wrapper, ID3D12CommandList* stateFixupCommandList )
 	{
 		assert( wrapper.isEncoding_ );
 
@@ -134,24 +134,71 @@ namespace lightd3d12
 
 		std::array<ID3D12CommandList*, 2> commandLists = {};
 		uint32_t numCommandLists = 0;
-		if( submitPrologue != nullptr )
+		if( stateFixupCommandList != nullptr )
 		{
-			commandLists[ numCommandLists++ ] = submitPrologue;
+			commandLists[ numCommandLists++ ] = stateFixupCommandList;
 		}
 		commandLists[ numCommandLists++ ] = wrapper.commandList_.Get();
 
 		queue_->ExecuteCommandLists( numCommandLists, commandLists.data() );
 		C_RESULT( queue_->Signal( wrapper.fence_.Get(), fenceCounter_ ), "Failed to signal immediate command fence." );
 
+		wrapper.handle_.submitId_ = fenceCounter_;
 		wrapper.fenceValue_ = fenceCounter_;
 		wrapper.isEncoding_ = false;
 		lastSubmitHandle_ = wrapper.handle_;
-		lastSubmitHandle_.submitId_ = fenceCounter_;
 
 		fenceCounter_++;
 		if( fenceCounter_ == 0 )
 		{
 			fenceCounter_++;
+		}
+
+		return lastSubmitHandle_;
+	}
+
+	SubmitHandle ImmediateCommands::SubmitBatch( std::span<const CommandBufferSubmission> commandBuffers )
+	{
+		if( commandBuffers.empty() )
+		{
+			return {};
+		}
+		if( commandBuffers.size() > ourMaxCommandBuffers )
+		{
+			throw std::length_error( "ImmediateCommands supports batches of up to 64 command buffers." );
+		}
+
+		std::array<ID3D12CommandList*, ourMaxCommandBuffers * 2> commandLists{};
+		uint32_t commandListCount = 0;
+		for( const CommandBufferSubmission& submission : commandBuffers )
+		{
+			assert( submission.commandBuffer_ != nullptr );
+			assert( submission.commandBuffer_->isEncoding_ );
+
+			C_RESULT( submission.commandBuffer_->commandList_->Close(), "Failed to close immediate command list." );
+			if( submission.stateFixupCommandList_ != nullptr )
+			{
+				commandLists[ commandListCount++ ] = submission.stateFixupCommandList_;
+			}
+			commandLists[ commandListCount++ ] = submission.commandBuffer_->commandList_.Get();
+		}
+
+		queue_->ExecuteCommandLists( commandListCount, commandLists.data() );
+		for( const CommandBufferSubmission& submission : commandBuffers )
+		{
+			CommandListWrapper& wrapper = *submission.commandBuffer_;
+			C_RESULT( queue_->Signal( wrapper.fence_.Get(), fenceCounter_ ), "Failed to signal immediate command fence." );
+
+			wrapper.handle_.submitId_ = fenceCounter_;
+			wrapper.fenceValue_ = fenceCounter_;
+			wrapper.isEncoding_ = false;
+			lastSubmitHandle_ = wrapper.handle_;
+
+			fenceCounter_++;
+			if( fenceCounter_ == 0 )
+			{
+				fenceCounter_++;
+			}
 		}
 
 		return lastSubmitHandle_;
