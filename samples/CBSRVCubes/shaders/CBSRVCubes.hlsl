@@ -6,11 +6,14 @@
 cbuffer PushConstants : register(b0)
 {
     uint gCubeCount;
+    uint gMatrixBaseIndex;
+    uint gColorFrameIndex;
     float gAspectRatio;
     float gViewDistance;
 };
 
 static const uint kMaxCubeColors = 32;
+static const uint kRingFrameCount = 3;
 
 struct MatrixRows
 {
@@ -20,11 +23,16 @@ struct MatrixRows
     float4 row3;
 };
 
-struct CubeColorConstants
+struct CubeColorFrame
 {
     float4 colors[kMaxCubeColors];
     uint colorCount;
     uint3 padding;
+};
+
+struct CubeColorConstants
+{
+    CubeColorFrame frames[kRingFrameCount];
 };
 
 struct VSOutput
@@ -97,7 +105,7 @@ VSOutput VSMain(uint vertexID : SV_VertexID, uint instanceID : SV_InstanceID)
 
     StructuredBuffer<MatrixRows> matrices = ResourceDescriptorHeap[SAMPLE_MATRIX_SRV_SLOT];
     const uint safeInstanceID = min(instanceID, max(gCubeCount, 1u) - 1u);
-    const MatrixRows matrix = matrices[safeInstanceID];
+    const MatrixRows matrix = matrices[gMatrixBaseIndex + safeInstanceID];
 
     float3 worldPosition = TransformPoint(matrix, positions[vertexID]).xyz;
     worldPosition.z += gViewDistance;
@@ -116,8 +124,9 @@ VSOutput VSMain(uint vertexID : SV_VertexID, uint instanceID : SV_InstanceID)
 float4 PSMain(VSOutput input) : SV_Target0
 {
     ConstantBuffer<CubeColorConstants> colorConstants = ResourceDescriptorHeap[SAMPLE_COLOR_CBV_SLOT];
-    const uint colorCount = max(colorConstants.colorCount, 1u);
-    const float3 baseColor = colorConstants.colors[input.colorIndex % colorCount].rgb;
+    const uint frameIndex = min(gColorFrameIndex, kRingFrameCount - 1u);
+    const uint colorCount = max(colorConstants.frames[frameIndex].colorCount, 1u);
+    const float3 baseColor = colorConstants.frames[frameIndex].colors[input.colorIndex % colorCount].rgb;
 
     const float3 lightDirection = normalize(float3(-0.35, 0.8, -0.45));
     const float lambert = saturate(dot(normalize(input.normal), lightDirection)) * 0.72 + 0.28;
