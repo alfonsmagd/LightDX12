@@ -204,7 +204,7 @@ Ldx12 is a compact, evolving renderer abstraction rather than a compatibility pr
 
 ## Stress test
 
-`Ldx12StressTests` repeatedly fills and fragments the bindless heap, creates and destroys GPU resources, records batches at the four-command-buffer limit, forces cross-command-list texture-state fixups and releases resources while their submission is still pending. `Ldx12FrameStressTests` simulates 10,000 offscreen frames with three frame slots, without waiting immediately after each submit. It waits only when the CPU catches the GPU and must reuse a slot, then reports total time, average CPU frame time, throughput, slot-wait count and final drain time.
+`Ldx12StressTests` repeatedly fills and fragments the bindless heap, creates and destroys GPU resources, records batches at the four-command-buffer limit, forces cross-command-list texture-state fixups and releases resources while their submission is still pending. `Ldx12FrameStressTests` simulates 10,000 offscreen frames with three frame slots, without waiting immediately after each submit. It waits only when the CPU catches the GPU and must reuse a slot, then reports total time, average CPU frame time, throughput, slot-wait count and final drain time. `Ldx12CommandStreamStressTests` deliberately blocks the GPU queue, fills all 68 internal immediate slots, releases the queue and continues until 10,000 submissions without an explicit wait inside the loop. This validates automatic allocator and command-list recycling when the CPU keeps producing commands while previous submissions remain pending.
 
 ```bat
 cmake --build build --config Debug --target Ldx12StressTests --parallel
@@ -212,6 +212,9 @@ ctest --test-dir build -C Debug -R Ldx12StressTests --output-on-failure --verbos
 
 cmake --build build --config Debug --target Ldx12FrameStressTests --parallel
 ctest --test-dir build -C Debug -R Ldx12FrameStressTests --output-on-failure --verbose
+
+cmake --build build --config Debug --target Ldx12CommandStreamStressTests --parallel
+ctest --test-dir build -C Debug -R Ldx12CommandStreamStressTests --output-on-failure --verbose
 ```
 
 ## Supported scope
@@ -233,5 +236,5 @@ The following paths are deliberately **not directly supported**:
 - **Dedicated compute shaders:** there is no public compute command-buffer, compute-queue or compute-submit path. The current low-level `CreateComputePipeline`, `CmdBindComputePipeline` and `CmdDispatch` primitives run inside the graphics command-buffer path; they are not a complete independent compute API.
 - **Ray tracing:** there is no DXR pipeline, acceleration-structure management, shader-table abstraction or `DispatchRays` API.
 - **Mesh and amplification shaders:** no dedicated pipeline descriptors or dispatch API are exposed.
-- **Portable native windows:** the public swapchain accepts Win32 `HWND` only. GLFW or SDL can be used only by extracting their underlying Win32 handle.
-- **Other platforms or graphics backends:** Vulkan, Direct3D 11, Metal, Linux and macOS are outside the current scope.
+- **Traditional resource binding:** there is no legacy per-draw descriptor-table binding path. The public resource-binding model is bindless.
+- **Portable native windows:** the public swapchain accepts Win32 `HWND` only.
