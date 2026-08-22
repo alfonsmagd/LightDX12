@@ -1,4 +1,4 @@
-# Ldx12
+# Lightdx12
 
 **A small, explicit and bindless-oriented Direct3D 12 abstraction for learning, experimentation and rapid renderer prototyping.**
 
