@@ -1,13 +1,6 @@
-#include "App/ObjMesh.hpp"
 #include "App/NodeGraph.hpp"
-#include "App/TaskSystem.hpp"
 
-#include <windows.h>
-
-#include <atomic>
 #include <cmath>
-#include <filesystem>
-#include <fstream>
 #include <iostream>
 #include <stdexcept>
 
@@ -23,34 +16,6 @@ int main()
 {
 	try
 	{
-		App::TaskSystem tasks( 2 );
-		std::atomic<int> value{ 0 };
-		tasks.Submit( "smoke job", [&value] { value.store( 42 ); } );
-		tasks.WaitIdle();
-		Require( value.load() == 42, "enkiTS job did not execute." );
-
-		const std::filesystem::path path = std::filesystem::temp_directory_path() /
-			( "lightdx12_obj_test_" + std::to_string( GetCurrentProcessId() ) + ".obj" );
-		{
-			std::ofstream file( path, std::ios::trunc );
-			file << "v -1 0 -1\n"
-				 << "v  1 0 -1\n"
-				 << "v  1 0  1\n"
-				 << "v -1 0  1\n"
-				 << "f 1 2 3 4\n";
-		}
-		const App::ObjMeshData mesh = App::LoadObj( path );
-		std::error_code removeError;
-		std::filesystem::remove( path, removeError );
-		Require( mesh.vertices.size() == 4, "OBJ vertex count is incorrect." );
-		Require( mesh.indices.size() == 6, "OBJ polygon triangulation is incorrect." );
-		Require( mesh.TriangleCount() == 2, "OBJ triangle count is incorrect." );
-		for( const App::MeshVertex& vertex : mesh.vertices )
-		{
-			const float length = std::sqrt( vertex.normal.x * vertex.normal.x + vertex.normal.y * vertex.normal.y + vertex.normal.z * vertex.normal.z );
-			Require( std::abs( length - 1.0f ) < 0.001f, "Generated OBJ normal is not normalized." );
-		}
-
 		App::NodeGraph graph;
 		const App::NodeId three = graph.AddNode( App::NodeKind::FloatConstant, 3.0f );
 		const App::NodeId two = graph.AddNode( App::NodeKind::FloatConstant, 2.0f );
@@ -87,7 +52,7 @@ int main()
 		const App::TextureReference texture = std::get<App::TextureReference>( textureResult.value );
 		Require( texture.resourceId == 77 && texture.width == 256 && texture.height == 128, "Texture2D evaluation result is incorrect." );
 
-		std::cout << "LightDX12 App smoke tests passed.\n";
+		std::cout << "LightDX12 NodeGraph tests passed.\n";
 		return 0;
 	}
 	catch( const std::exception& exception )

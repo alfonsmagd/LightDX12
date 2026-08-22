@@ -12,22 +12,6 @@ if(NOT WIN32)
     message(FATAL_ERROR "LightD3D12 currently supports only Windows.")
 endif()
 
-include(FetchContent)
-
-# App::TaskSystem is the only layer that sees enkiTS. Pinning the revision keeps
-# local and CI builds reproducible.
-set(ENKITS_BUILD_C_INTERFACE OFF CACHE BOOL "" FORCE)
-set(ENKITS_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-set(ENKITS_BUILD_SHARED OFF CACHE BOOL "" FORCE)
-set(ENKITS_INSTALL OFF CACHE BOOL "" FORCE)
-FetchContent_Declare(
-    enkiTS
-    GIT_REPOSITORY https://github.com/dougbinks/enkiTS.git
-    GIT_TAG e3329cc01aeb3dff205e0153bf0480277d1a3dbd
-    GIT_SHALLOW FALSE
-)
-FetchContent_MakeAvailable(enkiTS)
-
 set(LIGHTD3D12_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/LightD3D12")
 
 set(LIGHTD3D12_PUBLIC_HEADERS
@@ -124,27 +108,12 @@ target_compile_definitions(DearImGui PUBLIC WIN32_LEAN_AND_MEAN NOMINMAX UNICODE
 target_link_libraries(DearImGui PUBLIC d3d12 dxgi)
 
 set(APP_PUBLIC_HEADERS
-    "${CMAKE_CURRENT_SOURCE_DIR}/App/include/App/ConcurrentQueue.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/App/include/App/GpuMemory.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/App/include/App/HttpClient.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/App/include/App/ImGuiLayer.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/App/include/App/MeshGenerationClient.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/App/include/App/NodeGraph.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/App/include/App/ObjMesh.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/App/include/App/OrbitCamera.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/App/include/App/TaskSystem.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/App/include/App/WindowApplication.hpp"
 )
 set(APP_SOURCES
-    "${CMAKE_CURRENT_SOURCE_DIR}/App/src/GpuMemory.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/App/src/HttpClient.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/App/src/ImGuiLayer.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/App/src/MeshGenerationClient.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/App/src/NodeGraph.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/App/src/ObjMesh.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/App/src/OrbitCamera.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/App/src/TaskSystem.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/App/src/WindowApplication.cpp"
 )
 
 add_library(App STATIC ${APP_PUBLIC_HEADERS} ${APP_SOURCES})
@@ -152,10 +121,7 @@ add_library(LightDX12::App ALIAS App)
 target_compile_features(App PUBLIC cxx_std_20)
 target_include_directories(App PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/App/include")
 target_compile_definitions(App PUBLIC WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE)
-target_link_libraries(App
-    PUBLIC LightD3D12::LightD3D12
-    PRIVATE enkiTS DearImGui winhttp
-)
+target_link_libraries(App PRIVATE DearImGui)
 
 if(MSVC)
     target_compile_options(LightD3D12 PRIVATE /W4 /EHsc /permissive- /MP)
@@ -190,7 +156,7 @@ add_executable(ImGuiNodeEditor WIN32
     "${CMAKE_CURRENT_SOURCE_DIR}/samples/ImGuiNodeEditor/README.md"
 )
 target_compile_features(ImGuiNodeEditor PRIVATE cxx_std_20)
-target_link_libraries(ImGuiNodeEditor PRIVATE LightDX12::App DearImGui)
+target_link_libraries(ImGuiNodeEditor PRIVATE LightD3D12::LightD3D12 LightDX12::App DearImGui)
 if(MSVC)
     target_compile_options(ImGuiNodeEditor PRIVATE /W4 /EHsc /permissive- /MP)
 endif()
@@ -220,17 +186,17 @@ if(BUILD_TESTING)
 	add_test(NAME LightDX12Tests COMMAND LightDX12Tests)
 	set_tests_properties(LightDX12Tests PROPERTIES TIMEOUT 60)
 
-    add_executable(LightDX12AppTests
-        "${CMAKE_CURRENT_SOURCE_DIR}/tests/AppSmokeTests.cpp"
+    add_executable(LightDX12NodeGraphTests
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/NodeGraphTests.cpp"
     )
-    target_compile_features(LightDX12AppTests PRIVATE cxx_std_20)
-    target_link_libraries(LightDX12AppTests PRIVATE LightDX12::App)
+    target_compile_features(LightDX12NodeGraphTests PRIVATE cxx_std_20)
+    target_link_libraries(LightDX12NodeGraphTests PRIVATE LightDX12::App)
     if(MSVC)
-        target_compile_options(LightDX12AppTests PRIVATE /W4 /EHsc /permissive- /MP)
+        target_compile_options(LightDX12NodeGraphTests PRIVATE /W4 /EHsc /permissive- /MP)
     endif()
-    add_test(NAME LightDX12AppTests COMMAND LightDX12AppTests)
+    add_test(NAME LightDX12NodeGraphTests COMMAND LightDX12NodeGraphTests)
 
-	set_target_properties(LightDX12Tests LightDX12AppTests PROPERTIES
+	set_target_properties(LightDX12Tests LightDX12NodeGraphTests PROPERTIES
 		FOLDER "Folder_Test"
 	)
 endif()
@@ -257,5 +223,5 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/samples/ImGuiNodeEditor/main.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/samples/ImGuiNodeEditor/README.md"
 	${LIGHTDX12_CORE_TEST_SOURCES}
-    "${CMAKE_CURRENT_SOURCE_DIR}/tests/AppSmokeTests.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tests/NodeGraphTests.cpp"
 )

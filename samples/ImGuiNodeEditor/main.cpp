@@ -6,6 +6,7 @@
 #include "imgui.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <filesystem>
@@ -22,6 +23,7 @@ namespace
 	constexpr float kNodeWidth = 190.0f;
 	constexpr float kHeaderHeight = 30.0f;
 	constexpr float kPinRowHeight = 26.0f;
+	constexpr uint32_t kFramesInFlight = 3;
 
 	struct NodeLayout
 	{
@@ -57,6 +59,8 @@ namespace
 		TextureHandle demoTexture{};
 		std::vector<uint32_t> cpuPixels;
 		EditorState editor;
+		std::array<SubmitHandle, kFramesInFlight> frameSubmissions{};
+		uint32_t frameIndex = 0;
 		bool running = true;
 		bool minimized = false;
 	};
@@ -577,8 +581,8 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 
 		ContextDesc contextDesc{};
 		contextDesc.enableDebugLayer = true;
-		contextDesc.framesInFlight = 3;
-		contextDesc.swapchainBufferCount = 3;
+		contextDesc.framesInFlight = kFramesInFlight;
+		contextDesc.swapchainBufferCount = kFramesInFlight;
 		SwapchainDesc swapchainDesc{};
 		swapchainDesc.window = MakeWin32WindowHandle( window );
 		swapchainDesc.width = initialWidth;
@@ -586,7 +590,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		swapchainDesc.vsync = true;
 		state.deviceManager = &DeviceManager::Initialize( contextDesc, swapchainDesc );
 		RenderDevice& device = *state.deviceManager->GetRenderDevice();
-		state.imgui = std::make_unique<App::ImGuiLayer>( window, device.GetNativeDevice(), device.GetNativeCommandQueue(), contextDesc.swapchainFormat, DXGI_FORMAT_UNKNOWN, 3 );
+		state.imgui = std::make_unique<App::ImGuiLayer>( window, device.GetNativeDevice(), device.GetNativeCommandQueue(), contextDesc.swapchainFormat, DXGI_FORMAT_UNKNOWN, kFramesInFlight );
 		state.cpuPixels = CreateDemoPixels();
 		state.demoTexture = UploadCpuTexture( device, state.cpuPixels );
 		state.editor.imguiTextureId = state.imgui->RegisterTexture( device.GetNativeTextureResource( state.demoTexture ), DXGI_FORMAT_R8G8B8A8_UNORM );
@@ -605,6 +609,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 			if( state.minimized ) { WaitMessage(); continue; }
 			if( state.editor.cpuInvertRequested ) ApplyCpuInvert( state, device );
 
+			device.Wait( state.frameSubmissions[ state.frameIndex ] );
 			state.imgui->NewFrame();
 			DrawPalette( state.editor );
 			DrawEditor( state.editor );
@@ -619,7 +624,8 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 			commands.CmdBeginRendering( renderPass, framebuffer );
 			state.imgui->Render( commands.GetNativeGraphicsCommandList() );
 			commands.CmdEndRendering();
-			device.Submit( commands, backBuffer );
+			state.frameSubmissions[ state.frameIndex ] = device.Submit( commands, backBuffer );
+			state.frameIndex = ( state.frameIndex + 1 ) % kFramesInFlight;
 		}
 
 		state.deviceManager->WaitIdle();
