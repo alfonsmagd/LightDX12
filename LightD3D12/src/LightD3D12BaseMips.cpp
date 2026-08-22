@@ -1,13 +1,11 @@
 #include "LightD3D12BaseMips.hpp"
 
+#include "LightD3D12BaseMipsShader.hpp"
 #include "LightD3D12ManagerImpl.hpp"
 #include "LightD3D12Resources.hpp"
 #include "LightD3D12ShaderCompiler.hpp"
 
 #include <algorithm>
-#include <filesystem>
-#include <fstream>
-#include <string>
 
 namespace lightd3d12
 {
@@ -24,46 +22,12 @@ namespace lightd3d12
 		{
 			return D3D12CalcSubresource( mipSlice, 0, 0, mipLevels, 1 );
 		}
-
-		[[nodiscard]] std::string ReadTextFile( const std::filesystem::path& path )
-		{
-			std::ifstream file( path, std::ios::binary );
-			if( !file )
-			{
-				throw std::runtime_error( "Failed to open BaseMips shader file: " + path.string() );
-			}
-
-			const std::string source( ( std::istreambuf_iterator<char>( file ) ), std::istreambuf_iterator<char>() );
-			if( source.size() >= 3 &&
-				static_cast<unsigned char>( source[ 0 ] ) == 0xef &&
-				static_cast<unsigned char>( source[ 1 ] ) == 0xbb &&
-				static_cast<unsigned char>( source[ 2 ] ) == 0xbf )
-			{
-				return source.substr( 3 );
-			}
-
-			return source;
-		}
-
-		[[nodiscard]] const char* LoadBaseMipsShaderSource()
-		{
-			static const std::string source = []
-			{
-				const std::filesystem::path shaderPath =
-					std::filesystem::path( __FILE__ ).parent_path() /
-					"shaders" /
-					"LightD3D12BaseMipsCS.hlsl";
-				return ReadTextFile( shaderPath );
-			}();
-
-			return source.c_str();
-		}
 	}
 
 	BaseMips::BaseMips( DeviceManager::Impl& manager ): manager_( manager )
 	{
 		ComputePipelineDesc pipelineDesc{};
-		pipelineDesc.computeShader.source = LoadBaseMipsShaderSource();
+		pipelineDesc.computeShader.source = detail::ourBaseMipsShaderSource;
 		pipelineDesc.computeShader.entryPoint = "main";
 		pipelineDesc.computeShader.profile = "cs_6_6";
 

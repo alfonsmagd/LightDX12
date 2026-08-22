@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   build-and-test:
-    name: Compile and CTest
+    name: Compile, CTest and Install
     runs-on: windows-2025
     timeout-minutes: 20
 
@@ -22,10 +22,50 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Configure CMake
-        run: cmake -S . -B build -DBUILD_TESTING=ON
+        run: >-
+          cmake -S . -B build
+          -DLIGHTDX12_BUILD_APP=ON
+          -DLIGHTDX12_BUILD_EXAMPLES=ON
+          -DLIGHTDX12_BUILD_TESTS=ON
+          -DLIGHTDX12_INSTALL=ON
 
       - name: Build all targets
         run: cmake --build build --config Debug --parallel
 
       - name: Run tests
         run: ctest --test-dir build -C Debug --output-on-failure
+
+      - name: Configure source consumer
+        run: cmake -S tests/cmake/source-consumer -B build-source-consumer
+
+      - name: Build source consumer
+        run: cmake --build build-source-consumer --config Debug --parallel
+
+      - name: Run source consumer
+        run: ctest --test-dir build-source-consumer -C Debug --output-on-failure
+
+      - name: Configure core-only package
+        run: >-
+          cmake -S . -B build-core
+          -DLIGHTDX12_BUILD_APP=OFF
+          -DLIGHTDX12_BUILD_EXAMPLES=OFF
+          -DLIGHTDX12_BUILD_TESTS=OFF
+          -DLIGHTDX12_INSTALL=ON
+
+      - name: Build core-only package
+        run: cmake --build build-core --config Debug --target LightD3D12 --parallel
+
+      - name: Install LightD3D12 package
+        run: |
+          $installPrefix = Join-Path $env:RUNNER_TEMP "LightD3D12-install"
+          cmake --install build-core --config Debug --prefix $installPrefix
+          "LIGHTD3D12_INSTALL_PREFIX=$installPrefix" >> $env:GITHUB_ENV
+
+      - name: Configure installed consumer
+        run: cmake -S tests/cmake/install-consumer -B build-install-consumer -DCMAKE_PREFIX_PATH="$env:LIGHTD3D12_INSTALL_PREFIX"
+
+      - name: Build installed consumer
+        run: cmake --build build-install-consumer --config Debug --parallel
+
+      - name: Run installed consumer
+        run: ctest --test-dir build-install-consumer -C Debug --output-on-failure
