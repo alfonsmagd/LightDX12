@@ -204,11 +204,14 @@ Ldx12 is a compact, evolving renderer abstraction rather than a compatibility pr
 
 ## Stress test
 
-`Ldx12StressTests` repeatedly fills and fragments the bindless heap, creates and destroys GPU resources, records batches at the four-command-buffer limit, forces cross-command-list texture-state fixups and releases resources while their submission is still pending. The test prints the operation count and elapsed time for the current machine.
+`Ldx12StressTests` repeatedly fills and fragments the bindless heap, creates and destroys GPU resources, records batches at the four-command-buffer limit, forces cross-command-list texture-state fixups and releases resources while their submission is still pending. `Ldx12FrameStressTests` simulates 10,000 offscreen frames with three frame slots, without waiting immediately after each submit. It waits only when the CPU catches the GPU and must reuse a slot, then reports total time, average CPU frame time, throughput, slot-wait count and final drain time.
 
 ```bat
 cmake --build build --config Debug --target Ldx12StressTests --parallel
 ctest --test-dir build -C Debug -R Ldx12StressTests --output-on-failure --verbose
+
+cmake --build build --config Debug --target Ldx12FrameStressTests --parallel
+ctest --test-dir build -C Debug -R Ldx12FrameStressTests --output-on-failure --verbose
 ```
 
 ## Supported scope

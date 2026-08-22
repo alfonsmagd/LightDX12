@@ -30,7 +30,7 @@ jobs:
           -DLDX12_INSTALL=OFF
 
       - name: Build core tests
-        run: cmake --build build-core-tests --config Debug --target Ldx12Tests Ldx12StressTests --parallel
+        run: cmake --build build-core-tests --config Debug --target Ldx12Tests Ldx12StressTests Ldx12FrameStressTests --parallel
 
       - name: Run core tests
         run: ctest --test-dir build-core-tests -C Debug --output-on-failure
