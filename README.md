@@ -71,6 +71,22 @@ device.Submit(commands, backbuffer);
 
 Under that interface, Ldx12 manages the Direct3D 12 device, swapchains, descriptor heaps, root signature, command-list reuse, fences, resource-state transitions and deferred GPU-safe releases.
 
+The complete lifetime of a single triangle frame remains compact (`CreateApplicationWindow` and `CreateTrianglePipeline` are the platform and shader helpers shown in the full [`Triangle`](samples/Triangle/main.cpp) sample):
+
+```cpp
+HWND hwnd = CreateApplicationWindow();
+SwapchainDesc swapchain{ MakeWin32WindowHandle( hwnd ), 1280, 720, true };
+DeviceManager& manager = DeviceManager::Initialize( {}, swapchain );
+RenderDevice& device = *manager.GetRenderDevice();
+RenderPipelineState pipeline = CreateTrianglePipeline( device );
+TextureHandle backbuffer = device.GetCurrentSwapchainTexture();
+Framebuffer framebuffer{}; framebuffer.color[ 0 ].texture = backbuffer;
+ICommandBuffer& commands = device.AcquireCommandBuffer();
+commands.CmdBeginRendering( {}, framebuffer ); commands.CmdBindRenderPipeline( pipeline ); commands.CmdDraw( 3 ); commands.CmdEndRendering();
+device.Submit( commands, backbuffer ); device.WaitIdle();
+DeviceManager::ShutdownSingleton();
+```
+
 ## Samples
 
 | Sample | What it demonstrates |
@@ -185,3 +201,34 @@ Ldx12/
 ## Current scope
 
 Ldx12 is a compact, evolving renderer abstraction rather than a compatibility promise or finished general-purpose engine. Its goal is to keep modern Direct3D 12 experiments understandable: explicit enough to teach the underlying model, small enough to change without fighting a framework.
+
+## Stress test
+
+`Ldx12StressTests` repeatedly fills and fragments the bindless heap, creates and destroys GPU resources, records batches at the four-command-buffer limit, forces cross-command-list texture-state fixups and releases resources while their submission is still pending. The test prints the operation count and elapsed time for the current machine.
+
+```bat
+cmake --build build --config Debug --target Ldx12StressTests --parallel
+ctest --test-dir build -C Debug -R Ldx12StressTests --output-on-failure --verbose
+```
+
+## Supported scope
+
+| Area | Current support |
+| --- | --- |
+| Platform and backend | Windows 10/11 with Direct3D 12, feature level 12.0 or newer. |
+| Distribution | C++20 static library through `add_subdirectory`, `FetchContent` or an installed CMake package. |
+| Windows and presentation | Win32 `HWND` swapchains, up to three backbuffers, VSync and tearing configuration. |
+| Graphics shaders | Runtime DXC compilation of Shader Model 6.6 vertex and pixel shaders. |
+| Graphics pipelines | Color/depth attachments, vertex and index buffers, push constants, draw, indexed draw, instancing and indirect indexed draw. |
+| Resources | Typed generational handles, buffers, 2D/3D textures, uploads, 2D texture downloads and external D3D12 texture import. |
+| Binding | Shared bindless CBV/SRV/UAV heap with fixed and dynamic slots, plus RTV and DSV descriptors. |
+| Commands and synchronization | Reusable graphics command buffers, submissions, batches of up to four command buffers, fences, waits and deferred GPU-safe destruction. |
+| Diagnostics | D3D12 debug layer, scoped GPU labels and optional PIX capture attachment. |
+
+The following paths are deliberately **not directly supported**:
+
+- **Dedicated compute shaders:** there is no public compute command-buffer, compute-queue or compute-submit path. The current low-level `CreateComputePipeline`, `CmdBindComputePipeline` and `CmdDispatch` primitives run inside the graphics command-buffer path; they are not a complete independent compute API.
+- **Ray tracing:** there is no DXR pipeline, acceleration-structure management, shader-table abstraction or `DispatchRays` API.
+- **Mesh and amplification shaders:** no dedicated pipeline descriptors or dispatch API are exposed.
+- **Portable native windows:** the public swapchain accepts Win32 `HWND` only. GLFW or SDL can be used only by extracting their underlying Win32 handle.
+- **Other platforms or graphics backends:** Vulkan, Direct3D 11, Metal, Linux and macOS are outside the current scope.
