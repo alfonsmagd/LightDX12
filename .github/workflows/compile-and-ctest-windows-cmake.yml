@@ -12,28 +12,51 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-and-test:
-    name: Compile, CTest and Install
+  lightd3d12-tests:
+    name: LightD3D12 Core and Tests
     runs-on: windows-2025
-    timeout-minutes: 20
+    timeout-minutes: 15
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Configure CMake
+      - name: Configure core tests
         run: >-
-          cmake -S . -B build
-          -DLIGHTDX12_BUILD_APP=ON
-          -DLIGHTDX12_BUILD_EXAMPLES=ON
+          cmake -S . -B build-core-tests
+          -DLIGHTDX12_BUILD_APP=OFF
+          -DLIGHTDX12_BUILD_EXAMPLES=OFF
           -DLIGHTDX12_BUILD_TESTS=ON
-          -DLIGHTDX12_INSTALL=ON
+          -DLIGHTDX12_INSTALL=OFF
 
-      - name: Build all targets
-        run: cmake --build build --config Debug --parallel
+      - name: Build core tests
+        run: cmake --build build-core-tests --config Debug --target LightDX12Tests --parallel
 
-      - name: Run tests
-        run: ctest --test-dir build -C Debug --output-on-failure
+      - name: Run core tests
+        run: ctest --test-dir build-core-tests -C Debug --output-on-failure
+
+  cmake-compatibility:
+    name: CMake ${{ matrix.cmake-version }} Compatibility
+    runs-on: windows-2025
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        cmake-version:
+          - "3.24.4"
+          - latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Install CMake ${{ matrix.cmake-version }}
+        uses: lukka/get-cmake@latest
+        with:
+          cmakeVersion: ${{ matrix.cmake-version }}
+
+      - name: Report CMake version
+        run: cmake --version
 
       - name: Configure source consumer
         run: cmake -S tests/cmake/source-consumer -B build-source-consumer
@@ -69,3 +92,23 @@ jobs:
 
       - name: Run installed consumer
         run: ctest --test-dir build-install-consumer -C Debug --output-on-failure
+
+  examples:
+    name: App and Examples
+    runs-on: windows-2025
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Configure examples
+        run: >-
+          cmake -S . -B build-examples
+          -DLIGHTDX12_BUILD_APP=ON
+          -DLIGHTDX12_BUILD_EXAMPLES=ON
+          -DLIGHTDX12_BUILD_TESTS=OFF
+          -DLIGHTDX12_INSTALL=OFF
+
+      - name: Build examples
+        run: cmake --build build-examples --config Debug --parallel
