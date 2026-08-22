@@ -1,6 +1,11 @@
-# Installed Ldx12 example
+# Ldx12 consumer example
 
-This project is intentionally independent from the Ldx12 source tree. It only consumes the installed CMake package.
+This project is intentionally independent from the Ldx12 source tree. The `LDX12_USE_FETCHCONTENT` option selects how it obtains the library:
+
+- `ON` by default: download and build Ldx12 through `FetchContent`.
+- `OFF`: use an installed package through `find_package`.
+
+## Installed package
 
 From the repository root, build and install the static library:
 
@@ -17,7 +22,25 @@ cmake --install build-ldx12 --config Release --prefix C:\Ldx12
 Configure, build and run this consumer:
 
 ```bat
-cmake -S examples/InstalledLdx12 -B build-consumer -DCMAKE_PREFIX_PATH=C:\Ldx12
+cmake -S examples/InstalledLdx12 -B build-consumer -DLDX12_USE_FETCHCONTENT=OFF -DCMAKE_PREFIX_PATH=C:\Ldx12
 cmake --build build-consumer --config Release --parallel
 build-consumer\Release\Ldx12InstalledExample.exe
+```
+
+## FetchContent
+
+No previous installation is required. From this example directory, the shortest flow is:
+
+```bat
+mkdir build
+cd build
+cmake ..
+cmake --build . --config Release --parallel
+Release\Ldx12InstalledExample.exe
+```
+
+`LDX12_FETCH_GIT_TAG` defaults to `main`. A project can pin a release or commit:
+
+```bat
+cmake -S examples/InstalledLdx12 -B build-consumer -DLDX12_USE_FETCHCONTENT=ON -DLDX12_FETCH_GIT_TAG=<tag-or-commit>
 ```

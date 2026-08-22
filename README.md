@@ -163,7 +163,7 @@ find_package(Ldx12 CONFIG REQUIRED)
 target_link_libraries(MyApplication PRIVATE Ldx12::Ldx12)
 ```
 
-A complete independent consumer with its own [`main.cpp`](examples/InstalledLdx12/main.cpp) and installation commands is available in [`examples/InstalledLdx12`](examples/InstalledLdx12/README.md).
+A complete independent consumer with its own [`main.cpp`](examples/InstalledLdx12/main.cpp) is available in [`examples/InstalledLdx12`](examples/InstalledLdx12/README.md). Set `LDX12_USE_FETCHCONTENT=OFF` to consume an installed package or `ON` to download Ldx12 automatically.
 
 ## Repository layout
 

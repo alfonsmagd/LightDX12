@@ -98,6 +98,15 @@ jobs:
       - name: Run installed consumer
         run: ctest --test-dir build-install-consumer --output-on-failure
 
+      - name: Configure FetchContent consumer
+        run: cmake -S examples/InstalledLdx12 -B build-fetch-consumer -G Ninja -DCMAKE_BUILD_TYPE=Debug -DLDX12_USE_FETCHCONTENT=ON
+
+      - name: Build FetchContent consumer
+        run: cmake --build build-fetch-consumer --parallel
+
+      - name: Run FetchContent consumer
+        run: ctest --test-dir build-fetch-consumer --output-on-failure
+
   examples:
     name: App and Examples
     runs-on: windows-2025
