@@ -19,6 +19,13 @@
 #define LIGHTD3D12_SINGLE_DIRECT_QUEUE 1
 #endif
 
+namespace lightd3d12
+{
+	inline constexpr uint32_t ourMaxActiveCommandBuffers = 64;
+	inline constexpr uint32_t ourMaxCommandBufferBatch = 4;
+	inline constexpr uint32_t ourMaxImmediateCommandBuffers = ourMaxActiveCommandBuffers + ourMaxCommandBufferBatch;
+}
+
 namespace lightd3d12::detail
 {
 	inline HRESULT CheckResult( HRESULT hr, const char* expression, const char* message )

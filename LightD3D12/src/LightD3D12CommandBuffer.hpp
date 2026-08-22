@@ -4,7 +4,6 @@
 #include "LightD3D12ImmediateCommands.hpp"
 
 #include <array>
-#include <span>
 
 namespace lightd3d12
 {
@@ -40,17 +39,6 @@ namespace lightd3d12
 			D3D12_RESOURCE_STATES currentState_ = D3D12_RESOURCE_STATE_COMMON;
 		};
 
-		struct SubmitFixupResources final
-		{
-			ComPtr<ID3D12CommandAllocator> allocator_;
-			ComPtr<ID3D12GraphicsCommandList4> commandList_;
-
-			bool Valid() const noexcept
-			{
-				return commandList_ != nullptr;
-			}
-		};
-
 		ImmediateCommands::CommandListWrapper& Wrapper() noexcept
 		{
 			return wrapper_;
@@ -61,12 +49,17 @@ namespace lightd3d12
 			return isRendering_;
 		}
 
-		std::span<const TrackedTextureState> GetTrackedTextures() const noexcept
+		const TrackedTextureState* GetTrackedTextures() const noexcept
 		{
-			return { trackedTextures_.data(), trackedTextureCount_ };
+			return trackedTextures_.data();
 		}
 
-		SubmitFixupResources BuildSubmitFixup();
+		uint32_t GetTrackedTextureCount() const noexcept
+		{
+			return trackedTextureCount_;
+		}
+
+		ImmediateCommands::CommandListWrapper* BuildSubmitFixup( CommandBufferImpl* const* previousCommandBuffers = nullptr, uint32_t previousCommandBufferCount = 0 );
 		void CommitSubmittedTextureStates();
 
 	private:

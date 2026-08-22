@@ -3,6 +3,7 @@
 #include "LightD3D12ManagerImpl.hpp"
 
 #include <cstdlib>
+#include <cassert>
 #include <cstring>
 #include <filesystem>
 #include <mutex>
@@ -293,9 +294,9 @@ namespace lightd3d12
 
 	CommandBufferImpl::TrackedTextureState& CommandBufferImpl::GetTrackedTextureState( TextureHandle texture )
 	{
-		for( TrackedTextureState& trackedTexture :
-			std::span( trackedTextures_.data(), trackedTextureCount_ ) )
+		for( uint32_t index = 0; index < trackedTextureCount_; ++index )
 		{
+			TrackedTextureState& trackedTexture = trackedTextures_[ index ];
 			if( trackedTexture.handle_ == texture )
 			{
 				return trackedTexture;
@@ -333,13 +334,33 @@ namespace lightd3d12
 		trackedTexture.currentState_ = newState;
 	}
 
-	CommandBufferImpl::SubmitFixupResources CommandBufferImpl::BuildSubmitFixup()
+	ImmediateCommands::CommandListWrapper* CommandBufferImpl::BuildSubmitFixup( CommandBufferImpl* const* previousCommandBuffers, uint32_t previousCommandBufferCount )
 	{
+		const auto getCurrentState = [this, previousCommandBuffers, previousCommandBufferCount]( TextureHandle texture )
+			{
+				for( uint32_t commandBufferIndex = previousCommandBufferCount; commandBufferIndex > 0; --commandBufferIndex )
+				{
+					assert( previousCommandBuffers != nullptr );
+					const CommandBufferImpl* previousCommandBuffer = previousCommandBuffers[ commandBufferIndex - 1 ];
+					assert( previousCommandBuffer != nullptr );
+					const TrackedTextureState* trackedTextures = previousCommandBuffer->GetTrackedTextures();
+					for( uint32_t textureIndex = 0; textureIndex < previousCommandBuffer->GetTrackedTextureCount(); ++textureIndex )
+					{
+						if( trackedTextures[ textureIndex ].handle_ == texture )
+						{
+							return trackedTextures[ textureIndex ].currentState_;
+						}
+					}
+				}
+
+				return manager_.GetTextureResource( texture ).currentState_;
+			};
+
 		bool requiresFixup = false;
-		for( const TrackedTextureState& trackedTexture : GetTrackedTextures() )
+		for( uint32_t index = 0; index < trackedTextureCount_; ++index )
 		{
-			const TextureResource& resource = manager_.GetTextureResource( trackedTexture.handle_ );
-			if( resource.currentState_ != trackedTexture.initialState_ )
+			const TrackedTextureState& trackedTexture = trackedTextures_[ index ];
+			if( getCurrentState( trackedTexture.handle_ ) != trackedTexture.initialState_ )
 			{
 				requiresFixup = true;
 				break;
@@ -348,45 +369,36 @@ namespace lightd3d12
 
 		if( !requiresFixup )
 		{
-			return {};
+			return nullptr;
 		}
 
-		SubmitFixupResources fixup;
-		C_RESULT(
-			manager_.device_->CreateCommandAllocator( D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS( fixup.allocator_.GetAddressOf() ) ),
-			"Failed to create command allocator for submit fixup." );
-		C_RESULT(
-			manager_.device_->CreateCommandList(
-				0,
-				D3D12_COMMAND_LIST_TYPE_DIRECT,
-				fixup.allocator_.Get(),
-				nullptr,
-				IID_PPV_ARGS( fixup.commandList_.GetAddressOf() ) ),
-			"Failed to create command list for submit fixup." );
+		ImmediateCommands::CommandListWrapper& fixup = manager_.GetGraphicsQueueContext().immediateCommands_->Acquire();
 
-		for( const TrackedTextureState& trackedTexture : GetTrackedTextures() )
+		for( uint32_t index = 0; index < trackedTextureCount_; ++index )
 		{
+			const TrackedTextureState& trackedTexture = trackedTextures_[ index ];
 			const TextureResource& resource = manager_.GetTextureResource( trackedTexture.handle_ );
-			if( resource.currentState_ == trackedTexture.initialState_ )
+			const D3D12_RESOURCE_STATES currentState = getCurrentState( trackedTexture.handle_ );
+			if( currentState == trackedTexture.initialState_ )
 			{
 				continue;
 			}
 
 			const auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(
 				resource.resource_.Get(),
-				resource.currentState_,
+				currentState,
 				trackedTexture.initialState_ );
 			fixup.commandList_->ResourceBarrier( 1, &barrier );
 		}
 
-		C_RESULT( fixup.commandList_->Close(), "Failed to close submit fixup command list." );
-		return fixup;
+		return &fixup;
 	}
 
 	void CommandBufferImpl::CommitSubmittedTextureStates()
 	{
-		for( const TrackedTextureState& trackedTexture : GetTrackedTextures() )
+		for( uint32_t index = 0; index < trackedTextureCount_; ++index )
 		{
+			const TrackedTextureState& trackedTexture = trackedTextures_[ index ];
 			TextureResource& resource = manager_.GetTextureResource( trackedTexture.handle_ );
 			resource.currentState_ = trackedTexture.currentState_;
 		}

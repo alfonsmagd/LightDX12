@@ -434,6 +434,9 @@ namespace lightd3d12
 	public:
 		ICommandBuffer& AcquireCommandBuffer();
 		TextureHandle GetCurrentSwapchainTexture( SwapchainHandle swapchain = {} ) const;
+		// Submits commandBuffers[0..commandBufferCount) in array order as one queue batch.
+		// If presentTexture is valid, the last command buffer transitions and presents it.
+		SubmitHandle SubmitBatch( ICommandBuffer* const* commandBuffers, uint32_t commandBufferCount, TextureHandle presentTexture = {} ) const;
 		SubmitHandle Submit( ICommandBuffer& buffer, TextureHandle presentTexture );
 		SubmitHandle Submit( ICommandBuffer& buffer ) const;
 		SubmitHandle SubmitAndPresent( ICommandBuffer& buffer, SwapchainHandle swapchain );

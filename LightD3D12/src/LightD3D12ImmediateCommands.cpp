@@ -1,6 +1,7 @@
 #include "LightD3D12ImmediateCommands.hpp"
 
 #include <array>
+#include <cassert>
 
 namespace lightd3d12
 {
@@ -16,8 +17,7 @@ namespace lightd3d12
 		}
 		if( numContexts == 0 || numContexts > buffers_.size() )
 		{
-			throw std::length_error(
-				"ImmediateCommands supports between 1 and 64 command buffers." );
+			throw std::length_error( "ImmediateCommands supports between 1 and " + std::to_string( ourMaxImmediateCommandBuffers ) + " command buffers." );
 		}
 
 		for( uint32_t i = 0; i < bufferCount_; ++i )
@@ -55,8 +55,9 @@ namespace lightd3d12
 
 	ImmediateCommands::~ImmediateCommands()
 	{
-		for( CommandListWrapper& buffer : Buffers() )
+		for( uint32_t index = 0; index < bufferCount_; ++index )
 		{
+			CommandListWrapper& buffer = buffers_[ index ];
 			if( buffer.fence_ && buffer.fence_->GetCompletedValue() < buffer.fenceValue_ )
 			{
 				buffer.fence_->SetEventOnCompletion( buffer.fenceValue_, buffer.fenceEvent_ );
@@ -99,8 +100,9 @@ namespace lightd3d12
 		}
 
 		CommandListWrapper* current = nullptr;
-		for( CommandListWrapper& buffer : Buffers() )
+		for( uint32_t index = 0; index < bufferCount_; ++index )
 		{
+			CommandListWrapper& buffer = buffers_[ index ];
 			if( !buffer.isEncoding_ && buffer.fenceValue_ == 0 )
 			{
 				current = &buffer;
@@ -123,30 +125,40 @@ namespace lightd3d12
 
 	SubmitHandle ImmediateCommands::Submit( CommandListWrapper& wrapper )
 	{
-		return Submit( wrapper, nullptr );
+		CommandListWrapper* wrappers[] = { &wrapper };
+		return SubmitBatch( wrappers, 1 );
 	}
 
-	SubmitHandle ImmediateCommands::Submit( CommandListWrapper& wrapper, ID3D12CommandList* submitPrologue )
+	SubmitHandle ImmediateCommands::SubmitBatch( CommandListWrapper* const* wrappers, uint32_t commandListCount )
 	{
-		assert( wrapper.isEncoding_ );
+		assert( wrappers != nullptr );
+		assert( commandListCount > 0 );
+		assert( commandListCount <= ourMaxCommandBufferBatch * 2 );
+		assert( commandListCount <= bufferCount_ );
 
-		C_RESULT( wrapper.commandList_->Close(), "Failed to close immediate command list." );
-
-		std::array<ID3D12CommandList*, 2> commandLists = {};
-		uint32_t numCommandLists = 0;
-		if( submitPrologue != nullptr )
+		std::array<ID3D12CommandList*, ourMaxCommandBufferBatch * 2> commandLists = {};
+		for( uint32_t index = 0; index < commandListCount; ++index )
 		{
-			commandLists[ numCommandLists++ ] = submitPrologue;
+			CommandListWrapper* wrapper = wrappers[ index ];
+			assert( wrapper != nullptr );
+			assert( wrapper->isEncoding_ );
+
+			C_RESULT( wrapper->commandList_->Close(), "Failed to close immediate command list." );
+			commandLists[ index ] = wrapper->commandList_.Get();
 		}
-		commandLists[ numCommandLists++ ] = wrapper.commandList_.Get();
 
-		queue_->ExecuteCommandLists( numCommandLists, commandLists.data() );
-		C_RESULT( queue_->Signal( wrapper.fence_.Get(), fenceCounter_ ), "Failed to signal immediate command fence." );
+		queue_->ExecuteCommandLists( commandListCount, commandLists.data() );
 
-		wrapper.fenceValue_ = fenceCounter_;
-		wrapper.isEncoding_ = false;
-		lastSubmitHandle_ = wrapper.handle_;
-		lastSubmitHandle_.submitId_ = fenceCounter_;
+		for( uint32_t index = 0; index < commandListCount; ++index )
+		{
+			CommandListWrapper& wrapper = *wrappers[ index ];
+			C_RESULT( queue_->Signal( wrapper.fence_.Get(), fenceCounter_ ), "Failed to signal immediate command fence." );
+			wrapper.fenceValue_ = fenceCounter_;
+			wrapper.handle_.submitId_ = fenceCounter_;
+			wrapper.isEncoding_ = false;
+		}
+
+		lastSubmitHandle_ = wrappers[ commandListCount - 1 ]->handle_;
 
 		fenceCounter_++;
 		if( fenceCounter_ == 0 )
@@ -218,8 +230,9 @@ namespace lightd3d12
 
 	void ImmediateCommands::WaitAll()
 	{
-		for( CommandListWrapper& buffer : Buffers() )
+		for( uint32_t index = 0; index < bufferCount_; ++index )
 		{
+			CommandListWrapper& buffer = buffers_[ index ];
 			if( buffer.fenceValue_ == 0 || buffer.isEncoding_ )
 			{
 				continue;

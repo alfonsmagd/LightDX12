@@ -323,7 +323,7 @@ namespace lightd3d12
 		context.immediateCommands_ = std::make_unique<ImmediateCommands>(
 			device_.Get(),
 			context.commandQueue_.Get(),
-			std::max( std::max<uint32_t>( 1u, desc_.framesInFlight ), ourMaxActiveCommandBuffers ) );
+			ourMaxImmediateCommandBuffers );
 	}
 
 	DeviceManager::Impl::QueueContext& DeviceManager::Impl::GetQueueContext( QueueType type ) noexcept

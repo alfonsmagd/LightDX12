@@ -24,7 +24,6 @@ namespace lightd3d12
 	class DeviceManager::Impl final
 	{
 	public:
-		static constexpr uint32_t ourMaxActiveCommandBuffers = 64;
 		static constexpr std::size_t ourMaxSwapchains = 16;
 		static constexpr std::size_t ourMaxBuffers = 4096;
 		static constexpr std::size_t ourMaxTextures = 4096;

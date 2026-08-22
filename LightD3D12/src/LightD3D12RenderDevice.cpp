@@ -2,6 +2,7 @@
 #include <cstdio>
 
 #include "LightD3D12BaseMips.hpp"
+#include "LightD3D12CommandBatch.hpp"
 #include "LightD3D12ManagerImpl.hpp"
 #include "LightD3D12ShaderCompiler.hpp"
 #include "LightD3D12StagingDevice.hpp"
@@ -17,7 +18,7 @@ namespace lightd3d12
 			uint32_t index,
 			uint32_t generation ) noexcept
 		{
-#if defined( _DEBUG )
+		#if defined( _DEBUG )
 			char message[ 192 ]{};
 			std::snprintf(
 				message,
@@ -27,11 +28,11 @@ namespace lightd3d12
 				index,
 				generation );
 			OutputDebugStringA( message );
-#else
-			static_cast<void>( resourceType );
-			static_cast<void>( index );
-			static_cast<void>( generation );
-#endif
+		#else
+			static_cast< void >(resourceType);
+			static_cast< void >(index);
+			static_cast< void >(generation);
+		#endif
 		}
 
 		struct TextureCreationPlan final
@@ -51,10 +52,10 @@ namespace lightd3d12
 			for( uint32_t slotOffset = 0; slotOffset < slotCount; ++slotOffset )
 			{
 				const uint32_t bit = 1u << slotOffset;
-				if( ( allocatedMask & bit ) == 0 )
+				if( (allocatedMask & bit) == 0 )
 				{
 					allocatedMask |= bit;
-					return static_cast<SlotType>( firstSlot + slotOffset );
+					return static_cast< SlotType >( firstSlot + slotOffset );
 				}
 			}
 
@@ -63,7 +64,7 @@ namespace lightd3d12
 
 		[[nodiscard]] uint64_t AlignUp( uint64_t value, uint64_t alignment ) noexcept
 		{
-			return ( value + alignment - 1u ) & ~( alignment - 1u );
+			return (value + alignment - 1u) & ~(alignment - 1u);
 		}
 
 		[[nodiscard]] uint32_t ToPublicDescriptorIndex( uint32_t index ) noexcept
@@ -213,7 +214,7 @@ namespace lightd3d12
 
 		D3D12_RESOURCE_FLAGS
 			ResolveTextureResourceFlags( TextureUsage usage, D3D12_RESOURCE_FLAGS additionalFlags,
-									 bool requiresTypedUavViews ) noexcept
+										 bool requiresTypedUavViews ) noexcept
 		{
 			D3D12_RESOURCE_FLAGS flags = additionalFlags;
 			if( HasTextureUsage( usage, TextureUsage::RenderTarget ) )
@@ -239,7 +240,7 @@ namespace lightd3d12
 		{
 			constexpr D3D12_RESOURCE_FLAGS allowedAdditionalFlags =
 				D3D12_RESOURCE_FLAG_ALLOW_SIMULTANEOUS_ACCESS;
-			if( ( desc.additionalResourceFlags & ~allowedAdditionalFlags ) != 0 )
+			if( (desc.additionalResourceFlags & ~allowedAdditionalFlags) != 0 )
 			{
 				throw std::runtime_error(
 					"TextureDesc::additionalResourceFlags supports only "
@@ -507,8 +508,7 @@ namespace lightd3d12
 	ICommandBuffer& RenderDevice::AcquireCommandBuffer()
 	{
 		DeviceManager::Impl& impl = *manager_->impl_;
-		DeviceManager::Impl::QueueContext& graphicsQueue =
-			impl.GetGraphicsQueueContext();
+		DeviceManager::Impl::QueueContext& graphicsQueue = impl.GetGraphicsQueueContext();
 		std::unique_ptr<CommandBufferImpl>* availableSlot = nullptr;
 		for( std::unique_ptr<CommandBufferImpl>& activeCommandBuffer :
 			 graphicsQueue.activeCommandBuffers_ )
@@ -522,9 +522,9 @@ namespace lightd3d12
 
 		if( availableSlot == nullptr )
 		{
-			throw std::runtime_error(
+			throw std::length_error(
 				"A maximum of " +
-				std::to_string( DeviceManager::Impl::ourMaxActiveCommandBuffers ) +
+				std::to_string( ourMaxActiveCommandBuffers ) +
 				" active command buffers are allowed per render device." );
 		}
 
@@ -553,133 +553,23 @@ namespace lightd3d12
 		return nativeSwapchain->GetCurrentTexture();
 	}
 
+	SubmitHandle RenderDevice::SubmitBatch( ICommandBuffer* const* commandBuffers, uint32_t commandBufferCount, TextureHandle presentTexture ) const
+	{
+		return SubmitCommandBufferBatch(
+			*manager_->impl_, commandBuffers, commandBufferCount, presentTexture );
+	}
+
 	SubmitHandle RenderDevice::Submit( ICommandBuffer& buffer,
 									   TextureHandle presentTexture )
 	{
-		DeviceManager::Impl& impl = *manager_->impl_;
-		DeviceManager::Impl::QueueContext& graphicsQueue =
-			impl.GetGraphicsQueueContext();
-		CommandBufferImpl* commandBuffer = dynamic_cast< CommandBufferImpl* >(&buffer);
-		if( commandBuffer == nullptr )
-		{
-			throw std::runtime_error(
-				"The command buffer does not belong to this render device." );
-		}
-
-		std::unique_ptr<CommandBufferImpl>* activeSlot = nullptr;
-		for( std::unique_ptr<CommandBufferImpl>& activeCommandBuffer :
-			 graphicsQueue.activeCommandBuffers_ )
-		{
-			if( activeCommandBuffer.get() == commandBuffer )
-			{
-				activeSlot = &activeCommandBuffer;
-				break;
-			}
-		}
-
-		if( activeSlot == nullptr )
-		{
-			throw std::runtime_error(
-				"The command buffer does not belong to this render device." );
-		}
-
-		if( commandBuffer->IsRendering() )
-		{
-			throw std::runtime_error(
-				"Cannot submit a command buffer while a render pass is still active." );
-		}
-
-		if( presentTexture.Valid() )
-		{
-			commandBuffer->CmdTransitionTexture( presentTexture,
-												 D3D12_RESOURCE_STATE_PRESENT );
-		}
-
-		CommandBufferImpl::SubmitFixupResources submitFixup =
-			commandBuffer->BuildSubmitFixup();
-		const SubmitHandle handle = graphicsQueue.immediateCommands_->Submit(
-			commandBuffer->Wrapper(), submitFixup.commandList_.Get() );
-		commandBuffer->CommitSubmittedTextureStates();
-		if( submitFixup.Valid() )
-		{
-			impl.AddDeferredRelease(
-				handle, [ allocator = std::move( submitFixup.allocator_ ),
-				commandList = std::move( submitFixup.commandList_ ) ]() mutable
-				{
-					commandList.Reset();
-					allocator.Reset();
-				} );
-		}
-
-		activeSlot->reset();
-
-		if( presentTexture.Valid() )
-		{
-			Swapchain* owningSwapchain = impl.GetOwningSwapchain( presentTexture );
-			if( owningSwapchain == nullptr )
-			{
-				throw std::runtime_error(
-					"Present texture does not belong to a swapchain." );
-			}
-
-			owningSwapchain->Present();
-		}
-		impl.ProcessDeferredReleases();
-		return handle;
+		ICommandBuffer* commandBuffers[] = { &buffer };
+		return SubmitBatch( commandBuffers, 1, presentTexture );
 	}
 
 	SubmitHandle RenderDevice::Submit( ICommandBuffer& buffer ) const
 	{
-		DeviceManager::Impl& impl = *manager_->impl_;
-		DeviceManager::Impl::QueueContext& graphicsQueue =
-			impl.GetGraphicsQueueContext();
-		CommandBufferImpl* commandBuffer = dynamic_cast< CommandBufferImpl* >(&buffer);
-		if( commandBuffer == nullptr )
-		{
-			throw std::runtime_error(
-				"The command buffer does not belong to this render device." );
-		}
-
-		std::unique_ptr<CommandBufferImpl>* activeSlot = nullptr;
-		for( std::unique_ptr<CommandBufferImpl>& activeCommandBuffer :
-			 graphicsQueue.activeCommandBuffers_ )
-		{
-			if( activeCommandBuffer.get() == commandBuffer )
-			{
-				activeSlot = &activeCommandBuffer;
-				break;
-			}
-		}
-
-		if( activeSlot == nullptr )
-		{
-			throw std::runtime_error(
-				"The command buffer does not belong to this render device." );
-		}
-
-		if( commandBuffer->IsRendering() )
-		{
-			throw std::runtime_error(
-				"Cannot submit a command buffer while a render pass is still active." );
-		}
-
-		CommandBufferImpl::SubmitFixupResources submitFixup = commandBuffer->BuildSubmitFixup();
-		const SubmitHandle handle = graphicsQueue.immediateCommands_->Submit( commandBuffer->Wrapper(), submitFixup.commandList_.Get() );
-		commandBuffer->CommitSubmittedTextureStates();
-		if( submitFixup.Valid() )
-		{
-			impl.AddDeferredRelease(
-				handle, [ allocator = std::move( submitFixup.allocator_ ),
-				commandList = std::move( submitFixup.commandList_ ) ]() mutable
-				{
-					commandList.Reset();
-					allocator.Reset();
-				} );
-		}
-		activeSlot->reset();
-
-		return handle;
-
+		ICommandBuffer* commandBuffers[] = { &buffer };
+		return SubmitBatch( commandBuffers, 1 );
 	}
 	SubmitHandle RenderDevice::SubmitAndPresent( ICommandBuffer& buffer, SwapchainHandle swapchain )
 	{
@@ -972,7 +862,7 @@ namespace lightd3d12
 		}
 
 		impl.stagingDevice_->BufferSubData(
-			resource, static_cast<size_t>( offset ), static_cast<size_t>( size ), data );
+			resource, static_cast< size_t >(offset), static_cast< size_t >(size), data );
 	}
 
 	TextureHandle RenderDevice::CreateTexture( const TextureDesc& desc )
@@ -1025,7 +915,7 @@ namespace lightd3d12
 	}
 
 	TextureHandle RenderDevice::ImportTexture( ID3D12Resource* nativeTexture,
-											 const TextureDesc& desc )
+											   const TextureDesc& desc )
 	{
 		if( nativeTexture == nullptr )
 		{

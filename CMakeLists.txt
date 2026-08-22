@@ -40,6 +40,7 @@ set(LIGHTD3D12_PUBLIC_HEADERS
 set(LIGHTD3D12_PRIVATE_HEADERS
     "${LIGHTD3D12_ROOT}/src/d3dx12.h"
     "${LIGHTD3D12_ROOT}/src/LightD3D12BaseMips.hpp"
+    "${LIGHTD3D12_ROOT}/src/LightD3D12CommandBatch.hpp"
     "${LIGHTD3D12_ROOT}/src/LightD3D12CommandBuffer.hpp"
     "${LIGHTD3D12_ROOT}/src/LightD3D12ImmediateCommands.hpp"
     "${LIGHTD3D12_ROOT}/src/LightD3D12Internal.hpp"
@@ -52,6 +53,7 @@ set(LIGHTD3D12_PRIVATE_HEADERS
 
 set(LIGHTD3D12_SOURCES
     "${LIGHTD3D12_ROOT}/src/LightD3D12BaseMips.cpp"
+    "${LIGHTD3D12_ROOT}/src/LightD3D12CommandBatch.cpp"
     "${LIGHTD3D12_ROOT}/src/LightD3D12CommandBuffer.cpp"
     "${LIGHTD3D12_ROOT}/src/LightD3D12DeviceManager.cpp"
     "${LIGHTD3D12_ROOT}/src/LightD3D12ImmediateCommands.cpp"
