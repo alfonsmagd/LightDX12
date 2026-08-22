@@ -12,8 +12,97 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: Detect Changed Areas
+    runs-on: windows-2025
+    outputs:
+      engine: ${{ steps.filter.outputs.engine }}
+      tests: ${{ steps.filter.outputs.tests }}
+      app: ${{ steps.filter.outputs.app }}
+      examples: ${{ steps.filter.outputs.examples }}
+      cmake: ${{ steps.filter.outputs.cmake }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed areas
+        id: filter
+        shell: pwsh
+        run: |
+          if ( "${{ github.event_name }}" -eq "pull_request" ) {
+              $baseSha = "${{ github.event.pull_request.base.sha }}"
+              $targetSha = "${{ github.event.pull_request.head.sha }}"
+          } else {
+              $baseSha = "${{ github.event.before }}"
+              $targetSha = "$env:GITHUB_SHA"
+          }
+
+          $zeroSha = "0000000000000000000000000000000000000000"
+          if ( [string]::IsNullOrWhiteSpace( $baseSha ) -or $baseSha -eq $zeroSha ) {
+              $changedFiles = @( git ls-tree -r --name-only $targetSha )
+          } else {
+              git cat-file -e "$baseSha^{commit}" 2>$null
+              if ( $LASTEXITCODE -eq 0 ) {
+                  $changedFiles = @( git diff --name-only $baseSha $targetSha )
+              } else {
+                  $changedFiles = @( git ls-tree -r --name-only $targetSha )
+              }
+          }
+
+          function Test-PathChange( [string[]] $patterns ) {
+              foreach ( $changedFile in $changedFiles ) {
+                  foreach ( $pattern in $patterns ) {
+                      if ( $changedFile -like $pattern ) {
+                          return $true
+                      }
+                  }
+              }
+              return $false
+          }
+
+          $engineChanged = Test-PathChange @(
+              "Ldx12/*",
+              "CMakeLists.txt",
+              "cmake/Ldx12BaseMipsShader.hpp.in",
+              "GenerateSolution.bat",
+              ".github/workflows/compile-and-ctest-windows-cmake.yml"
+          )
+          $testsChanged = Test-PathChange @(
+              "tests/Ldx12/*",
+              "tests/Ldx12Tests.cpp",
+              "tests/Ldx12StressTests.cpp",
+              "tests/Ldx12FrameStressTests.cpp",
+              "tests/Ldx12CommandStreamStressTests.cpp"
+          )
+          $appChanged = Test-PathChange @(
+              "App/*",
+              "third_party/imgui/*",
+              "tests/NodeGraphTests.cpp"
+          )
+          $examplesChanged = Test-PathChange @(
+              "samples/*"
+          )
+          $cmakeChanged = Test-PathChange @(
+              "cmake/Ldx12Config.cmake.in",
+              "examples/InstalledLdx12/*",
+              "tests/cmake/*"
+          )
+
+          "engine=$($engineChanged.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+          "tests=$($testsChanged.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+          "app=$($appChanged.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+          "examples=$($examplesChanged.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+          "cmake=$($cmakeChanged.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+
+          $changedFiles | ForEach-Object { Write-Host "Changed: $_" }
+
   ldx12-tests:
     name: Ldx12 Core and Tests
+    needs: changes
+    if: needs.changes.outputs.engine == 'true' || needs.changes.outputs.tests == 'true'
     runs-on: windows-2025
     timeout-minutes: 15
 
@@ -37,6 +126,8 @@ jobs:
 
   cmake-compatibility:
     name: CMake ${{ matrix.cmake-version }} Compatibility
+    needs: changes
+    if: needs.changes.outputs.engine == 'true' || needs.changes.outputs.cmake == 'true'
     runs-on: windows-2025
     timeout-minutes: 20
     strategy:
@@ -107,8 +198,35 @@ jobs:
       - name: Run FetchContent consumer
         run: ctest --test-dir build-fetch-consumer --output-on-failure
 
+  app:
+    name: App and Tests
+    needs: changes
+    if: needs.changes.outputs.engine == 'true' || needs.changes.outputs.app == 'true'
+    runs-on: windows-2025
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Configure App
+        run: >-
+          cmake -S . -B build-app
+          -DLDX12_BUILD_APP=ON
+          -DLDX12_BUILD_EXAMPLES=OFF
+          -DLDX12_BUILD_TESTS=ON
+          -DLDX12_INSTALL=OFF
+
+      - name: Build App
+        run: cmake --build build-app --config Debug --target App Ldx12NodeGraphTests --parallel
+
+      - name: Run App tests
+        run: ctest --test-dir build-app -C Debug -R "^Ldx12NodeGraphTests$" --output-on-failure
+
   examples:
-    name: App and Examples
+    name: Examples
+    needs: changes
+    if: needs.changes.outputs.engine == 'true' || needs.changes.outputs.examples == 'true'
     runs-on: windows-2025
     timeout-minutes: 20
 

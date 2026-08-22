@@ -6,6 +6,8 @@
 #include <exception>
 #include <iostream>
 
+// Keeps submitting command buffers while earlier GPU work is pending to validate automatic command-buffer and allocator recycling.
+
 namespace
 {
 	constexpr uint32_t ourSubmissionCount = 10'000;

@@ -217,20 +217,9 @@ Ldx12/
 
 Ldx12 is a compact, evolving renderer abstraction rather than a compatibility promise or finished general-purpose engine. Its goal is to keep modern Direct3D 12 experiments understandable: explicit enough to teach the underlying model, small enough to change without fighting a framework.
 
-## Stress test
+## Tests
 
-`Ldx12StressTests` repeatedly fills and fragments the bindless heap, creates and destroys GPU resources, records batches at the four-command-buffer limit, forces cross-command-list texture-state fixups and releases resources while their submission is still pending. `Ldx12FrameStressTests` simulates 10,000 offscreen frames with three frame slots, without waiting immediately after each submit. It waits only when the CPU catches the GPU and must reuse a slot, then reports total time, average CPU frame time, throughput, slot-wait count and final drain time. `Ldx12CommandStreamStressTests` deliberately blocks the GPU queue, fills all 68 internal immediate slots, releases the queue and continues until 10,000 submissions without an explicit wait inside the loop. This validates automatic allocator and command-list recycling when the CPU keeps producing commands while previous submissions remain pending.
-
-```bat
-cmake --build build --config Debug --target Ldx12StressTests --parallel
-ctest --test-dir build -C Debug -R Ldx12StressTests --output-on-failure --verbose
-
-cmake --build build --config Debug --target Ldx12FrameStressTests --parallel
-ctest --test-dir build -C Debug -R Ldx12FrameStressTests --output-on-failure --verbose
-
-cmake --build build --config Debug --target Ldx12CommandStreamStressTests --parallel
-ctest --test-dir build -C Debug -R Ldx12CommandStreamStressTests --output-on-failure --verbose
-```
+Test descriptions and commands are available in the [tests documentation](tests/README.md).
 
 ## Supported scope
 

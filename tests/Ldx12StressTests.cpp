@@ -5,6 +5,8 @@
 #include <exception>
 #include <iostream>
 
+// Exercises resource lifetime, bindless descriptor recycling, command batches and texture-state fixups under repeated allocation pressure.
+
 namespace
 {
 	constexpr uint32_t ourResourceCount = 128;

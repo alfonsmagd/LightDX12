@@ -5,6 +5,8 @@
 #include <exception>
 #include <iostream>
 
+// Simulates 10,000 offscreen frames with three reusable slots and waits only before reusing a slot that is still busy.
+
 namespace
 {
 	constexpr uint32_t ourFrameCount = 10'000;
