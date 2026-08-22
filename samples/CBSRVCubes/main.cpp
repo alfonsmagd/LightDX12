@@ -1,5 +1,5 @@
-#include "LightD3D12/LightD3D12.hpp"
-#include "LightD3D12/LightHLSLLoader.hpp"
+#include "Ldx12/Ldx12.hpp"
+#include "Ldx12/HLSLLoader.hpp"
 
 #include <algorithm>
 #include <array>
@@ -10,7 +10,7 @@
 #include <stdexcept>
 #include <vector>
 
-using namespace lightd3d12;
+using namespace ldx12;
 
 namespace
 {
@@ -154,8 +154,8 @@ namespace
 	RenderPipelineState CreateCBSRVCubesPipeline( RenderDevice& ctx, DXGI_FORMAT colorFormat, DXGI_FORMAT depthFormat )
 	{
 		RenderPipelineDesc desc{};
-		desc.vertexShader = LightHLSLLoader::LoadStage( "shaders/CBSRVCubes.hlsl", "vs_6_6", "VSMain" );
-		desc.fragmentShader = LightHLSLLoader::LoadStage( "shaders/CBSRVCubes.hlsl", "ps_6_6", "PSMain" );
+		desc.vertexShader = HLSLLoader::LoadStage( "shaders/CBSRVCubes.hlsl", "vs_6_6", "VSMain" );
+		desc.fragmentShader = HLSLLoader::LoadStage( "shaders/CBSRVCubes.hlsl", "ps_6_6", "PSMain" );
 		desc.color[ 0 ].format = colorFormat;
 		desc.depthFormat = depthFormat;
 		desc.rasterizerState.CullMode = D3D12_CULL_MODE_BACK;
@@ -335,7 +335,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		windowClass.cbSize = sizeof( WNDCLASSEX );
 		windowClass.lpfnWndProc = WindowProc;
 		windowClass.hInstance = instance;
-		windowClass.lpszClassName = L"LightD3D12CBSRVCubesWindow";
+		windowClass.lpszClassName = L"Ldx12CBSRVCubesWindow";
 		windowClass.hCursor = LoadCursor( nullptr, IDC_ARROW );
 		RegisterClassExW( &windowClass );
 
@@ -345,7 +345,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		HWND hwnd = CreateWindowExW(
 			0,
 			windowClass.lpszClassName,
-			L"LightD3D12 CB + SRV Cubes",
+			L"Ldx12 CB + SRV Cubes",
 			WS_OVERLAPPEDWINDOW,
 			CW_USEDEFAULT,
 			CW_USEDEFAULT,
@@ -367,7 +367,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		AppState app{};
 		SetWindowLongPtr( hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>( &app ) );
 
-		LightHLSLLoader::SetRootDirectory( std::filesystem::path( __FILE__ ).parent_path() );
+		HLSLLoader::SetRootDirectory( std::filesystem::path( __FILE__ ).parent_path() );
 
 		ContextDesc contextDesc{};
 		contextDesc.enableDebugLayer = true;
@@ -474,7 +474,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 	catch( const std::exception& error )
 	{
 		DeviceManager::ShutdownSingleton();
-		MessageBoxA( nullptr, error.what(), "LightD3D12 CB + SRV Cubes failed", MB_ICONERROR | MB_OK );
+		MessageBoxA( nullptr, error.what(), "Ldx12 CB + SRV Cubes failed", MB_ICONERROR | MB_OK );
 		return 1;
 	}
 }

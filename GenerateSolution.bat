@@ -17,4 +17,4 @@ if errorlevel 1 (
 )
 
 echo.
-echo Solution generated at build\LightDX12.sln
+echo Solution generated at build\Ldx12.sln

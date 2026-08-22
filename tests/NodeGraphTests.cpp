@@ -52,7 +52,7 @@ int main()
 		const App::TextureReference texture = std::get<App::TextureReference>( textureResult.value );
 		Require( texture.resourceId == 77 && texture.width == 256 && texture.height == 128, "Texture2D evaluation result is incorrect." );
 
-		std::cout << "LightDX12 NodeGraph tests passed.\n";
+		std::cout << "Ldx12 NodeGraph tests passed.\n";
 		return 0;
 	}
 	catch( const std::exception& exception )

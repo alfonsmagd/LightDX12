@@ -1,7 +1,7 @@
-#include <LightD3D12/LightD3D12.hpp>
+#include <Ldx12/Ldx12.hpp>
 
 int main()
 {
-	lightd3d12::DeviceManager::ShutdownSingleton();
+	ldx12::DeviceManager::ShutdownSingleton();
 	return 0;
 }

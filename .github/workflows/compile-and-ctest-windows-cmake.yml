@@ -12,8 +12,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  lightd3d12-tests:
-    name: LightD3D12 Core and Tests
+  ldx12-tests:
+    name: Ldx12 Core and Tests
     runs-on: windows-2025
     timeout-minutes: 15
 
@@ -24,13 +24,13 @@ jobs:
       - name: Configure core tests
         run: >-
           cmake -S . -B build-core-tests
-          -DLIGHTDX12_BUILD_APP=OFF
-          -DLIGHTDX12_BUILD_EXAMPLES=OFF
-          -DLIGHTDX12_BUILD_TESTS=ON
-          -DLIGHTDX12_INSTALL=OFF
+          -DLDX12_BUILD_APP=OFF
+          -DLDX12_BUILD_EXAMPLES=OFF
+          -DLDX12_BUILD_TESTS=ON
+          -DLDX12_INSTALL=OFF
 
       - name: Build core tests
-        run: cmake --build build-core-tests --config Debug --target LightDX12Tests --parallel
+        run: cmake --build build-core-tests --config Debug --target Ldx12Tests --parallel
 
       - name: Run core tests
         run: ctest --test-dir build-core-tests -C Debug --output-on-failure
@@ -73,24 +73,24 @@ jobs:
       - name: Configure core-only package
         run: >-
           cmake -S . -B build-core
-          -DLIGHTDX12_BUILD_APP=OFF
-          -DLIGHTDX12_BUILD_EXAMPLES=OFF
-          -DLIGHTDX12_BUILD_TESTS=OFF
-          -DLIGHTDX12_INSTALL=ON
+          -DLDX12_BUILD_APP=OFF
+          -DLDX12_BUILD_EXAMPLES=OFF
+          -DLDX12_BUILD_TESTS=OFF
+          -DLDX12_INSTALL=ON
           -G Ninja
           -DCMAKE_BUILD_TYPE=Debug
 
       - name: Build core-only package
-        run: cmake --build build-core --target LightD3D12 --parallel
+        run: cmake --build build-core --target Ldx12 --parallel
 
-      - name: Install LightD3D12 package
+      - name: Install Ldx12 package
         run: |
-          $installPrefix = Join-Path $env:RUNNER_TEMP "LightD3D12-install"
+          $installPrefix = Join-Path $env:RUNNER_TEMP "Ldx12-install"
           cmake --install build-core --prefix $installPrefix
-          "LIGHTD3D12_INSTALL_PREFIX=$installPrefix" >> $env:GITHUB_ENV
+          "LDX12_INSTALL_PREFIX=$installPrefix" >> $env:GITHUB_ENV
 
       - name: Configure installed consumer
-        run: cmake -S tests/cmake/install-consumer -B build-install-consumer -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_PREFIX_PATH="$env:LIGHTD3D12_INSTALL_PREFIX"
+        run: cmake -S examples/InstalledLdx12 -B build-install-consumer -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_PREFIX_PATH="$env:LDX12_INSTALL_PREFIX"
 
       - name: Build installed consumer
         run: cmake --build build-install-consumer --parallel
@@ -110,10 +110,10 @@ jobs:
       - name: Configure examples
         run: >-
           cmake -S . -B build-examples
-          -DLIGHTDX12_BUILD_APP=ON
-          -DLIGHTDX12_BUILD_EXAMPLES=ON
-          -DLIGHTDX12_BUILD_TESTS=OFF
-          -DLIGHTDX12_INSTALL=OFF
+          -DLDX12_BUILD_APP=ON
+          -DLDX12_BUILD_EXAMPLES=ON
+          -DLDX12_BUILD_TESTS=OFF
+          -DLDX12_INSTALL=OFF
 
       - name: Build examples
         run: cmake --build build-examples --config Debug --parallel

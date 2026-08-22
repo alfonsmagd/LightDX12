@@ -1,6 +1,0 @@
-#pragma once
-
-namespace lightd3d12::detail
-{
-	inline constexpr char ourBaseMipsShaderSource[] = R"LDX12(@LIGHTD3D12_BASE_MIPS_SHADER_SOURCE@)LDX12";
-}

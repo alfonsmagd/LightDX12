@@ -1,7 +1,7 @@
 # ImGui Node Editor
 
 This sample implements a small typed node graph and editor without changing
-`LightD3D12` and without depending on a separate node-editor library.
+`Ldx12` and without depending on a separate node-editor library.
 
 ## Included node types
 
@@ -31,7 +31,7 @@ panning and mouse interaction.
 
 The initial graph calculates `(3 + 2, 3 - 2, (3 + 2) * (3 - 2))`, producing
 `Vector3(5, 1, 5)`, and then calculates its length. A second branch connects a
-real LightD3D12 texture through `Invertir textura CPU` to the preview node. The
+real Ldx12 texture through `Invertir textura CPU` to the preview node. The
 modifier loops over the RGBA8 array in RAM; no compute or pixel shader modifies
 the image. The App layer registers the uploaded texture in ImGui's descriptor
 heap; the renderer itself remains unchanged.

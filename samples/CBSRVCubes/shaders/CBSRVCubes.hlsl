@@ -1,7 +1,7 @@
-#include "LightD3D12_Defines.hlsli"
+#include "Ldx12_Defines.hlsli"
 
-#define SAMPLE_MATRIX_SRV_SLOT LIGHTD3D12_SRV_SLOT_FREESRV0
-#define SAMPLE_COLOR_CBV_SLOT LIGHTD3D12_CBV_SLOT_FREECB0
+#define SAMPLE_MATRIX_SRV_SLOT LDX12_SRV_SLOT_FREESRV0
+#define SAMPLE_COLOR_CBV_SLOT LDX12_CBV_SLOT_FREECB0
 
 cbuffer PushConstants : register(b0)
 {

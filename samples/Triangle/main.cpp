@@ -1,8 +1,8 @@
-#include "LightD3D12/LightD3D12.hpp"
+#include "Ldx12/Ldx12.hpp"
 
 #include <stdexcept>
 
-using namespace lightd3d12;
+using namespace ldx12;
 
 namespace
 {
@@ -117,7 +117,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		windowClass.cbSize = sizeof( WNDCLASSEX );
 		windowClass.lpfnWndProc = WindowProc;
 		windowClass.hInstance = instance;
-		windowClass.lpszClassName = L"LightD3D12TriangleWindow";
+		windowClass.lpszClassName = L"Ldx12TriangleWindow";
 		windowClass.hCursor = LoadCursor( nullptr, IDC_ARROW );
 		RegisterClassExW( &windowClass );
 
@@ -127,7 +127,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		HWND hwnd = CreateWindowExW(
 			0,
 			windowClass.lpszClassName,
-			L"LightD3D12 Triangle",
+			L"Ldx12 Triangle",
 			WS_OVERLAPPEDWINDOW,
 			CW_USEDEFAULT,
 			CW_USEDEFAULT,
@@ -220,7 +220,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 	catch( const std::exception& )
 	{
 		DeviceManager::ShutdownSingleton();
-		MessageBoxA( nullptr, "LightD3D12 Triangle failed.", "LightD3D12", MB_ICONERROR | MB_OK );
+		MessageBoxA( nullptr, "Ldx12 Triangle failed.", "Ldx12", MB_ICONERROR | MB_OK );
 		return 1;
 	}
 }

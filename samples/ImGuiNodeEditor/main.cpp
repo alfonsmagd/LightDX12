@@ -1,6 +1,6 @@
 #include "App/ImGuiLayer.hpp"
 #include "App/NodeGraph.hpp"
-#include "LightD3D12/LightD3D12.hpp"
+#include "Ldx12/Ldx12.hpp"
 
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "imgui.h"
@@ -16,7 +16,7 @@
 #include <unordered_map>
 #include <vector>
 
-using namespace lightd3d12;
+using namespace ldx12;
 
 namespace
 {
@@ -564,13 +564,13 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		windowClass.cbSize = sizeof( WNDCLASSEXW );
 		windowClass.lpfnWndProc = WindowProc;
 		windowClass.hInstance = instance;
-		windowClass.lpszClassName = L"LightDX12ImGuiNodeEditor";
+		windowClass.lpszClassName = L"Ldx12ImGuiNodeEditor";
 		windowClass.hCursor = LoadCursor( nullptr, IDC_ARROW );
 		RegisterClassExW( &windowClass );
 
 		constexpr uint32_t initialWidth = 1500;
 		constexpr uint32_t initialHeight = 900;
-		HWND window = CreateWindowExW( 0, windowClass.lpszClassName, L"LightDX12 - ImGui Node Editor", WS_OVERLAPPEDWINDOW,
+		HWND window = CreateWindowExW( 0, windowClass.lpszClassName, L"Ldx12 - ImGui Node Editor", WS_OVERLAPPEDWINDOW,
 			CW_USEDEFAULT, CW_USEDEFAULT, initialWidth, initialHeight, nullptr, nullptr, instance, nullptr );
 		if( !window ) throw std::runtime_error( "No se pudo crear la ventana." );
 

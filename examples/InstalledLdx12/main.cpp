@@ -1,0 +1,35 @@
+#include <Ldx12/Ldx12.hpp>
+
+#include <exception>
+#include <iostream>
+
+int main()
+{
+	try
+	{
+		ldx12::ContextDesc context{};
+		context.preferHighPerformanceAdapter = false;
+
+		ldx12::DeviceManager& manager = ldx12::DeviceManager::Initialize( context );
+		ldx12::RenderDevice& device = *manager.GetRenderDevice();
+
+		ldx12::BufferDesc bufferDesc{};
+		bufferDesc.debugName = "Installed Ldx12 example buffer";
+		bufferDesc.size = 256;
+		bufferDesc.heapType = D3D12_HEAP_TYPE_UPLOAD;
+
+		const ldx12::BufferHandle buffer = device.CreateBuffer( bufferDesc );
+		device.Destroy( buffer );
+		device.WaitIdle();
+		ldx12::DeviceManager::ShutdownSingleton();
+
+		std::cout << "Ldx12 installed package is working.\n";
+		return 0;
+	}
+	catch( const std::exception& exception )
+	{
+		ldx12::DeviceManager::ShutdownSingleton();
+		std::cerr << "Ldx12 initialization failed: " << exception.what() << '\n';
+		return 1;
+	}
+}

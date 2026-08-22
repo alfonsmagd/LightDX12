@@ -1,0 +1,6 @@
+#pragma once
+
+namespace ldx12::detail
+{
+	inline constexpr char ourBaseMipsShaderSource[] = R"LDX12(@LDX12_BASE_MIPS_SHADER_SOURCE@)LDX12";
+}
