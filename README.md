@@ -75,15 +75,30 @@ The complete lifetime of a single triangle frame remains compact (`CreateApplica
 
 ```cpp
 HWND hwnd = CreateApplicationWindow();
-SwapchainDesc swapchain{ MakeWin32WindowHandle( hwnd ), 1280, 720, true };
+
+SwapchainDesc swapchain{
+    MakeWin32WindowHandle( hwnd ),
+    1280,
+    720,
+    true
+};
+
 DeviceManager& manager = DeviceManager::Initialize( {}, swapchain );
 RenderDevice& device = *manager.GetRenderDevice();
 RenderPipelineState pipeline = CreateTrianglePipeline( device );
+
 TextureHandle backbuffer = device.GetCurrentSwapchainTexture();
-Framebuffer framebuffer{}; framebuffer.color[ 0 ].texture = backbuffer;
+Framebuffer framebuffer{};
+framebuffer.color[ 0 ].texture = backbuffer;
+
 ICommandBuffer& commands = device.AcquireCommandBuffer();
-commands.CmdBeginRendering( {}, framebuffer ); commands.CmdBindRenderPipeline( pipeline ); commands.CmdDraw( 3 ); commands.CmdEndRendering();
-device.Submit( commands, backbuffer ); device.WaitIdle();
+commands.CmdBeginRendering( {}, framebuffer );
+commands.CmdBindRenderPipeline( pipeline );
+commands.CmdDraw( 3 );
+commands.CmdEndRendering();
+
+device.Submit( commands, backbuffer );
+device.WaitIdle();
 DeviceManager::ShutdownSingleton();
 ```
 
