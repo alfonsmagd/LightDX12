@@ -50,6 +50,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
+      - name: Configure MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1
+
       - name: Install CMake ${{ matrix.cmake-version }}
         uses: lukka/get-cmake@latest
         with:
@@ -59,13 +62,13 @@ jobs:
         run: cmake --version
 
       - name: Configure source consumer
-        run: cmake -S tests/cmake/source-consumer -B build-source-consumer
+        run: cmake -S tests/cmake/source-consumer -B build-source-consumer -G Ninja -DCMAKE_BUILD_TYPE=Debug
 
       - name: Build source consumer
-        run: cmake --build build-source-consumer --config Debug --parallel
+        run: cmake --build build-source-consumer --parallel
 
       - name: Run source consumer
-        run: ctest --test-dir build-source-consumer -C Debug --output-on-failure
+        run: ctest --test-dir build-source-consumer --output-on-failure
 
       - name: Configure core-only package
         run: >-
@@ -74,24 +77,26 @@ jobs:
           -DLIGHTDX12_BUILD_EXAMPLES=OFF
           -DLIGHTDX12_BUILD_TESTS=OFF
           -DLIGHTDX12_INSTALL=ON
+          -G Ninja
+          -DCMAKE_BUILD_TYPE=Debug
 
       - name: Build core-only package
-        run: cmake --build build-core --config Debug --target LightD3D12 --parallel
+        run: cmake --build build-core --target LightD3D12 --parallel
 
       - name: Install LightD3D12 package
         run: |
           $installPrefix = Join-Path $env:RUNNER_TEMP "LightD3D12-install"
-          cmake --install build-core --config Debug --prefix $installPrefix
+          cmake --install build-core --prefix $installPrefix
           "LIGHTD3D12_INSTALL_PREFIX=$installPrefix" >> $env:GITHUB_ENV
 
       - name: Configure installed consumer
-        run: cmake -S tests/cmake/install-consumer -B build-install-consumer -DCMAKE_PREFIX_PATH="$env:LIGHTD3D12_INSTALL_PREFIX"
+        run: cmake -S tests/cmake/install-consumer -B build-install-consumer -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_PREFIX_PATH="$env:LIGHTD3D12_INSTALL_PREFIX"
 
       - name: Build installed consumer
-        run: cmake --build build-install-consumer --config Debug --parallel
+        run: cmake --build build-install-consumer --parallel
 
       - name: Run installed consumer
-        run: ctest --test-dir build-install-consumer -C Debug --output-on-failure
+        run: ctest --test-dir build-install-consumer --output-on-failure
 
   examples:
     name: App and Examples
