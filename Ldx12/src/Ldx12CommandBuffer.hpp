@@ -7,14 +7,12 @@
 
 namespace ldx12
 {
-	class DeviceManager::Impl;
-
 	class CommandBufferImpl final: public ICommandBuffer
 	{
 	public:
 		static constexpr uint32_t ourMaxTrackedTextures = 256;
 
-		CommandBufferImpl( DeviceManager::Impl& manager, ImmediateCommands::CommandListWrapper& wrapper );
+		CommandBufferImpl( DeviceManager& manager, ImmediateCommands::CommandListWrapper& wrapper );
 
 		void CmdBeginRendering( const RenderPass& renderPass, const Framebuffer& framebuffer ) override;
 		void CmdEndRendering() override;
@@ -32,7 +30,6 @@ namespace ldx12
 		void CmdDrawIndexed( uint32_t indexCount, uint32_t instanceCount = 1, uint32_t firstIndex = 0, int32_t vertexOffset = 0, uint32_t firstInstance = 0 ) override;
 		void CmdDrawIndexedIndirect( BufferHandle indirectBuffer, uint32_t drawCount, uint64_t byteOffset = 0 ) override;
 		void CmdDispatch( uint32_t groupCountX, uint32_t groupCountY = 1, uint32_t groupCountZ = 1 ) override;
-		ID3D12GraphicsCommandList* GetNativeGraphicsCommandList() override;
 
 		struct TrackedTextureState final
 		{
@@ -65,10 +62,11 @@ namespace ldx12
 		void CommitSubmittedTextureStates();
 
 	private:
+		ID3D12GraphicsCommandList* GetNativeGraphicsCommandList() override;
 		TrackedTextureState& GetTrackedTextureState( TextureHandle texture );
 		void TransitionTexture( TextureHandle texture, TextureResource& resource, D3D12_RESOURCE_STATES newState );
 
-		DeviceManager::Impl& manager_;
+		DeviceManager& manager_;
 		ImmediateCommands::CommandListWrapper& wrapper_;
 		bool isRendering_ = false;
 		uint32_t debugGroupDepth_ = 0;

@@ -1,4 +1,5 @@
 #include "TestTemplate.hpp"
+#include "Ldx12/Ldx12Native.hpp"
 
 #include <array>
 
@@ -14,6 +15,7 @@ namespace ldx12::tests
 		DeviceManager& manager = DeviceManager::Initialize( context );
 		guard.active = true;
 		RenderDevice& device = *manager.GetRenderDevice();
+		D3D12Native native = device.GetNative();
 
 		const SubmitHandle emptySubmission{};
 		Require( device.IsReady( emptySubmission ),
@@ -85,6 +87,8 @@ namespace ldx12::tests
 		device.Destroy( batchTexture );
 
 		ICommandBuffer& commandBuffer = device.AcquireCommandBuffer();
+		Require( native.GetCommandList( commandBuffer ) != nullptr,
+			"Command buffer does not expose its native D3D12 command list." );
 		commandBuffer.CmdSetViewport( 4.0f, 8.0f, 32.0f, 16.0f, 0.25f, 0.75f );
 		commandBuffer.CmdSetScissor( 4, 8, 36, 24 );
 		const SubmitHandle submission = device.Submit( commandBuffer );

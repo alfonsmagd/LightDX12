@@ -10,7 +10,7 @@
 
 namespace ldx12
 {
-	template<typename ImplObjType>
+	template<typename ResourceType>
 	class Handle final
 	{
 	public:

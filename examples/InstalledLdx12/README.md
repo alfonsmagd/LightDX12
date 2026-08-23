@@ -5,6 +5,9 @@ This project is intentionally independent from the Ldx12 source tree. The `LDX12
 - `ON` by default: download and build Ldx12 through `FetchContent`.
 - `OFF`: use an installed package through `find_package`.
 
+The executable also includes `Ldx12Native.hpp` to verify that optional native D3D12 access is installed correctly.
+Consumers use the installed public headers and `Ldx12.lib`; the library's `.cpp` files are already compiled into the static library and are not distributed.
+
 ## Installed package
 
 From the repository root, build and install the static library:

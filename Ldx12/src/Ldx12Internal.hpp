@@ -15,17 +15,6 @@
 #include <dxgidebug.h>
 #endif
 
-#ifndef LDX12_SINGLE_DIRECT_QUEUE
-#define LDX12_SINGLE_DIRECT_QUEUE 1
-#endif
-
-namespace ldx12
-{
-	inline constexpr uint32_t ourMaxActiveCommandBuffers = 64;
-	inline constexpr uint32_t ourMaxCommandBufferBatch = 4;
-	inline constexpr uint32_t ourMaxImmediateCommandBuffers = ourMaxActiveCommandBuffers + ourMaxCommandBufferBatch;
-}
-
 namespace ldx12::detail
 {
 	inline HRESULT CheckResult( HRESULT hr, const char* expression, const char* message )

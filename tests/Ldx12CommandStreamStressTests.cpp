@@ -1,4 +1,5 @@
 #include "Ldx12/TestTemplate.hpp"
+#include "Ldx12/Ldx12Native.hpp"
 
 #include <algorithm>
 #include <array>
@@ -32,8 +33,9 @@ namespace
 		DeviceManager& manager = DeviceManager::Initialize( context );
 		guard.active = true;
 		RenderDevice& device = *manager.GetRenderDevice();
-		ID3D12Device* nativeDevice = device.GetNativeDevice();
-		ID3D12CommandQueue* nativeQueue = device.GetNativeCommandQueue();
+		D3D12Native native = device.GetNative();
+		ID3D12Device* nativeDevice = native.GetDevice();
+		ID3D12CommandQueue* nativeQueue = native.GetCommandQueue();
 		Require( nativeDevice != nullptr && nativeQueue != nullptr, "Command-stream stress requires a native device and queue." );
 
 		ComPtr<ID3D12Fence> gateFence;

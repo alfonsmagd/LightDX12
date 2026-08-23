@@ -1,4 +1,5 @@
 #include "TestTemplate.hpp"
+#include "Ldx12/Ldx12Native.hpp"
 
 #include <array>
 
@@ -18,8 +19,9 @@ namespace ldx12::tests
 		DeviceManager& manager = DeviceManager::Initialize( context );
 		guard.active = true;
 		RenderDevice& device = *manager.GetRenderDevice();
-		Require( device.GetNativeDevice() != nullptr, "D3D12 device creation failed." );
-		Require( device.GetNativeCommandQueue() != nullptr, "D3D12 command queue creation failed." );
+		D3D12Native native = device.GetNative();
+		Require( native.GetDevice() != nullptr, "D3D12 device creation failed." );
+		Require( native.GetCommandQueue() != nullptr, "D3D12 command queue creation failed." );
 
 		BufferDesc genericBufferDesc{};
 		genericBufferDesc.debugName = "Ldx12Tests generic buffer";
@@ -27,6 +29,8 @@ namespace ldx12::tests
 		genericBufferDesc.heapType = D3D12_HEAP_TYPE_UPLOAD;
 		const BufferHandle genericBuffer = device.CreateBuffer( genericBufferDesc );
 		Require( genericBuffer.Valid(), "Generic buffer creation returned an invalid handle." );
+		Require( native.GetResource( genericBuffer ) != nullptr,
+			"Buffer does not expose a native D3D12 resource." );
 		Require( device.GetBindlessIndex( genericBuffer ) == LDX12_DESCRIPTOR_SLOT_INVALID,
 			"A buffer without an SRV unexpectedly owns a bindless descriptor." );
 		Require( device.GetConstantBufferIndex( genericBuffer ) == LDX12_DESCRIPTOR_SLOT_INVALID,
@@ -81,7 +85,7 @@ namespace ldx12::tests
 			textureUav < context.bindlessCapacity && textureUav != textureSrv,
 			"Texture UAV index is invalid or aliases its SRV." );
 
-		ID3D12Resource* nativeTexture = device.GetNativeTextureResource( texture );
+		ID3D12Resource* nativeTexture = native.GetResource( texture );
 		Require( nativeTexture != nullptr, "Texture does not expose a native D3D12 resource." );
 		const D3D12_RESOURCE_DESC nativeTextureDesc = nativeTexture->GetDesc();
 		Require( nativeTextureDesc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE2D,

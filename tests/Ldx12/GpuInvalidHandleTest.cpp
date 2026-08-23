@@ -1,4 +1,5 @@
 #include "TestTemplate.hpp"
+#include "Ldx12/Ldx12Native.hpp"
 
 namespace ldx12::tests
 {
@@ -15,6 +16,7 @@ namespace ldx12::tests
 		DeviceManager& manager = DeviceManager::Initialize( context );
 		guard.active = true;
 		RenderDevice& device = *manager.GetRenderDevice();
+		D3D12Native native = device.GetNative();
 
 		Require( !device.IsAlive( BufferHandle{} ),
 			"An empty buffer handle was reported as alive." );
@@ -75,7 +77,7 @@ namespace ldx12::tests
 		Require( device.IsAlive( replacementTexture ),
 			"A stale texture operation invalidated the replacement." );
 		RequireThrows<std::runtime_error>(
-			[&device, staleTexture] { device.GetNativeTextureResource( staleTexture ); },
+			[&native, staleTexture] { static_cast<void>( native.GetResource( staleTexture ) ); },
 			"A stale texture handle was accepted by a resource query." );
 
 		Require( device.Destroy( replacementBuffer ),

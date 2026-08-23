@@ -1,7 +1,10 @@
 #pragma once
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
+#include <deque>
+#include <functional>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -31,10 +34,19 @@ namespace ldx12
 	static constexpr uint32_t ourMaxBindlessDescriptors = 4096;
 	static constexpr uint32_t ourMaxRtvDescriptors = 256;
 	static constexpr uint32_t ourMaxDsvDescriptors = 64;
+	static constexpr uint32_t ourMaxActiveCommandBuffers = 64;
+	static constexpr uint32_t ourMaxCommandBufferBatch = 4;
+	static constexpr uint32_t ourMaxImmediateCommandBuffers = ourMaxActiveCommandBuffers + ourMaxCommandBufferBatch;
 
 	struct BufferResource;
 	struct TextureResource;
 	struct SwapchainResource;
+	class BaseMips;
+	class CommandBufferImpl;
+	class D3D12Native;
+	class ImmediateCommands;
+	class StagingDevice;
+	class Swapchain;
 
 	struct NativeWindowHandle
 	{
@@ -328,6 +340,114 @@ namespace ldx12
 		bool vsync = true;
 	};
 
+	struct BufferResource final
+	{
+		[[nodiscard]] uint8_t* GetMappedPtr() const noexcept
+		{
+			return static_cast<uint8_t*>( mappedPtr_ );
+		}
+
+		[[nodiscard]] bool IsMapped() const noexcept
+		{
+			return mappedPtr_ != nullptr;
+		}
+
+		void BufferSubData( size_t offset, size_t size, const void* data );
+		[[nodiscard]] D3D12_VERTEX_BUFFER_VIEW GetVertexBufferView( uint32_t stride = 0 ) const noexcept;
+		[[nodiscard]] D3D12_INDEX_BUFFER_VIEW GetIndexBufferView( DXGI_FORMAT format = DXGI_FORMAT_R32_UINT ) const noexcept;
+
+		static D3D12_RESOURCE_DESC BufferDesc( uint64_t size, D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE ) noexcept;
+
+		ComPtr<ID3D12Resource> resource_;
+		D3D12_GPU_VIRTUAL_ADDRESS gpuAddress_ = 0;
+		uint64_t bufferSize_ = 0;
+		uint32_t bufferStride_ = 0;
+		BufferDesc::BufferType bufferType_ = BufferDesc::BufferType::Generic;
+		D3D12_RESOURCE_STATES currentState_ = D3D12_RESOURCE_STATE_COMMON;
+		D3D12_RESOURCE_FLAGS resourceFlags_ = D3D12_RESOURCE_FLAG_NONE;
+		D3D12_RESOURCE_DESC desc_ = {};
+		D3D12_HEAP_TYPE heapType_ = D3D12_HEAP_TYPE_DEFAULT;
+		D3D12_CPU_DESCRIPTOR_HANDLE srvHandle_{ 0 };
+		D3D12_CPU_DESCRIPTOR_HANDLE cbvHandle_{ 0 };
+		uint32_t srvIndex_ = UINT32_MAX;
+		uint32_t cbvIndex_ = UINT32_MAX;
+		void* mappedPtr_ = nullptr;
+	};
+
+	struct TextureResource final
+	{
+		struct ResolvedFormats final
+		{
+			DXGI_FORMAT resource_ = DXGI_FORMAT_UNKNOWN;
+			DXGI_FORMAT srv_ = DXGI_FORMAT_UNKNOWN;
+			DXGI_FORMAT uav_ = DXGI_FORMAT_UNKNOWN;
+			DXGI_FORMAT rtv_ = DXGI_FORMAT_UNKNOWN;
+			DXGI_FORMAT dsv_ = DXGI_FORMAT_UNKNOWN;
+		};
+
+		[[nodiscard]] D3D12_CPU_DESCRIPTOR_HANDLE GetRTV() const noexcept
+		{
+			return rtvHandle_;
+		}
+
+		[[nodiscard]] D3D12_CPU_DESCRIPTOR_HANDLE GetDSV() const noexcept
+		{
+			return dsvHandle_;
+		}
+
+		[[nodiscard]] D3D12_CPU_DESCRIPTOR_HANDLE GetSRV() const noexcept
+		{
+			return srvHandle_;
+		}
+
+		[[nodiscard]] D3D12_CPU_DESCRIPTOR_HANDLE GetUAV() const noexcept
+		{
+			return uavHandle_;
+		}
+
+		static bool IsDepthFormat( DXGI_FORMAT format ) noexcept;
+		static bool IsDepthStencilFormat( DXGI_FORMAT format ) noexcept;
+
+		ComPtr<ID3D12Resource> resource_;
+		D3D12_RESOURCE_FLAGS usageFlags_ = D3D12_RESOURCE_FLAG_NONE;
+		D3D12_RESOURCE_STATES currentState_ = D3D12_RESOURCE_STATE_COMMON;
+		DXGI_FORMAT format_ = DXGI_FORMAT_UNKNOWN;
+		ResolvedFormats formats_ = {};
+		D3D12_RESOURCE_DESC desc_ = {};
+		D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle_{ 0 };
+		D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle_{ 0 };
+		D3D12_CPU_DESCRIPTOR_HANDLE srvHandle_{ 0 };
+		D3D12_CPU_DESCRIPTOR_HANDLE uavHandle_{ 0 };
+		uint32_t rtvIndex_ = UINT32_MAX;
+		uint32_t dsvIndex_ = UINT32_MAX;
+		uint32_t srvIndex_ = UINT32_MAX;
+		uint32_t uavIndex_ = UINT32_MAX;
+		uint32_t baseMipsUavBaseIndex_ = UINT32_MAX;
+		uint32_t width_ = 0;
+		uint32_t height_ = 0;
+		uint16_t mipLevels_ = 1;
+		uint16_t depthOrArraySize_ = 1;
+		uint16_t baseMipsUavCount_ = 0;
+		TextureDimension dimension_ = TextureDimension::Texture2D;
+		bool isDepthFormat_ = false;
+		bool isStencilFormat_ = false;
+		bool isSwapchainImage_ = false;
+		SwapchainHandle swapchain_ = {};
+	};
+
+	struct SwapchainResource final
+	{
+		SwapchainResource();
+		~SwapchainResource();
+		SwapchainResource( SwapchainResource&& other ) noexcept;
+		SwapchainResource& operator=( SwapchainResource&& other ) noexcept;
+		SwapchainResource( const SwapchainResource& ) = delete;
+		SwapchainResource& operator=( const SwapchainResource& ) = delete;
+
+		SwapchainDesc desc_ = {};
+		std::unique_ptr<Swapchain> swapchain_;
+	};
+
 	class RenderPipelineState
 	{
 	public:
@@ -390,6 +510,10 @@ namespace ldx12
 		virtual void CmdDrawIndexed( uint32_t indexCount, uint32_t instanceCount = 1, uint32_t firstIndex = 0, int32_t vertexOffset = 0, uint32_t firstInstance = 0 ) = 0;
 		virtual void CmdDrawIndexedIndirect( BufferHandle indirectBuffer, uint32_t drawCount, uint64_t byteOffset = 0 ) = 0;
 		virtual void CmdDispatch( uint32_t groupCountX, uint32_t groupCountY = 1, uint32_t groupCountZ = 1 ) = 0;
+
+	private:
+		friend class D3D12Native;
+
 		virtual ID3D12GraphicsCommandList* GetNativeGraphicsCommandList() = 0;
 	};
 
@@ -453,10 +577,6 @@ namespace ldx12
 		BufferHandle CreateBuffer( const BufferDesc& desc, ShaderResourceSlot slot );
 		void WriteBuffer( BufferHandle buffer, uint64_t offset, const void* data, uint64_t size );
 		TextureHandle CreateTexture( const TextureDesc& desc );
-		// Imports a texture allocated by another Direct3D 12-compatible component.
-		// The resource must stay compatible with desc for its whole lifetime. This call
-		// retains a COM reference and creates Ldx12's views for the resource.
-		TextureHandle ImportTexture( ID3D12Resource* nativeTexture, const TextureDesc& desc );
 		void DownloadTexture2D( TextureHandle texture, void* outData, uint32_t rowPitch, uint32_t slicePitch );
 		ConstantBufferSlot GetAvailableConstantBuffer();
 		ShaderResourceSlot GetAvailableShaderResource();
@@ -465,9 +585,7 @@ namespace ldx12
 		uint32_t GetBindlessIndex( BufferHandle buffer ) const;
 		uint32_t GetBindlessIndex( TextureHandle texture ) const;
 		uint32_t GetUnorderedAccessIndex( TextureHandle texture ) const;
-		ID3D12Device* GetNativeDevice() const noexcept;
-		ID3D12CommandQueue* GetNativeCommandQueue() const noexcept;
-		ID3D12Resource* GetNativeTextureResource( TextureHandle texture ) const;
+		[[nodiscard]] D3D12Native GetNative() noexcept;
 		bool BindlessSupported() const noexcept;
 		bool IsAlive( BufferHandle buffer ) const noexcept;
 		bool IsAlive( TextureHandle texture ) const noexcept;
@@ -477,6 +595,7 @@ namespace ldx12
 
 	private:
 		friend class DeviceManager;
+		friend class D3D12Native;
 
 		explicit RenderDevice( DeviceManager& manager ) noexcept;
 		BufferHandle CreateBufferInternal( const BufferDesc& desc, uint32_t constantBufferSlot, uint32_t shaderResourceSlot );
@@ -487,8 +606,6 @@ namespace ldx12
 	class DeviceManager
 	{
 	public:
-		class Impl;
-
 		static DeviceManager& Initialize( const ContextDesc& desc );
 		static DeviceManager& Initialize( const ContextDesc& desc, const SwapchainDesc& primarySwapchainDesc );
 		static DeviceManager& Get();
@@ -518,11 +635,132 @@ namespace ldx12
 		void WaitIdle();
 
 	private:
+		static constexpr std::size_t ourMaxSwapchains = 16;
+		static constexpr std::size_t ourMaxBuffers = 4096;
+		static constexpr std::size_t ourMaxTextures = 4096;
+
+		struct DeferredRelease final
+		{
+			SubmitHandle handle_;
+			std::function<void()> release_;
+		};
+
+		struct QueueContext final
+		{
+			QueueContext();
+			explicit QueueContext( QueueType type ) noexcept;
+			~QueueContext();
+			QueueContext( const QueueContext& ) = delete;
+			QueueContext& operator=( const QueueContext& ) = delete;
+
+			QueueType type_ = QueueType::Graphics;
+			ComPtr<ID3D12CommandQueue> commandQueue_;
+			ComPtr<ID3D12Fence> queueIdleFence_;
+			HANDLE queueIdleEvent_ = nullptr;
+			uint64_t queueIdleFenceValue_ = 0;
+			std::unique_ptr<ImmediateCommands> immediateCommands_;
+			std::array<std::unique_ptr<CommandBufferImpl>, ourMaxActiveCommandBuffers> activeCommandBuffers_ = {};
+			std::deque<DeferredRelease> deferredReleases_;
+		};
+
+		struct DescriptorRange final
+		{
+			uint32_t start_ = 0;
+			uint32_t count_ = 0;
+		};
+
+		struct BindingSlotMasks final
+		{
+			uint32_t constantBuffer_ = 0;
+			uint32_t shaderResource_ = 0;
+			uint32_t readWriteResource_ = 0;
+		};
+
 		explicit DeviceManager( const ContextDesc& desc );
 		SwapchainHandle RequirePrimarySwapchain() const;
+		void Initialize();
+		void InitializeFactory();
+		void InitializeDevice();
+		void InitializeCommandQueues();
+		void InitializeQueueContext( QueueContext& context, D3D12_COMMAND_LIST_TYPE type );
+		void InitializeDescriptorHeaps();
+		void InitializeRootSignature();
+		void InitializeCommandSignature();
+		QueueContext& GetQueueContext( QueueType type ) noexcept;
+		const QueueContext& GetQueueContext( QueueType type ) const noexcept;
+		QueueContext& GetGraphicsQueueContext() noexcept;
+		const QueueContext& GetGraphicsQueueContext() const noexcept;
+		SwapchainHandle CreateSwapchainInternal( const SwapchainDesc& desc );
+		void DestroySwapchainInternal( SwapchainHandle swapchain ) noexcept;
+		Swapchain* GetSwapchain( SwapchainHandle swapchain ) noexcept;
+		const Swapchain* GetSwapchain( SwapchainHandle swapchain ) const noexcept;
+		SwapchainDesc* GetSwapchainDesc( SwapchainHandle swapchain ) noexcept;
+		const SwapchainDesc* GetSwapchainDesc( SwapchainHandle swapchain ) const noexcept;
+		Swapchain* GetOwningSwapchain( TextureHandle texture ) noexcept;
+		uint32_t AllocateBindlessDescriptor();
+		uint32_t AllocateBindlessDescriptorRange( uint32_t count );
+		uint32_t AllocateFixedBindlessDescriptor( uint32_t index );
+		uint32_t AllocateRtvDescriptor();
+		uint32_t AllocateDsvDescriptor();
+		void FreeBindlessDescriptor( uint32_t index );
+		void FreeBindlessDescriptorRange( uint32_t index, uint32_t count );
+		void EraseFreeBindlessRange( uint32_t rangeIndex ) noexcept;
+		void FreeRtvDescriptor( uint32_t index );
+		void FreeDsvDescriptor( uint32_t index );
+		BufferResource& GetBufferResource( BufferHandle handle );
+		const BufferResource& GetBufferResource( BufferHandle handle ) const;
+		TextureResource& GetTextureResource( TextureHandle handle );
+		const TextureResource& GetTextureResource( TextureHandle handle ) const;
+		void AddDeferredRelease( SubmitHandle handle, std::function<void()>&& release );
+		void ProcessDeferredReleases();
+		void ProcessDeferredReleases( QueueContext& context );
+		void WaitForQueueIdle();
+		void WaitForQueueIdle( QueueContext& context );
+		void Shutdown() noexcept;
+		void ReportLiveObjects() noexcept;
+		void CreateCommittedTextureResource( const TextureDesc& desc, TextureResource& resource );
+		D3D12_CPU_DESCRIPTOR_HANDLE MakeBindlessCpuHandle( uint32_t index ) noexcept;
+		void CreateTextureShaderResourceView( TextureResource& resource );
+		void CreateTextureBaseMipViews( TextureResource& resource );
+		void CreateTextureUnorderedAccessView( TextureResource& resource );
+		void CreateTextureRenderTargetView( TextureResource& resource );
+		void CreateTextureDepthStencilView( TextureResource& resource );
 
 		friend class RenderDevice;
-		std::unique_ptr<Impl> impl_;
+		friend class D3D12Native;
+		friend class BaseMips;
+		friend class CommandBufferImpl;
+		friend class StagingDevice;
+		friend class Swapchain;
+		friend SubmitHandle SubmitCommandBufferBatch( DeviceManager& manager, ICommandBuffer* const* commandBuffers, uint32_t commandBufferCount, TextureHandle presentTexture );
+
+		ContextDesc desc_;
+		ComPtr<IDXGIFactory6> factory_;
+		ComPtr<IDXGIAdapter1> adapter_;
+		ComPtr<ID3D12Device> device_;
+		QueueContext graphicsQueue_ = QueueContext( QueueType::Graphics );
+		ComPtr<ID3D12DescriptorHeap> bindlessHeap_;
+		ComPtr<ID3D12DescriptorHeap> rtvHeap_;
+		ComPtr<ID3D12DescriptorHeap> dsvHeap_;
+		uint32_t bindlessDescriptorSize_ = 0;
+		uint32_t rtvDescriptorSize_ = 0;
+		uint32_t dsvDescriptorSize_ = 0;
+		std::array<DescriptorRange, ourMaxBindlessDescriptors> freeBindlessRanges_ = {};
+		std::array<uint8_t, LDX12_BINDLESS_DYNAMIC_SLOT_FIRST> fixedBindlessDescriptorUsed_ = {};
+		std::array<uint32_t, ourMaxRtvDescriptors> freeRtvDescriptors_ = {};
+		std::array<uint32_t, ourMaxDsvDescriptors> freeDsvDescriptors_ = {};
+		uint32_t freeBindlessRangeCount_ = 0;
+		uint32_t freeRtvDescriptorCount_ = 0;
+		uint32_t freeDsvDescriptorCount_ = 0;
+		ComPtr<ID3D12RootSignature> rootSignature_;
+		ComPtr<ID3D12CommandSignature> commandSignature_;
+		SlotMap<SwapchainResource, ourMaxSwapchains> slotMapSwapchains_;
+		SlotMap<BufferResource, ourMaxBuffers> slotMapBuffers_;
+		SlotMap<TextureResource, ourMaxTextures> slotMapTextures_;
+		std::unique_ptr<StagingDevice> stagingDevice_;
+		std::unique_ptr<BaseMips> baseMips_;
+		BindingSlotMasks allocatedFreeBindingSlots_;
+		bool bindlessSupported_ = false;
 		SwapchainHandle primarySwapchain_ = {};
 		RenderDevice renderDevice_;
 	};

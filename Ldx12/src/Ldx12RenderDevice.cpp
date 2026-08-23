@@ -3,7 +3,8 @@
 
 #include "Ldx12BaseMips.hpp"
 #include "Ldx12CommandBatch.hpp"
-#include "Ldx12ManagerImpl.hpp"
+#include "Ldx12CommandBuffer.hpp"
+#include "Ldx12ImmediateCommands.hpp"
 #include "Ldx12ShaderCompiler.hpp"
 #include "Ldx12StagingDevice.hpp"
 #include "Ldx12Swapchain.hpp"
@@ -335,122 +336,103 @@ namespace ldx12
 			resource.desc_ = BuildTextureResourceDesc( desc, resource );
 			return resource;
 		}
+	} // namespace
 
-		void CreateCommittedTextureResource( DeviceManager::Impl& impl,
-											 const TextureDesc& desc,
-											 TextureResource& resource )
+	void DeviceManager::CreateCommittedTextureResource( const TextureDesc& desc, TextureResource& resource )
+	{
+		const CD3DX12_HEAP_PROPERTIES heapProps( D3D12_HEAP_TYPE_DEFAULT );
+		const D3D12_CLEAR_VALUE* clearValue = desc.useClearValue ? &desc.clearValue : nullptr;
+		C_RESULT( device_->CreateCommittedResource(
+			&heapProps, D3D12_HEAP_FLAG_NONE, &resource.desc_, desc.initialState, clearValue,
+			IID_PPV_ARGS( resource.resource_.GetAddressOf() ) ),
+			"Failed to create texture resource." );
+	}
+
+	D3D12_CPU_DESCRIPTOR_HANDLE DeviceManager::MakeBindlessCpuHandle( uint32_t index ) noexcept
+	{
+		D3D12_CPU_DESCRIPTOR_HANDLE handle = bindlessHeap_->GetCPUDescriptorHandleForHeapStart();
+		handle.ptr += static_cast<SIZE_T>( index ) * bindlessDescriptorSize_;
+		return handle;
+	}
+
+	void DeviceManager::CreateTextureShaderResourceView( TextureResource& resource )
+	{
+		resource.srvIndex_ = AllocateBindlessDescriptor();
+		resource.srvHandle_ = MakeBindlessCpuHandle( resource.srvIndex_ );
+
+		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
+		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+		srvDesc.Format = resource.formats_.srv_;
+		if( resource.dimension_ == TextureDimension::Texture3D )
 		{
-			const CD3DX12_HEAP_PROPERTIES heapProps( D3D12_HEAP_TYPE_DEFAULT );
-			const D3D12_CLEAR_VALUE* clearValue =
-				desc.useClearValue ? &desc.clearValue : nullptr;
-			C_RESULT( impl.device_->CreateCommittedResource(
-				&heapProps, D3D12_HEAP_FLAG_NONE, &resource.desc_,
-				desc.initialState, clearValue,
-				IID_PPV_ARGS( resource.resource_.GetAddressOf() ) ),
-				"Failed to create texture resource." );
+			srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE3D;
+			srvDesc.Texture3D.MipLevels = resource.mipLevels_;
 		}
-
-		[[nodiscard]] D3D12_CPU_DESCRIPTOR_HANDLE
-			MakeBindlessCpuHandle( DeviceManager::Impl& impl, uint32_t index ) noexcept
+		else
 		{
-			D3D12_CPU_DESCRIPTOR_HANDLE handle =
-				impl.bindlessHeap_->GetCPUDescriptorHandleForHeapStart();
-			handle.ptr += static_cast< SIZE_T >(index) * impl.bindlessDescriptorSize_;
-			return handle;
+			srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+			srvDesc.Texture2D.MipLevels = resource.mipLevels_;
 		}
+		device_->CreateShaderResourceView( resource.resource_.Get(), &srvDesc, resource.srvHandle_ );
+	}
 
-		void CreateTextureShaderResourceView( DeviceManager::Impl& impl,
-											  TextureResource& resource )
+	void DeviceManager::CreateTextureBaseMipViews( TextureResource& resource )
+	{
+		resource.baseMipsUavCount_ = static_cast<uint16_t>( resource.mipLevels_ - 1u );
+		resource.baseMipsUavBaseIndex_ = AllocateBindlessDescriptorRange( resource.baseMipsUavCount_ );
+		for( uint16_t mipLevel = 1; mipLevel < resource.mipLevels_; ++mipLevel )
 		{
-			resource.srvIndex_ = impl.AllocateBindlessDescriptor();
-			resource.srvHandle_ = MakeBindlessCpuHandle( impl, resource.srvIndex_ );
-
-			D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
-			srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-			srvDesc.Format = resource.formats_.srv_;
-			if( resource.dimension_ == TextureDimension::Texture3D )
-			{
-				srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE3D;
-				srvDesc.Texture3D.MipLevels = resource.mipLevels_;
-			}
-			else
-			{
-				srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-				srvDesc.Texture2D.MipLevels = resource.mipLevels_;
-			}
-			impl.device_->CreateShaderResourceView( resource.resource_.Get(), &srvDesc,
-													resource.srvHandle_ );
-		}
-
-		void CreateTextureBaseMipViews( DeviceManager::Impl& impl,
-										TextureResource& resource )
-		{
-			resource.baseMipsUavCount_ = static_cast< uint16_t >(resource.mipLevels_ - 1u);
-			resource.baseMipsUavBaseIndex_ =
-				impl.AllocateBindlessDescriptorRange( resource.baseMipsUavCount_ );
-			for( uint16_t mipLevel = 1; mipLevel < resource.mipLevels_; ++mipLevel )
-			{
-				D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
-				uavDesc.Format = resource.formats_.uav_;
-				uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-				uavDesc.Texture2D.MipSlice = mipLevel;
-
-				impl.device_->CreateUnorderedAccessView(
-					resource.resource_.Get(), nullptr, &uavDesc,
-					MakeBindlessCpuHandle( impl, resource.baseMipsUavBaseIndex_ +
-					static_cast< uint32_t >( mipLevel - 1u ) ) );
-			}
-		}
-
-		void CreateTextureUnorderedAccessView( DeviceManager::Impl& impl,
-											   TextureResource& resource )
-		{
-			resource.uavIndex_ = impl.AllocateBindlessDescriptor();
-			resource.uavHandle_ = MakeBindlessCpuHandle( impl, resource.uavIndex_ );
-
 			D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
 			uavDesc.Format = resource.formats_.uav_;
-			uavDesc.ViewDimension = resource.dimension_ == TextureDimension::Texture3D
-				? D3D12_UAV_DIMENSION_TEXTURE3D
-				: D3D12_UAV_DIMENSION_TEXTURE2D;
-			if( resource.dimension_ == TextureDimension::Texture3D )
-			{
-				uavDesc.Texture3D.WSize = resource.depthOrArraySize_;
-			}
-			impl.device_->CreateUnorderedAccessView( resource.resource_.Get(), nullptr,
-													 &uavDesc, resource.uavHandle_ );
-		}
+			uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+			uavDesc.Texture2D.MipSlice = mipLevel;
 
-		void CreateTextureRenderTargetView( DeviceManager::Impl& impl,
-											TextureResource& resource )
+			device_->CreateUnorderedAccessView(
+				resource.resource_.Get(), nullptr, &uavDesc,
+				MakeBindlessCpuHandle( resource.baseMipsUavBaseIndex_ + static_cast<uint32_t>( mipLevel - 1u ) ) );
+		}
+	}
+
+	void DeviceManager::CreateTextureUnorderedAccessView( TextureResource& resource )
+	{
+		resource.uavIndex_ = AllocateBindlessDescriptor();
+		resource.uavHandle_ = MakeBindlessCpuHandle( resource.uavIndex_ );
+
+		D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
+		uavDesc.Format = resource.formats_.uav_;
+		uavDesc.ViewDimension = resource.dimension_ == TextureDimension::Texture3D
+			? D3D12_UAV_DIMENSION_TEXTURE3D
+			: D3D12_UAV_DIMENSION_TEXTURE2D;
+		if( resource.dimension_ == TextureDimension::Texture3D )
 		{
-			resource.rtvIndex_ = impl.AllocateRtvDescriptor();
-			resource.rtvHandle_ = impl.rtvHeap_->GetCPUDescriptorHandleForHeapStart();
-			resource.rtvHandle_.ptr +=
-				static_cast< SIZE_T >(resource.rtvIndex_) * impl.rtvDescriptorSize_;
-
-			D3D12_RENDER_TARGET_VIEW_DESC rtvDesc{};
-			rtvDesc.Format = resource.formats_.rtv_;
-			rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
-			impl.device_->CreateRenderTargetView( resource.resource_.Get(), &rtvDesc,
-												  resource.rtvHandle_ );
+			uavDesc.Texture3D.WSize = resource.depthOrArraySize_;
 		}
+		device_->CreateUnorderedAccessView( resource.resource_.Get(), nullptr, &uavDesc, resource.uavHandle_ );
+	}
 
-		void CreateTextureDepthStencilView( DeviceManager::Impl& impl,
-											TextureResource& resource )
-		{
-			resource.dsvIndex_ = impl.AllocateDsvDescriptor();
-			resource.dsvHandle_ = impl.dsvHeap_->GetCPUDescriptorHandleForHeapStart();
-			resource.dsvHandle_.ptr +=
-				static_cast< SIZE_T >(resource.dsvIndex_) * impl.dsvDescriptorSize_;
+	void DeviceManager::CreateTextureRenderTargetView( TextureResource& resource )
+	{
+		resource.rtvIndex_ = AllocateRtvDescriptor();
+		resource.rtvHandle_ = rtvHeap_->GetCPUDescriptorHandleForHeapStart();
+		resource.rtvHandle_.ptr += static_cast<SIZE_T>( resource.rtvIndex_ ) * rtvDescriptorSize_;
 
-			D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc{};
-			dsvDesc.Format = resource.formats_.dsv_;
-			dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
-			impl.device_->CreateDepthStencilView( resource.resource_.Get(), &dsvDesc,
-												  resource.dsvHandle_ );
-		}
-	} // namespace
+		D3D12_RENDER_TARGET_VIEW_DESC rtvDesc{};
+		rtvDesc.Format = resource.formats_.rtv_;
+		rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+		device_->CreateRenderTargetView( resource.resource_.Get(), &rtvDesc, resource.rtvHandle_ );
+	}
+
+	void DeviceManager::CreateTextureDepthStencilView( TextureResource& resource )
+	{
+		resource.dsvIndex_ = AllocateDsvDescriptor();
+		resource.dsvHandle_ = dsvHeap_->GetCPUDescriptorHandleForHeapStart();
+		resource.dsvHandle_.ptr += static_cast<SIZE_T>( resource.dsvIndex_ ) * dsvDescriptorSize_;
+
+		D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc{};
+		dsvDesc.Format = resource.formats_.dsv_;
+		dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+		device_->CreateDepthStencilView( resource.resource_.Get(), &dsvDesc, resource.dsvHandle_ );
+	}
 
 	RenderPipelineDesc::RenderPipelineDesc() noexcept
 	{
@@ -507,8 +489,8 @@ namespace ldx12
 
 	ICommandBuffer& RenderDevice::AcquireCommandBuffer()
 	{
-		DeviceManager::Impl& impl = *manager_->impl_;
-		DeviceManager::Impl::QueueContext& graphicsQueue = impl.GetGraphicsQueueContext();
+		DeviceManager& manager = *manager_;
+		DeviceManager::QueueContext& graphicsQueue = manager.GetGraphicsQueueContext();
 		std::unique_ptr<CommandBufferImpl>* availableSlot = nullptr;
 		for( std::unique_ptr<CommandBufferImpl>& activeCommandBuffer :
 			 graphicsQueue.activeCommandBuffers_ )
@@ -528,23 +510,22 @@ namespace ldx12
 				" active command buffers are allowed per render device." );
 		}
 
-		impl.ProcessDeferredReleases();
+		manager.ProcessDeferredReleases();
 		ImmediateCommands::CommandListWrapper& wrapper =
 			graphicsQueue.immediateCommands_->Acquire();
-		*availableSlot = std::make_unique<CommandBufferImpl>( impl, wrapper );
+		*availableSlot = std::make_unique<CommandBufferImpl>( manager, wrapper );
 		return **availableSlot;
 	}
 
 	TextureHandle
 		RenderDevice::GetCurrentSwapchainTexture( SwapchainHandle swapchain ) const
 	{
-		DeviceManager::Impl& impl = *manager_->impl_;
 		if( !swapchain.Valid() )
 		{
 			swapchain = manager_->primarySwapchain_;
 		}
 
-		Swapchain* nativeSwapchain = impl.GetSwapchain( swapchain );
+		Swapchain* nativeSwapchain = manager_->GetSwapchain( swapchain );
 		if( nativeSwapchain == nullptr )
 		{
 			return {};
@@ -555,8 +536,7 @@ namespace ldx12
 
 	SubmitHandle RenderDevice::SubmitBatch( ICommandBuffer* const* commandBuffers, uint32_t commandBufferCount, TextureHandle presentTexture ) const
 	{
-		return SubmitCommandBufferBatch(
-			*manager_->impl_, commandBuffers, commandBufferCount, presentTexture );
+		return SubmitCommandBufferBatch( *manager_, commandBuffers, commandBufferCount, presentTexture );
 	}
 
 	SubmitHandle RenderDevice::Submit( ICommandBuffer& buffer,
@@ -578,17 +558,15 @@ namespace ldx12
 	}
 	void RenderDevice::Present( SwapchainHandle swapchain ) const
 	{
-		DeviceManager::Impl& impl = *manager_->impl_;
-
 		if( swapchain.Valid() == false )
 		{
 			swapchain = manager_->primarySwapchain_;
 		}
-		if( Swapchain* nativeSwapchain = impl.GetSwapchain( swapchain ) )
+		if( Swapchain* nativeSwapchain = manager_->GetSwapchain( swapchain ) )
 		{
 			const TextureHandle textureBackBuffer = nativeSwapchain->GetCurrentTexture();
 
-			TextureResource& presentBackBufferResource = impl.GetTextureResource( textureBackBuffer );
+			TextureResource& presentBackBufferResource = manager_->GetTextureResource( textureBackBuffer );
 
 			if( presentBackBufferResource.currentState_ != D3D12_RESOURCE_STATE_PRESENT )
 			{
@@ -598,28 +576,27 @@ namespace ldx12
 			}
 
 			nativeSwapchain->Present();
-			impl.ProcessDeferredReleases();
+			manager_->ProcessDeferredReleases();
 		}
 
 	}
 
 	bool RenderDevice::IsReady( SubmitHandle submission ) const
 	{
-		DeviceManager::Impl::QueueContext& graphicsQueue = manager_->impl_->GetGraphicsQueueContext();
+		DeviceManager::QueueContext& graphicsQueue = manager_->GetGraphicsQueueContext();
 		return graphicsQueue.immediateCommands_->IsReady( submission );
 	}
 
 	void RenderDevice::Wait( SubmitHandle submission ) const
 	{
-		DeviceManager::Impl::QueueContext& graphicsQueue = manager_->impl_->GetGraphicsQueueContext();
+		DeviceManager::QueueContext& graphicsQueue = manager_->GetGraphicsQueueContext();
 		graphicsQueue.immediateCommands_->Wait( submission );
-		manager_->impl_->ProcessDeferredReleases( graphicsQueue );
+		manager_->ProcessDeferredReleases( graphicsQueue );
 	}
 
 	RenderPipelineState
 		RenderDevice::CreateRenderPipeline( const RenderPipelineDesc& desc )
 	{
-		DeviceManager::Impl& impl = *manager_->impl_;
 		if( desc.vertexShader.source == nullptr ||
 			desc.fragmentShader.source == nullptr )
 		{
@@ -633,7 +610,7 @@ namespace ldx12
 			CompileShader( desc.fragmentShader, "ps_6_6" );
 
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc{};
-		psoDesc.pRootSignature = impl.rootSignature_.Get();
+		psoDesc.pRootSignature = manager_->rootSignature_.Get();
 		psoDesc.VS = vertexShader.Bytecode();
 		psoDesc.PS = fragmentShader.Bytecode();
 		psoDesc.BlendState = desc.blendState;
@@ -687,7 +664,7 @@ namespace ldx12
 		psoDesc.SampleDesc = { 1, 0 };
 
 		RenderPipelineState pipeline;
-		C_RESULT( impl.device_->CreateGraphicsPipelineState(
+		C_RESULT( manager_->device_->CreateGraphicsPipelineState(
 			&psoDesc, IID_PPV_ARGS( pipeline.pipelineState_.GetAddressOf() ) ),
 			"Failed to create graphics pipeline state." );
 		pipeline.topology_ = desc.topology;
@@ -697,7 +674,6 @@ namespace ldx12
 	ComputePipelineState
 		RenderDevice::CreateComputePipeline( const ComputePipelineDesc& desc )
 	{
-		DeviceManager::Impl& impl = *manager_->impl_;
 		if( desc.computeShader.source == nullptr )
 		{
 			throw std::runtime_error(
@@ -708,11 +684,11 @@ namespace ldx12
 			CompileShader( desc.computeShader, "cs_6_6" );
 
 		D3D12_COMPUTE_PIPELINE_STATE_DESC psoDesc{};
-		psoDesc.pRootSignature = impl.rootSignature_.Get();
+		psoDesc.pRootSignature = manager_->rootSignature_.Get();
 		psoDesc.CS = computeShader.Bytecode();
 
 		ComputePipelineState pipeline;
-		C_RESULT( impl.device_->CreateComputePipelineState(
+		C_RESULT( manager_->device_->CreateComputePipelineState(
 			&psoDesc, IID_PPV_ARGS( pipeline.pipelineState_.GetAddressOf() ) ),
 			"Failed to create compute pipeline state." );
 		return pipeline;
@@ -749,7 +725,6 @@ namespace ldx12
 
 	BufferHandle RenderDevice::CreateBufferInternal( const BufferDesc& desc, uint32_t constantBufferSlot, uint32_t shaderResourceSlot )
 	{
-		DeviceManager::Impl& impl = *manager_->impl_;
 		if( desc.size == 0 )
 		{
 			throw std::runtime_error( "BufferDesc.size must be greater than zero." );
@@ -778,7 +753,7 @@ namespace ldx12
 			: desc.initialState;
 
 		const CD3DX12_HEAP_PROPERTIES heapProps( desc.heapType );
-		C_RESULT( impl.device_->CreateCommittedResource(
+		C_RESULT( manager_->device_->CreateCommittedResource(
 			&heapProps, D3D12_HEAP_FLAG_NONE, &resource.desc_,
 			resource.currentState_, nullptr,
 			IID_PPV_ARGS( resource.resource_.GetAddressOf() ) ),
@@ -794,9 +769,9 @@ namespace ldx12
 		if( desc.createShaderResourceView )
 		{
 			resource.srvIndex_ = shaderResourceSlot != UINT32_MAX
-				? impl.AllocateFixedBindlessDescriptor( shaderResourceSlot )
-				: impl.AllocateBindlessDescriptor();
-			resource.srvHandle_ = MakeBindlessCpuHandle( impl, resource.srvIndex_ );
+				? manager_->AllocateFixedBindlessDescriptor( shaderResourceSlot )
+				: manager_->AllocateBindlessDescriptor();
+			resource.srvHandle_ = manager_->MakeBindlessCpuHandle( resource.srvIndex_ );
 
 			D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
 			srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
@@ -815,30 +790,30 @@ namespace ldx12
 					desc.stride ? static_cast< UINT >(desc.size / desc.stride) : 0u;
 			}
 
-			impl.device_->CreateShaderResourceView( resource.resource_.Get(), &srvDesc,
+			manager_->device_->CreateShaderResourceView( resource.resource_.Get(), &srvDesc,
 													resource.srvHandle_ );
 		}
 
 		if( desc.createConstantBufferView )
 		{
 			resource.cbvIndex_ = constantBufferSlot != UINT32_MAX
-				? impl.AllocateFixedBindlessDescriptor( constantBufferSlot )
-				: impl.AllocateBindlessDescriptor();
-			resource.cbvHandle_ = MakeBindlessCpuHandle( impl, resource.cbvIndex_ );
+				? manager_->AllocateFixedBindlessDescriptor( constantBufferSlot )
+				: manager_->AllocateBindlessDescriptor();
+			resource.cbvHandle_ = manager_->MakeBindlessCpuHandle( resource.cbvIndex_ );
 
 			D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc{};
 			cbvDesc.BufferLocation = resource.gpuAddress_;
 			cbvDesc.SizeInBytes = static_cast< UINT >(resourceSize);
-			impl.device_->CreateConstantBufferView( &cbvDesc, resource.cbvHandle_ );
+			manager_->device_->CreateConstantBufferView( &cbvDesc, resource.cbvHandle_ );
 		}
 
 		if( desc.data != nullptr && desc.dataSize > 0 )
 		{
-			impl.stagingDevice_->BufferSubData(
+			manager_->stagingDevice_->BufferSubData(
 				resource, 0, static_cast< size_t >(desc.dataSize), desc.data );
 		}
 
-		return impl.slotMapBuffers_.Create( std::move( resource ) );
+		return manager_->slotMapBuffers_.Create( std::move( resource ) );
 	}
 
 	void RenderDevice::WriteBuffer( BufferHandle buffer, uint64_t offset, const void* data, uint64_t size )
@@ -852,132 +827,75 @@ namespace ldx12
 			throw std::runtime_error( "WriteBuffer requires a valid data pointer." );
 		}
 
-		DeviceManager::Impl& impl = *manager_->impl_;
-		BufferResource& resource = impl.GetBufferResource( buffer );
+		BufferResource& resource = manager_->GetBufferResource( buffer );
 		if( offset > resource.bufferSize_ || size > resource.bufferSize_ - offset )
 		{
 			throw std::runtime_error( "WriteBuffer range exceeds buffer size." );
 		}
 
-		impl.stagingDevice_->BufferSubData(
+		manager_->stagingDevice_->BufferSubData(
 			resource, static_cast< size_t >(offset), static_cast< size_t >(size), data );
 	}
 
 	TextureHandle RenderDevice::CreateTexture( const TextureDesc& desc )
 	{
-		DeviceManager::Impl& impl = *manager_->impl_;
 		ValidateTextureDesc( desc );
 		const TextureCreationPlan creationPlan = BuildTextureCreationPlan( desc );
 		TextureResource resource = PrepareTextureResource( desc, creationPlan );
-		CreateCommittedTextureResource( impl, desc, resource );
+		manager_->CreateCommittedTextureResource( desc, resource );
 
 		if( HasTextureUsage( desc.usage, TextureUsage::Sampled ) )
 		{
-			CreateTextureShaderResourceView( impl, resource );
+			manager_->CreateTextureShaderResourceView( resource );
 		}
 
 		if( creationPlan.generateInitialMipChain_ )
 		{
-			CreateTextureBaseMipViews( impl, resource );
+			manager_->CreateTextureBaseMipViews( resource );
 		}
 
 		if( HasTextureUsage( desc.usage, TextureUsage::UnorderedAccess ) )
 		{
-			CreateTextureUnorderedAccessView( impl, resource );
+			manager_->CreateTextureUnorderedAccessView( resource );
 		}
 
 		if( HasTextureUsage( desc.usage, TextureUsage::RenderTarget ) )
 		{
-			CreateTextureRenderTargetView( impl, resource );
+			manager_->CreateTextureRenderTargetView( resource );
 		}
 
 		if( HasTextureUsage( desc.usage, TextureUsage::DepthStencil ) )
 		{
-			CreateTextureDepthStencilView( impl, resource );
+			manager_->CreateTextureDepthStencilView( resource );
 		}
 
-		const TextureHandle handle =
-			impl.slotMapTextures_.Create( std::move( resource ) );
+		const TextureHandle handle = manager_->slotMapTextures_.Create( std::move( resource ) );
 		if( desc.data != nullptr && desc.rowPitch > 0 && desc.slicePitch > 0 )
 		{
-			TextureResource& textureResource = impl.GetTextureResource( handle );
-			impl.stagingDevice_->TextureSubData2D( textureResource, desc.data,
+			TextureResource& textureResource = manager_->GetTextureResource( handle );
+			manager_->stagingDevice_->TextureSubData2D( textureResource, desc.data,
 												   desc.rowPitch, desc.slicePitch );
 			if( creationPlan.generateInitialMipChain_ )
 			{
-				impl.baseMips_->Generate( textureResource, desc.initialState );
+				manager_->baseMips_->Generate( textureResource, desc.initialState );
 			}
 		}
 
 		return handle;
 	}
 
-	TextureHandle RenderDevice::ImportTexture( ID3D12Resource* nativeTexture,
-											   const TextureDesc& desc )
-	{
-		if( nativeTexture == nullptr )
-		{
-			throw std::runtime_error( "ImportTexture requires a valid native texture resource." );
-		}
-
-		DeviceManager::Impl& impl = *manager_->impl_;
-		ValidateTextureDesc( desc );
-		const TextureCreationPlan creationPlan = BuildTextureCreationPlan( desc );
-		if( creationPlan.generateInitialMipChain_ )
-		{
-			throw std::runtime_error( "ImportTexture does not support automatic mip generation." );
-		}
-
-		TextureResource resource = PrepareTextureResource( desc, creationPlan );
-		const D3D12_RESOURCE_DESC nativeDesc = nativeTexture->GetDesc();
-		if( nativeDesc.Dimension != resource.desc_.Dimension ||
-			nativeDesc.Width != resource.desc_.Width ||
-			nativeDesc.Height != resource.desc_.Height ||
-			nativeDesc.DepthOrArraySize != resource.desc_.DepthOrArraySize ||
-			nativeDesc.MipLevels != resource.desc_.MipLevels ||
-			nativeDesc.Format != resource.desc_.Format ||
-			nativeDesc.SampleDesc.Count != resource.desc_.SampleDesc.Count )
-		{
-			throw std::runtime_error( "The imported texture resource does not match its TextureDesc." );
-		}
-
-		resource.resource_ = nativeTexture;
-		resource.desc_ = nativeDesc;
-
-		if( HasTextureUsage( desc.usage, TextureUsage::Sampled ) )
-		{
-			CreateTextureShaderResourceView( impl, resource );
-		}
-		if( HasTextureUsage( desc.usage, TextureUsage::UnorderedAccess ) )
-		{
-			CreateTextureUnorderedAccessView( impl, resource );
-		}
-		if( HasTextureUsage( desc.usage, TextureUsage::RenderTarget ) )
-		{
-			CreateTextureRenderTargetView( impl, resource );
-		}
-		if( HasTextureUsage( desc.usage, TextureUsage::DepthStencil ) )
-		{
-			CreateTextureDepthStencilView( impl, resource );
-		}
-
-		return impl.slotMapTextures_.Create( std::move( resource ) );
-	}
-
 	void RenderDevice::DownloadTexture2D( TextureHandle texture, void* outData,
 										  uint32_t rowPitch, uint32_t slicePitch )
 	{
-		DeviceManager::Impl& impl = *manager_->impl_;
-		TextureResource& textureResource = impl.GetTextureResource( texture );
-		impl.stagingDevice_->TextureData2D( textureResource, outData, rowPitch,
+		TextureResource& textureResource = manager_->GetTextureResource( texture );
+		manager_->stagingDevice_->TextureData2D( textureResource, outData, rowPitch,
 											slicePitch );
 	}
 
 	ConstantBufferSlot RenderDevice::GetAvailableConstantBuffer()
 	{
-		DeviceManager::Impl& impl = *manager_->impl_;
 		return AllocateFreeBindingSlot<ConstantBufferSlot>(
-			impl.allocatedFreeBindingSlots_.constantBuffer_,
+			manager_->allocatedFreeBindingSlots_.constantBuffer_,
 			LDX12_FREE_CBV_SLOT_FIRST,
 			LDX12_FREE_CBV_SLOT_COUNT,
 			"No free constant buffer slots are available." );
@@ -985,9 +903,8 @@ namespace ldx12
 
 	ShaderResourceSlot RenderDevice::GetAvailableShaderResource()
 	{
-		DeviceManager::Impl& impl = *manager_->impl_;
 		return AllocateFreeBindingSlot<ShaderResourceSlot>(
-			impl.allocatedFreeBindingSlots_.shaderResource_,
+			manager_->allocatedFreeBindingSlots_.shaderResource_,
 			LDX12_FREE_SRV_SLOT_FIRST,
 			LDX12_FREE_SRV_SLOT_COUNT,
 			"No free shader resource slots are available." );
@@ -995,9 +912,8 @@ namespace ldx12
 
 	ReadWriteResourceSlot RenderDevice::GetAvailableReadWriteResource()
 	{
-		DeviceManager::Impl& impl = *manager_->impl_;
 		return AllocateFreeBindingSlot<ReadWriteResourceSlot>(
-			impl.allocatedFreeBindingSlots_.readWriteResource_,
+			manager_->allocatedFreeBindingSlots_.readWriteResource_,
 			LDX12_FREE_RW_SLOT_FIRST,
 			LDX12_FREE_RW_SLOT_COUNT,
 			"No free read/write resource slots are available." );
@@ -1005,71 +921,52 @@ namespace ldx12
 
 	uint32_t RenderDevice::GetConstantBufferIndex( BufferHandle buffer ) const
 	{
-		return ToPublicDescriptorIndex( manager_->impl_->GetBufferResource( buffer ).cbvIndex_ );
+		return ToPublicDescriptorIndex( manager_->GetBufferResource( buffer ).cbvIndex_ );
 	}
 
 	uint32_t RenderDevice::GetBindlessIndex( BufferHandle buffer ) const
 	{
-		return ToPublicDescriptorIndex( manager_->impl_->GetBufferResource( buffer ).srvIndex_ );
+		return ToPublicDescriptorIndex( manager_->GetBufferResource( buffer ).srvIndex_ );
 	}
 
 	uint32_t RenderDevice::GetBindlessIndex( TextureHandle texture ) const
 	{
-		return ToPublicDescriptorIndex( manager_->impl_->GetTextureResource( texture ).srvIndex_ );
+		return ToPublicDescriptorIndex( manager_->GetTextureResource( texture ).srvIndex_ );
 	}
 
 	uint32_t RenderDevice::GetUnorderedAccessIndex( TextureHandle texture ) const
 	{
-		return ToPublicDescriptorIndex( manager_->impl_->GetTextureResource( texture ).uavIndex_ );
-	}
-
-	ID3D12Device* RenderDevice::GetNativeDevice() const noexcept
-	{
-		return manager_->impl_->device_.Get();
-	}
-
-	ID3D12CommandQueue* RenderDevice::GetNativeCommandQueue() const noexcept
-	{
-		return manager_->impl_->GetGraphicsQueueContext().commandQueue_.Get();
-	}
-
-	ID3D12Resource*
-		RenderDevice::GetNativeTextureResource( TextureHandle texture ) const
-	{
-		return manager_->impl_->GetTextureResource( texture ).resource_.Get();
+		return ToPublicDescriptorIndex( manager_->GetTextureResource( texture ).uavIndex_ );
 	}
 
 	bool RenderDevice::BindlessSupported() const noexcept
 	{
-		return manager_->impl_->bindlessSupported_;
+		return manager_->bindlessSupported_;
 	}
 
 	bool RenderDevice::IsAlive( BufferHandle buffer ) const noexcept
 	{
-		return manager_ != nullptr && manager_->impl_ != nullptr &&
-			manager_->impl_->slotMapBuffers_.Contains( buffer );
+		return manager_ != nullptr && manager_->slotMapBuffers_.Contains( buffer );
 	}
 
 	bool RenderDevice::IsAlive( TextureHandle texture ) const noexcept
 	{
-		return manager_ != nullptr && manager_->impl_ != nullptr &&
-			manager_->impl_->slotMapTextures_.Contains( texture );
+		return manager_ != nullptr && manager_->slotMapTextures_.Contains( texture );
 	}
 
-	void RenderDevice::WaitIdle() { manager_->impl_->WaitIdle(); }
+	void RenderDevice::WaitIdle() { manager_->WaitIdle(); }
 
 	bool RenderDevice::Destroy( BufferHandle buffer )
 	{
-		DeviceManager::Impl& impl = *manager_->impl_;
-		BufferResource* resource = impl.slotMapBuffers_.Get( buffer );
+		DeviceManager& manager = *manager_;
+		BufferResource* resource = manager.slotMapBuffers_.Get( buffer );
 		if( resource == nullptr )
 		{
 			ReportInvalidDestroy( "BufferHandle", buffer.Index(), buffer.Gen() );
 			return false;
 		}
 
-		DeviceManager::Impl::QueueContext& graphicsQueue =
-			impl.GetGraphicsQueueContext();
+		DeviceManager::QueueContext& graphicsQueue = manager.GetGraphicsQueueContext();
 		const SubmitHandle releaseHandle =
 			graphicsQueue.immediateCommands_ != nullptr
 			? graphicsQueue.immediateCommands_->GetLastSubmitHandle()
@@ -1081,9 +978,9 @@ namespace ldx12
 		resource->mappedPtr_ = nullptr;
 		resource->srvIndex_ = UINT32_MAX;
 		resource->cbvIndex_ = UINT32_MAX;
-		impl.slotMapBuffers_.Destroy( buffer );
+		manager.slotMapBuffers_.Destroy( buffer );
 
-		std::function<void()> release = [ &impl,
+		std::function<void()> release = [ &manager,
 			nativeResource = std::move( nativeResource ),
 			wasMapped, srvIndex, cbvIndex ]() mutable
 			{
@@ -1092,8 +989,8 @@ namespace ldx12
 					nativeResource->Unmap( 0, nullptr );
 				}
 
-				impl.FreeBindlessDescriptor( srvIndex );
-				impl.FreeBindlessDescriptor( cbvIndex );
+				manager.FreeBindlessDescriptor( srvIndex );
+				manager.FreeBindlessDescriptor( cbvIndex );
 				nativeResource.Reset();
 			};
 
@@ -1104,7 +1001,7 @@ namespace ldx12
 		}
 		else
 		{
-			impl.AddDeferredRelease( releaseHandle, std::move( release ) );
+			manager.AddDeferredRelease( releaseHandle, std::move( release ) );
 		}
 
 		return true;
@@ -1112,8 +1009,8 @@ namespace ldx12
 
 	bool RenderDevice::Destroy( TextureHandle texture )
 	{
-		DeviceManager::Impl& impl = *manager_->impl_;
-		TextureResource* resource = impl.slotMapTextures_.Get( texture );
+		DeviceManager& manager = *manager_;
+		TextureResource* resource = manager.slotMapTextures_.Get( texture );
 		if( resource == nullptr )
 		{
 			ReportInvalidDestroy( "TextureHandle", texture.Index(), texture.Gen() );
@@ -1124,8 +1021,7 @@ namespace ldx12
 			"Cannot destroy a swapchain texture directly. Destroy "
 			"the owning swapchain instead." );
 
-		DeviceManager::Impl::QueueContext& graphicsQueue =
-			impl.GetGraphicsQueueContext();
+		DeviceManager::QueueContext& graphicsQueue = manager.GetGraphicsQueueContext();
 		const SubmitHandle releaseHandle =
 			graphicsQueue.immediateCommands_ != nullptr
 			? graphicsQueue.immediateCommands_->GetLastSubmitHandle()
@@ -1139,19 +1035,19 @@ namespace ldx12
 		const uint32_t baseMipsUavBaseIndex = resource->baseMipsUavBaseIndex_;
 		const uint32_t baseMipsUavCount = resource->baseMipsUavCount_;
 
-		impl.slotMapTextures_.Destroy( texture );
+		manager.slotMapTextures_.Destroy( texture );
 
-		std::function<void()> release = [ &impl,
+		std::function<void()> release = [ &manager,
 			nativeResource = std::move( nativeResource ),
 			srvIndex, uavIndex, rtvIndex, dsvIndex,
 			baseMipsUavBaseIndex,
 			baseMipsUavCount ]() mutable
 			{
-				impl.FreeBindlessDescriptor( srvIndex );
-				impl.FreeBindlessDescriptor( uavIndex );
-				impl.FreeBindlessDescriptorRange( baseMipsUavBaseIndex, baseMipsUavCount );
-				impl.FreeRtvDescriptor( rtvIndex );
-				impl.FreeDsvDescriptor( dsvIndex );
+				manager.FreeBindlessDescriptor( srvIndex );
+				manager.FreeBindlessDescriptor( uavIndex );
+				manager.FreeBindlessDescriptorRange( baseMipsUavBaseIndex, baseMipsUavCount );
+				manager.FreeRtvDescriptor( rtvIndex );
+				manager.FreeDsvDescriptor( dsvIndex );
 				nativeResource.Reset();
 			};
 
@@ -1162,7 +1058,7 @@ namespace ldx12
 		}
 		else
 		{
-			impl.AddDeferredRelease( releaseHandle, std::move( release ) );
+			manager.AddDeferredRelease( releaseHandle, std::move( release ) );
 		}
 
 		return true;

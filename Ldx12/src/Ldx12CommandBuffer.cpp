@@ -1,6 +1,5 @@
 #include "Ldx12CommandBuffer.hpp"
 
-#include "Ldx12ManagerImpl.hpp"
 
 #include <cstdlib>
 #include <cassert>
@@ -286,7 +285,7 @@ namespace ldx12
 		}
 	}
 
-	CommandBufferImpl::CommandBufferImpl( DeviceManager::Impl& manager, ImmediateCommands::CommandListWrapper& wrapper ):
+	CommandBufferImpl::CommandBufferImpl( DeviceManager& manager, ImmediateCommands::CommandListWrapper& wrapper ):
 		manager_( manager ),
 		wrapper_( wrapper )
 	{

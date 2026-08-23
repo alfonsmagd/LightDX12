@@ -1,6 +1,8 @@
-#include "Ldx12ManagerImpl.hpp"
+#include "Ldx12Internal.hpp"
 
 #include "Ldx12BaseMips.hpp"
+#include "Ldx12CommandBuffer.hpp"
+#include "Ldx12ImmediateCommands.hpp"
 #include "Ldx12StagingDevice.hpp"
 #include "Ldx12Swapchain.hpp"
 
@@ -164,6 +166,18 @@ namespace ldx12
 #endif
 	}
 
+	SwapchainResource::SwapchainResource() = default;
+	SwapchainResource::~SwapchainResource() = default;
+	SwapchainResource::SwapchainResource( SwapchainResource&& other ) noexcept = default;
+	SwapchainResource& SwapchainResource::operator=( SwapchainResource&& other ) noexcept = default;
+
+	DeviceManager::QueueContext::QueueContext() = default;
+	DeviceManager::QueueContext::QueueContext( QueueType type ) noexcept:
+		type_( type )
+	{
+	}
+	DeviceManager::QueueContext::~QueueContext() = default;
+
 	bool TryLoadPixGpuCapturer() noexcept
 	{
 #if defined( LDX12_ENABLE_PIX )
@@ -182,17 +196,7 @@ namespace ldx12
 #endif
 	}
 
-	DeviceManager::Impl::Impl( const ContextDesc& desc ):
-		desc_( desc )
-	{
-	}
-
-	DeviceManager::Impl::~Impl()
-	{
-		Shutdown();
-	}
-
-	void DeviceManager::Impl::Initialize()
+	void DeviceManager::Initialize()
 	{
 		if( desc_.enablePixGpuCapture )
 		{
@@ -210,7 +214,7 @@ namespace ldx12
 		stagingDevice_ = std::make_unique<StagingDevice>( *this );
 	}
 
-	void DeviceManager::Impl::InitializeFactory()
+	void DeviceManager::InitializeFactory()
 	{
 		UINT flags = 0;
 #if defined( _DEBUG )
@@ -227,7 +231,7 @@ namespace ldx12
 		C_RESULT( CreateDXGIFactory2( flags, IID_PPV_ARGS( factory_.GetAddressOf() ) ), "Failed to create DXGI factory." );
 	}
 
-	void DeviceManager::Impl::InitializeDevice()
+	void DeviceManager::InitializeDevice()
 	{
 		auto tryAdapter = [ this ]( IDXGIAdapter1* candidate )->bool
 			{
@@ -299,16 +303,12 @@ namespace ldx12
 
 	}
 
-	void DeviceManager::Impl::InitializeCommandQueues()
+	void DeviceManager::InitializeCommandQueues()
 	{
-		#if LDX12_SINGLE_DIRECT_QUEUE
 		InitializeQueueContext( graphicsQueue_, D3D12_COMMAND_LIST_TYPE_DIRECT );
-		#else
-			throw std::runtime_error("Ldx12 does not support multiple queues. Set LDX12_SINGLE_DIRECT_QUEUE to 1.");
-		#endif
 	}
 
-	void DeviceManager::Impl::InitializeQueueContext( QueueContext& context, D3D12_COMMAND_LIST_TYPE type )
+	void DeviceManager::InitializeQueueContext( QueueContext& context, D3D12_COMMAND_LIST_TYPE type )
 	{
 		D3D12_COMMAND_QUEUE_DESC queueDesc{};
 		queueDesc.Type = type;
@@ -326,61 +326,29 @@ namespace ldx12
 			ourMaxImmediateCommandBuffers );
 	}
 
-	DeviceManager::Impl::QueueContext& DeviceManager::Impl::GetQueueContext( QueueType type ) noexcept
+	DeviceManager::QueueContext& DeviceManager::GetQueueContext( QueueType type ) noexcept
 	{
-#if LDX12_SINGLE_DIRECT_QUEUE
 		static_cast<void>( type );
 		return graphicsQueue_;
-#else
-		switch( type )
-		{
-			case QueueType::Graphics:
-				return graphicsQueue_;
-
-			case QueueType::Compute:
-				return computeQueue_;
-
-			case QueueType::Copy:
-				return copyQueue_;
-		}
-
-		return graphicsQueue_;
-#endif
 	}
 
-	const DeviceManager::Impl::QueueContext& DeviceManager::Impl::GetQueueContext( QueueType type ) const noexcept
+	const DeviceManager::QueueContext& DeviceManager::GetQueueContext( QueueType type ) const noexcept
 	{
-#if LDX12_SINGLE_DIRECT_QUEUE
 		static_cast<void>( type );
 		return graphicsQueue_;
-#else
-		switch( type )
-		{
-			case QueueType::Graphics:
-				return graphicsQueue_;
-
-			case QueueType::Compute:
-				return computeQueue_;
-
-			case QueueType::Copy:
-				return copyQueue_;
-		}
-
-		return graphicsQueue_;
-#endif
 	}
 
-	DeviceManager::Impl::QueueContext& DeviceManager::Impl::GetGraphicsQueueContext() noexcept
+	DeviceManager::QueueContext& DeviceManager::GetGraphicsQueueContext() noexcept
 	{
 		return GetQueueContext( QueueType::Graphics );
 	}
 
-	const DeviceManager::Impl::QueueContext& DeviceManager::Impl::GetGraphicsQueueContext() const noexcept
+	const DeviceManager::QueueContext& DeviceManager::GetGraphicsQueueContext() const noexcept
 	{
 		return GetQueueContext( QueueType::Graphics );
 	}
 
-	void DeviceManager::Impl::InitializeDescriptorHeaps()
+	void DeviceManager::InitializeDescriptorHeaps()
 	{
 		if( desc_.bindlessCapacity <= LDX12_BINDLESS_FIXED_SLOT_LAST )
 		{
@@ -437,7 +405,7 @@ namespace ldx12
 		}
 	}
 
-	void DeviceManager::Impl::InitializeRootSignature()
+	void DeviceManager::InitializeRootSignature()
 	{
 		D3D12_ROOT_PARAMETER1 parameters[ 2 ] = {};
 		parameters[ 0 ].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
@@ -483,7 +451,7 @@ namespace ldx12
 			"Failed to create root signature." );
 	}
 
-	void DeviceManager::Impl::InitializeCommandSignature()
+	void DeviceManager::InitializeCommandSignature()
 	{
 		D3D12_INDIRECT_ARGUMENT_DESC arguments[ 2 ] = {};
 		arguments[ 0 ].Type = D3D12_INDIRECT_ARGUMENT_TYPE_CONSTANT;
@@ -501,12 +469,12 @@ namespace ldx12
 			"Failed to create command signature." );
 	}
 
-	uint32_t DeviceManager::Impl::AllocateBindlessDescriptor()
+	uint32_t DeviceManager::AllocateBindlessDescriptor()
 	{
 		return AllocateBindlessDescriptorRange( 1u );
 	}
 
-	uint32_t DeviceManager::Impl::AllocateBindlessDescriptorRange( uint32_t count )
+	uint32_t DeviceManager::AllocateBindlessDescriptorRange( uint32_t count )
 	{
 		if( count == 0 )
 		{
@@ -535,7 +503,7 @@ namespace ldx12
 		throw std::runtime_error( "Bindless descriptor heap is exhausted." );
 	}
 
-	uint32_t DeviceManager::Impl::AllocateFixedBindlessDescriptor( uint32_t index )
+	uint32_t DeviceManager::AllocateFixedBindlessDescriptor( uint32_t index )
 	{
 		if( index < LDX12_BINDLESS_FIXED_SLOT_FIRST ||
 			index > LDX12_BINDLESS_FIXED_SLOT_LAST ||
@@ -553,7 +521,7 @@ namespace ldx12
 		return index;
 	}
 
-	uint32_t DeviceManager::Impl::AllocateRtvDescriptor()
+	uint32_t DeviceManager::AllocateRtvDescriptor()
 	{
 		if( freeRtvDescriptorCount_ == 0 )
 		{
@@ -563,7 +531,7 @@ namespace ldx12
 		return freeRtvDescriptors_[ --freeRtvDescriptorCount_ ];
 	}
 
-	uint32_t DeviceManager::Impl::AllocateDsvDescriptor()
+	uint32_t DeviceManager::AllocateDsvDescriptor()
 	{
 		if( freeDsvDescriptorCount_ == 0 )
 		{
@@ -573,12 +541,12 @@ namespace ldx12
 		return freeDsvDescriptors_[ --freeDsvDescriptorCount_ ];
 	}
 
-	void DeviceManager::Impl::FreeBindlessDescriptor( uint32_t index )
+	void DeviceManager::FreeBindlessDescriptor( uint32_t index )
 	{
 		FreeBindlessDescriptorRange( index, 1u );
 	}
 
-	void DeviceManager::Impl::FreeBindlessDescriptorRange( uint32_t index, uint32_t count )
+	void DeviceManager::FreeBindlessDescriptorRange( uint32_t index, uint32_t count )
 	{
 		if( index == UINT32_MAX || count == 0 )
 		{
@@ -637,7 +605,7 @@ namespace ldx12
 		}
 	}
 
-	void DeviceManager::Impl::EraseFreeBindlessRange( uint32_t rangeIndex ) noexcept
+	void DeviceManager::EraseFreeBindlessRange( uint32_t rangeIndex ) noexcept
 	{
 		assert( rangeIndex < freeBindlessRangeCount_ );
 		for( uint32_t moveIndex = rangeIndex + 1u;
@@ -649,7 +617,7 @@ namespace ldx12
 		freeBindlessRanges_[ freeBindlessRangeCount_ ] = {};
 	}
 
-	void DeviceManager::Impl::FreeRtvDescriptor( uint32_t index )
+	void DeviceManager::FreeRtvDescriptor( uint32_t index )
 	{
 		if( index != UINT32_MAX )
 		{
@@ -658,7 +626,7 @@ namespace ldx12
 		}
 	}
 
-	void DeviceManager::Impl::FreeDsvDescriptor( uint32_t index )
+	void DeviceManager::FreeDsvDescriptor( uint32_t index )
 	{
 		if( index != UINT32_MAX )
 		{
@@ -667,7 +635,7 @@ namespace ldx12
 		}
 	}
 
-	BufferResource& DeviceManager::Impl::GetBufferResource( BufferHandle handle )
+	BufferResource& DeviceManager::GetBufferResource( BufferHandle handle )
 	{
 		auto* resource = slotMapBuffers_.Get( handle );
 		if( resource == nullptr )
@@ -677,7 +645,7 @@ namespace ldx12
 		return *resource;
 	}
 
-	const BufferResource& DeviceManager::Impl::GetBufferResource( BufferHandle handle ) const
+	const BufferResource& DeviceManager::GetBufferResource( BufferHandle handle ) const
 	{
 		const auto* resource = slotMapBuffers_.Get( handle );
 		if( resource == nullptr )
@@ -687,7 +655,7 @@ namespace ldx12
 		return *resource;
 	}
 
-	TextureResource& DeviceManager::Impl::GetTextureResource( TextureHandle handle )
+	TextureResource& DeviceManager::GetTextureResource( TextureHandle handle )
 	{
 		auto* resource = slotMapTextures_.Get( handle );
 		if( resource == nullptr )
@@ -697,7 +665,7 @@ namespace ldx12
 		return *resource;
 	}
 
-	const TextureResource& DeviceManager::Impl::GetTextureResource( TextureHandle handle ) const
+	const TextureResource& DeviceManager::GetTextureResource( TextureHandle handle ) const
 	{
 		const auto* resource = slotMapTextures_.Get( handle );
 		if( resource == nullptr )
@@ -707,17 +675,17 @@ namespace ldx12
 		return *resource;
 	}
 
-	void DeviceManager::Impl::AddDeferredRelease( SubmitHandle handle, std::function<void()>&& release )
+	void DeviceManager::AddDeferredRelease( SubmitHandle handle, std::function<void()>&& release )
 	{
 		GetGraphicsQueueContext().deferredReleases_.push_back( { handle, std::move( release ) } );
 	}
 
-	void DeviceManager::Impl::ProcessDeferredReleases()
+	void DeviceManager::ProcessDeferredReleases()
 	{
 		ProcessDeferredReleases( GetGraphicsQueueContext() );
 	}
 
-	void DeviceManager::Impl::ProcessDeferredReleases( QueueContext& context )
+	void DeviceManager::ProcessDeferredReleases( QueueContext& context )
 	{
 		while( !context.deferredReleases_.empty() )
 		{
@@ -731,12 +699,12 @@ namespace ldx12
 		}
 	}
 
-	void DeviceManager::Impl::WaitForQueueIdle()
+	void DeviceManager::WaitForQueueIdle()
 	{
 		WaitForQueueIdle( GetGraphicsQueueContext() );
 	}
 
-	void DeviceManager::Impl::WaitForQueueIdle( QueueContext& context )
+	void DeviceManager::WaitForQueueIdle( QueueContext& context )
 	{
 		if( context.commandQueue_ == nullptr || context.queueIdleFence_ == nullptr )
 		{
@@ -752,7 +720,7 @@ namespace ldx12
 		}
 	}
 
-	void DeviceManager::Impl::WaitIdle()
+	void DeviceManager::WaitIdle()
 	{
 		auto waitQueueIdle = [ this ]( QueueContext& context )
 		{
@@ -771,13 +739,9 @@ namespace ldx12
 		};
 
 		waitQueueIdle( graphicsQueue_ );
-#if !LDX12_SINGLE_DIRECT_QUEUE
-		waitQueueIdle( computeQueue_ );
-		waitQueueIdle( copyQueue_ );
-#endif
 	}
 
-	void DeviceManager::Impl::Shutdown() noexcept
+	void DeviceManager::Shutdown() noexcept
 	{
 		auto resetActiveBuffers = []( QueueContext& context )
 		{
@@ -788,10 +752,6 @@ namespace ldx12
 		};
 
 		resetActiveBuffers( graphicsQueue_ );
-#if !LDX12_SINGLE_DIRECT_QUEUE
-		resetActiveBuffers( computeQueue_ );
-		resetActiveBuffers( copyQueue_ );
-#endif
 
 		try
 		{
@@ -803,10 +763,6 @@ namespace ldx12
 
 		stagingDevice_.reset();
 		graphicsQueue_.immediateCommands_.reset();
-#if !LDX12_SINGLE_DIRECT_QUEUE
-		computeQueue_.immediateCommands_.reset();
-		copyQueue_.immediateCommands_.reset();
-#endif
 		baseMips_.reset();
 
 		slotMapBuffers_.ForEach( []( BufferResource& buffer )
@@ -846,10 +802,6 @@ namespace ldx12
 		slotMapTextures_.Clear();
 		slotMapBuffers_.Clear();
 		graphicsQueue_.deferredReleases_.clear();
-#if !LDX12_SINGLE_DIRECT_QUEUE
-		computeQueue_.deferredReleases_.clear();
-		copyQueue_.deferredReleases_.clear();
-#endif
 
 		commandSignature_.Reset();
 		rootSignature_.Reset();
@@ -869,16 +821,12 @@ namespace ldx12
 		};
 
 		releaseQueueContext( graphicsQueue_ );
-#if !LDX12_SINGLE_DIRECT_QUEUE
-		releaseQueueContext( computeQueue_ );
-		releaseQueueContext( copyQueue_ );
-#endif
 		device_.Reset();
 		adapter_.Reset();
 		factory_.Reset();
 	}
 
-	void DeviceManager::Impl::ReportLiveObjects() noexcept
+	void DeviceManager::ReportLiveObjects() noexcept
 	{
 #if defined( _DEBUG )
 		if( !desc_.enableDebugLayer )
@@ -897,7 +845,7 @@ namespace ldx12
 #endif
 	}
 
-	SwapchainHandle DeviceManager::Impl::CreateSwapchain( const SwapchainDesc& desc )
+	SwapchainHandle DeviceManager::CreateSwapchainInternal( const SwapchainDesc& desc )
 	{
 		SwapchainResource swapchainResource{};
 		swapchainResource.desc_ = desc;
@@ -926,7 +874,7 @@ namespace ldx12
 		return handle;
 	}
 
-	void DeviceManager::Impl::DestroySwapchain( SwapchainHandle swapchain ) noexcept
+	void DeviceManager::DestroySwapchainInternal( SwapchainHandle swapchain ) noexcept
 	{
 		auto* resource = slotMapSwapchains_.Get( swapchain );
 		if( resource == nullptr )
@@ -938,31 +886,31 @@ namespace ldx12
 		slotMapSwapchains_.Destroy( swapchain );
 	}
 
-	Swapchain* DeviceManager::Impl::GetSwapchain( SwapchainHandle swapchain ) noexcept
+	Swapchain* DeviceManager::GetSwapchain( SwapchainHandle swapchain ) noexcept
 	{
 		SwapchainResource* resource = slotMapSwapchains_.Get( swapchain );
 		return resource != nullptr ? resource->swapchain_.get() : nullptr;
 	}
 
-	const Swapchain* DeviceManager::Impl::GetSwapchain( SwapchainHandle swapchain ) const noexcept
+	const Swapchain* DeviceManager::GetSwapchain( SwapchainHandle swapchain ) const noexcept
 	{
 		const SwapchainResource* resource = slotMapSwapchains_.Get( swapchain );
 		return resource != nullptr ? resource->swapchain_.get() : nullptr;
 	}
 
-	SwapchainDesc* DeviceManager::Impl::GetSwapchainDesc( SwapchainHandle swapchain ) noexcept
+	SwapchainDesc* DeviceManager::GetSwapchainDesc( SwapchainHandle swapchain ) noexcept
 	{
 		auto* resource = slotMapSwapchains_.Get( swapchain );
 		return resource != nullptr ? &resource->desc_ : nullptr;
 	}
 
-	const SwapchainDesc* DeviceManager::Impl::GetSwapchainDesc( SwapchainHandle swapchain ) const noexcept
+	const SwapchainDesc* DeviceManager::GetSwapchainDesc( SwapchainHandle swapchain ) const noexcept
 	{
 		const auto* resource = slotMapSwapchains_.Get( swapchain );
 		return resource != nullptr ? &resource->desc_ : nullptr;
 	}
 
-	Swapchain* DeviceManager::Impl::GetOwningSwapchain( TextureHandle texture ) noexcept
+	Swapchain* DeviceManager::GetOwningSwapchain( TextureHandle texture ) noexcept
 	{
 		const auto* resource = slotMapTextures_.Get( texture );
 		if( resource == nullptr || !resource->swapchain_.Valid() )
@@ -974,10 +922,18 @@ namespace ldx12
 	}
 
 	DeviceManager::DeviceManager( const ContextDesc& desc ):
-		impl_( std::make_unique<Impl>( desc ) ),
+		desc_( desc ),
 		renderDevice_( *this )
 	{
-		impl_->Initialize();
+		try
+		{
+			Initialize();
+		}
+		catch( ... )
+		{
+			Shutdown();
+			throw;
+		}
 	}
 
 	DeviceManager& DeviceManager::Initialize( const ContextDesc& desc )
@@ -987,7 +943,7 @@ namespace ldx12
 		{
 			gDeviceManagerSingleton = std::unique_ptr<DeviceManager>( new DeviceManager( desc ) );
 		}
-		else if( !ContextDescsAreCompatible( gDeviceManagerSingleton->impl_->desc_, desc ) )
+		else if( !ContextDescsAreCompatible( gDeviceManagerSingleton->desc_, desc ) )
 		{
 			throw std::runtime_error( "DeviceManager singleton already initialized with an incompatible ContextDesc." );
 		}
@@ -1032,11 +988,14 @@ namespace ldx12
 		ReleaseDeviceManagerSingleton();
 	}
 
-	DeviceManager::~DeviceManager() = default;
+	DeviceManager::~DeviceManager()
+	{
+		Shutdown();
+	}
 
 	SwapchainHandle DeviceManager::CreateSwapchain( const SwapchainDesc& desc )
 	{
-		const SwapchainHandle handle = impl_->CreateSwapchain( desc );
+		const SwapchainHandle handle = CreateSwapchainInternal( desc );
 		if( !primarySwapchain_.Valid() )
 		{
 			primarySwapchain_ = handle;
@@ -1047,13 +1006,13 @@ namespace ldx12
 
 	void DeviceManager::DestroySwapchain( SwapchainHandle swapchain )
 	{
-		if( !swapchain.Valid() || impl_ == nullptr )
+		if( !swapchain.Valid() )
 		{
 			return;
 		}
 
 		WaitIdle();
-		impl_->DestroySwapchain( swapchain );
+		DestroySwapchainInternal( swapchain );
 		if( primarySwapchain_ == swapchain )
 		{
 			primarySwapchain_ = {};
@@ -1082,13 +1041,13 @@ namespace ldx12
 
 	void DeviceManager::Resize( SwapchainHandle swapchain, uint32_t width, uint32_t height )
 	{
-		if( width == 0 || height == 0 || impl_ == nullptr )
+		if( width == 0 || height == 0 )
 		{
 			return;
 		}
 
-		SwapchainDesc* swapchainDesc = impl_->GetSwapchainDesc( swapchain );
-		Swapchain* nativeSwapchain = impl_->GetSwapchain( swapchain );
+		SwapchainDesc* swapchainDesc = GetSwapchainDesc( swapchain );
+		Swapchain* nativeSwapchain = GetSwapchain( swapchain );
 		if( swapchainDesc == nullptr || nativeSwapchain == nullptr )
 		{
 			return;
@@ -1107,7 +1066,7 @@ namespace ldx12
 
 	uint32_t DeviceManager::GetWidth( SwapchainHandle swapchain ) const noexcept
 	{
-		const SwapchainDesc* swapchainDesc = impl_ != nullptr ? impl_->GetSwapchainDesc( swapchain ) : nullptr;
+		const SwapchainDesc* swapchainDesc = GetSwapchainDesc( swapchain );
 		return swapchainDesc != nullptr ? swapchainDesc->width : 0u;
 	}
 
@@ -1118,7 +1077,7 @@ namespace ldx12
 
 	uint32_t DeviceManager::GetHeight( SwapchainHandle swapchain ) const noexcept
 	{
-		const SwapchainDesc* swapchainDesc = impl_ != nullptr ? impl_->GetSwapchainDesc( swapchain ) : nullptr;
+		const SwapchainDesc* swapchainDesc = GetSwapchainDesc( swapchain );
 		return swapchainDesc != nullptr ? swapchainDesc->height : 0u;
 	}
 
@@ -1129,7 +1088,7 @@ namespace ldx12
 
 	bool DeviceManager::IsVsyncEnabled( SwapchainHandle swapchain ) const noexcept
 	{
-		const SwapchainDesc* swapchainDesc = impl_ != nullptr ? impl_->GetSwapchainDesc( swapchain ) : nullptr;
+		const SwapchainDesc* swapchainDesc = GetSwapchainDesc( swapchain );
 		return swapchainDesc != nullptr ? swapchainDesc->vsync : true;
 	}
 
@@ -1140,16 +1099,11 @@ namespace ldx12
 
 	void DeviceManager::SetVsync( SwapchainHandle swapchain, bool enabled ) noexcept
 	{
-		SwapchainDesc* swapchainDesc = impl_ != nullptr ? impl_->GetSwapchainDesc( swapchain ) : nullptr;
+		SwapchainDesc* swapchainDesc = GetSwapchainDesc( swapchain );
 		if( swapchainDesc != nullptr )
 		{
 			swapchainDesc->vsync = enabled;
 		}
-	}
-
-	void DeviceManager::WaitIdle()
-	{
-		impl_->WaitIdle();
 	}
 }
 

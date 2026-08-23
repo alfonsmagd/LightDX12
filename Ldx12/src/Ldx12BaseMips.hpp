@@ -4,13 +4,10 @@
 
 namespace ldx12
 {
-	struct TextureResource;
-	class DeviceManager::Impl;
-
 	class BaseMips final
 	{
 	public:
-		explicit BaseMips( DeviceManager::Impl& manager );
+		explicit BaseMips( DeviceManager& manager );
 		BaseMips( const BaseMips& ) = delete;
 		BaseMips& operator=( const BaseMips& ) = delete;
 
@@ -34,7 +31,7 @@ namespace ldx12
 			D3D12_RESOURCE_STATES before,
 			D3D12_RESOURCE_STATES after ) noexcept;
 
-		DeviceManager::Impl& manager_;
+		DeviceManager& manager_;
 		ComPtr<ID3D12PipelineState> pipelineState_;
 	};
 }

@@ -1,4 +1,4 @@
-#include "Ldx12Resources.hpp"
+#include "Ldx12Internal.hpp"
 
 #include <cstring>
 

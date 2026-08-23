@@ -32,6 +32,7 @@ configure_file(
 set(LDX12_PUBLIC_HEADERS
     "${LDX12_ROOT}/include/Ldx12/HandleSlotMap.hpp"
     "${LDX12_ROOT}/include/Ldx12/Ldx12.hpp"
+    "${LDX12_ROOT}/include/Ldx12/Ldx12Native.hpp"
     "${LDX12_ROOT}/include/Ldx12/Ldx12_Defines.hpp"
     "${LDX12_ROOT}/include/Ldx12/HLSLLoader.hpp"
 )
@@ -43,8 +44,6 @@ set(LDX12_PRIVATE_HEADERS
     "${LDX12_ROOT}/src/Ldx12CommandBuffer.hpp"
     "${LDX12_ROOT}/src/Ldx12ImmediateCommands.hpp"
     "${LDX12_ROOT}/src/Ldx12Internal.hpp"
-    "${LDX12_ROOT}/src/Ldx12ManagerImpl.hpp"
-    "${LDX12_ROOT}/src/Ldx12Resources.hpp"
     "${LDX12_ROOT}/src/Ldx12ShaderCompiler.hpp"
     "${LDX12_ROOT}/src/Ldx12StagingDevice.hpp"
     "${LDX12_ROOT}/src/Ldx12Swapchain.hpp"
@@ -60,6 +59,7 @@ set(LDX12_SOURCES
     "${LDX12_ROOT}/src/Ldx12CommandBuffer.cpp"
     "${LDX12_ROOT}/src/Ldx12DeviceManager.cpp"
     "${LDX12_ROOT}/src/Ldx12ImmediateCommands.cpp"
+    "${LDX12_ROOT}/src/Ldx12Native.cpp"
     "${LDX12_ROOT}/src/Ldx12RenderDevice.cpp"
     "${LDX12_ROOT}/src/Ldx12Resources.cpp"
     "${LDX12_ROOT}/src/Ldx12ShaderCompiler.cpp"

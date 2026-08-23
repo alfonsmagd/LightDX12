@@ -1,8 +1,7 @@
 #include "Ldx12BaseMips.hpp"
 
 #include "Ldx12BaseMipsShader.hpp"
-#include "Ldx12ManagerImpl.hpp"
-#include "Ldx12Resources.hpp"
+#include "Ldx12ImmediateCommands.hpp"
 #include "Ldx12ShaderCompiler.hpp"
 
 #include <algorithm>
@@ -24,7 +23,7 @@ namespace ldx12
 		}
 	}
 
-	BaseMips::BaseMips( DeviceManager::Impl& manager ): manager_( manager )
+	BaseMips::BaseMips( DeviceManager& manager ): manager_( manager )
 	{
 		ComputePipelineDesc pipelineDesc{};
 		pipelineDesc.computeShader.source = detail::ourBaseMipsShaderSource;

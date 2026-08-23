@@ -197,6 +197,22 @@ target_link_libraries(MyApplication PRIVATE Ldx12::Ldx12)
 
 A complete independent consumer with its own [`main.cpp`](examples/InstalledLdx12/main.cpp) is available in [`examples/InstalledLdx12`](examples/InstalledLdx12/README.md). Set `LDX12_USE_FETCHCONTENT=OFF` to consume an installed package or `ON` to download Ldx12 automatically.
 
+## Optional native D3D12 access
+
+Normal rendering only requires `Ldx12.hpp`. Code that deliberately needs the underlying Direct3D 12 objects must opt in through the separate native header:
+
+```cpp
+#include <Ldx12/Ldx12Native.hpp>
+
+ldx12::D3D12Native native = device.GetNative();
+ID3D12Device* d3dDevice = native.GetDevice();
+ID3D12CommandQueue* queue = native.GetCommandQueue();
+ID3D12GraphicsCommandList* commandList = native.GetCommandList( commands );
+ID3D12Resource* resource = native.GetResource( texture );
+```
+
+These pointers are borrowed: the caller must not release them. Commands and resource-state changes recorded through native D3D12 calls remain the caller's responsibility.
+
 ## Repository layout
 
 ```text

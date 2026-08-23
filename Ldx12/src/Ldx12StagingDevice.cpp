@@ -1,10 +1,11 @@
 #include "Ldx12StagingDevice.hpp"
 
-#include "Ldx12ManagerImpl.hpp"
+#include "Ldx12ImmediateCommands.hpp"
+
 
 namespace ldx12
 {
-	StagingDevice::StagingDevice( DeviceManager::Impl& manager ): manager_( manager )
+	StagingDevice::StagingDevice( DeviceManager& manager ): manager_( manager )
 	{
 		if( manager_.device_ == nullptr )
 		{

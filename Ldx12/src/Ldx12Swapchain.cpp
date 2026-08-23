@@ -1,12 +1,11 @@
 #include "Ldx12Swapchain.hpp"
 
-#include "Ldx12ManagerImpl.hpp"
 
 #include <stdexcept>
 
 namespace ldx12
 {
-	Swapchain::Swapchain( DeviceManager::Impl& ctx, SwapchainHandle swapchainHandle, HWND hwnd, uint32_t width, uint32_t height ):
+	Swapchain::Swapchain( DeviceManager& ctx, SwapchainHandle swapchainHandle, HWND hwnd, uint32_t width, uint32_t height ):
 		ctx_( ctx ),
 		swapchainHandle_( swapchainHandle )
 	{

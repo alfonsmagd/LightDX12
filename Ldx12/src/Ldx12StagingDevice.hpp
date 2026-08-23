@@ -4,14 +4,10 @@
 
 namespace ldx12
 {
-	struct BufferResource;
-	struct TextureResource;
-	class DeviceManager::Impl;
-
 	class StagingDevice final
 	{
 	public:
-		explicit StagingDevice( DeviceManager::Impl& manager );
+		explicit StagingDevice( DeviceManager& manager );
 		StagingDevice( const StagingDevice& ) = delete;
 		StagingDevice& operator=( const StagingDevice& ) = delete;
 
@@ -20,7 +16,7 @@ namespace ldx12
 		void TextureData2D( TextureResource& texture, void* outData, uint32_t rowPitch, uint32_t slicePitch );
 
 	private:
-		DeviceManager::Impl& manager_;
+		DeviceManager& manager_;
 	};
 }
 

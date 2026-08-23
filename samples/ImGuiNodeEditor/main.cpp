@@ -1,6 +1,7 @@
 #include "App/ImGuiLayer.hpp"
 #include "App/NodeGraph.hpp"
 #include "Ldx12/Ldx12.hpp"
+#include "Ldx12/Ldx12Native.hpp"
 
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "imgui.h"
@@ -527,7 +528,7 @@ namespace
 		state.imgui->UnregisterTexture( state.editor.imguiTextureId );
 		device.Destroy( state.demoTexture );
 		state.demoTexture = UploadCpuTexture( device, state.cpuPixels );
-		state.editor.imguiTextureId = state.imgui->RegisterTexture( device.GetNativeTextureResource( state.demoTexture ), DXGI_FORMAT_R8G8B8A8_UNORM );
+		state.editor.imguiTextureId = state.imgui->RegisterTexture( device.GetNative().GetResource( state.demoTexture ), DXGI_FORMAT_R8G8B8A8_UNORM );
 		state.editor.status = "Textura invertida recorriendo 65.536 pixels en CPU.";
 		state.editor.cpuInvertRequested = false;
 	}
@@ -590,10 +591,11 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		swapchainDesc.vsync = true;
 		state.deviceManager = &DeviceManager::Initialize( contextDesc, swapchainDesc );
 		RenderDevice& device = *state.deviceManager->GetRenderDevice();
-		state.imgui = std::make_unique<App::ImGuiLayer>( window, device.GetNativeDevice(), device.GetNativeCommandQueue(), contextDesc.swapchainFormat, DXGI_FORMAT_UNKNOWN, kFramesInFlight );
+		D3D12Native native = device.GetNative();
+		state.imgui = std::make_unique<App::ImGuiLayer>( window, native.GetDevice(), native.GetCommandQueue(), contextDesc.swapchainFormat, DXGI_FORMAT_UNKNOWN, kFramesInFlight );
 		state.cpuPixels = CreateDemoPixels();
 		state.demoTexture = UploadCpuTexture( device, state.cpuPixels );
-		state.editor.imguiTextureId = state.imgui->RegisterTexture( device.GetNativeTextureResource( state.demoTexture ), DXGI_FORMAT_R8G8B8A8_UNORM );
+		state.editor.imguiTextureId = state.imgui->RegisterTexture( native.GetResource( state.demoTexture ), DXGI_FORMAT_R8G8B8A8_UNORM );
 		BuildExampleGraph( state.editor );
 
 		MSG message{};
@@ -622,7 +624,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 			Framebuffer framebuffer{};
 			framebuffer.color[0].texture = backBuffer;
 			commands.CmdBeginRendering( renderPass, framebuffer );
-			state.imgui->Render( commands.GetNativeGraphicsCommandList() );
+			state.imgui->Render( native.GetCommandList( commands ) );
 			commands.CmdEndRendering();
 			state.frameSubmissions[ state.frameIndex ] = device.Submit( commands, backBuffer );
 			state.frameIndex = ( state.frameIndex + 1 ) % kFramesInFlight;
