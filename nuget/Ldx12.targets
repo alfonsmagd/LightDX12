@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Target Name="Ldx12ValidateNativePackage" BeforeTargets="PrepareForBuild">
+    <Error Condition="'$(Platform)' != 'x64'" Text="The Ldx12 NuGet package currently supports only the x64 Visual Studio platform." />
+  </Target>
+  <ItemDefinitionGroup Condition="'$(Platform)' == 'x64'">
+    <Link>
+      <AdditionalLibraryDirectories>$(Ldx12PackageRoot)lib\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies Condition="'$(UseDebugLibraries)' == 'true'">Ldx12d.lib;d3d12.lib;d3dcompiler.lib;dxgi.lib;dxguid.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies Condition="'$(UseDebugLibraries)' != 'true'">Ldx12.lib;d3d12.lib;d3dcompiler.lib;dxgi.lib;dxguid.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+</Project>

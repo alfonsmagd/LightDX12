@@ -180,9 +180,13 @@ cmake -S . -B build-core ^
     -DLDX12_BUILD_EXAMPLES=OFF ^
     -DLDX12_BUILD_TESTS=OFF ^
     -DLDX12_INSTALL=ON
+cmake --build build-core --config Debug --target Ldx12 --parallel
 cmake --build build-core --config Release --target Ldx12 --parallel
+cmake --install build-core --config Debug --prefix install
 cmake --install build-core --config Release --prefix install
 ```
+
+The installed package provides `Ldx12d.lib` for Debug and `Ldx12.lib` for Release. CMake selects the matching library automatically.
 
 Another CMake project can then consume that installation:
 
@@ -195,7 +199,9 @@ find_package(Ldx12 CONFIG REQUIRED)
 target_link_libraries(MyApplication PRIVATE Ldx12::Ldx12)
 ```
 
-A complete independent consumer with its own [`main.cpp`](examples/InstalledLdx12/main.cpp) is available in [`examples/InstalledLdx12`](examples/InstalledLdx12/README.md). Set `LDX12_USE_FETCHCONTENT=OFF` to consume an installed package or `ON` to download Ldx12 automatically.
+A complete independent consumer with its own [`main.cpp`](examples/InstalledLdx12/main.cpp) is available in [`examples/InstalledLdx12`](examples/InstalledLdx12/README.md). It deliberately uses only `find_package`, the installed public headers and `Ldx12.lib`; it never includes the library's `.cpp` files.
+
+Native x64 Visual Studio 2022 projects can also consume the generated NuGet package. It automatically exposes the public headers and selects `Ldx12d.lib` for Debug or `Ldx12.lib` for Release. See [`nuget/README.md`](nuget/README.md) for local feed testing and NuGet.org publication.
 
 ## Optional native D3D12 access
 
@@ -226,6 +232,7 @@ Ldx12/
 |   `-- ImGuiNodeEditor/ Typed visual node graph example
 |-- examples/
 |   `-- InstalledLdx12/  Independent find_package consumer
+|-- nuget/                Native VS2022 package integration and scripts
 |-- third_party/imgui/   Dear ImGui core and Win32/DX12 backends
 |-- CMakeLists.txt
 `-- GenerateSolution.bat
@@ -244,7 +251,7 @@ Test descriptions and commands are available in the [tests documentation](tests/
 | Area | Current support |
 | --- | --- |
 | Platform and backend | Windows 10/11 with Direct3D 12, feature level 12.0 or newer. |
-| Distribution | C++20 static library through `add_subdirectory`, `FetchContent` or an installed CMake package. |
+| Distribution | C++20 static library through `add_subdirectory`, `FetchContent`, an installed CMake package or a native x64 VS2022 NuGet package. |
 | Windows and presentation | Win32 `HWND` swapchains, up to three backbuffers, VSync and tearing configuration. |
 | Graphics shaders | Runtime DXC compilation of Shader Model 6.6 vertex and pixel shaders. |
 | Graphics pipelines | Color/depth attachments, viewport and scissor control, vertex and index buffers, push constants, draw, indexed draw, instancing and indirect indexed draw. |

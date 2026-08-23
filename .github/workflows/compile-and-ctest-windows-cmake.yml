@@ -3,6 +3,7 @@ name: Compile and CTest Windows CMake
 on:
   push:
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -21,6 +22,7 @@ jobs:
       app: ${{ steps.filter.outputs.app }}
       examples: ${{ steps.filter.outputs.examples }}
       cmake: ${{ steps.filter.outputs.cmake }}
+      nuget: ${{ steps.filter.outputs.nuget }}
 
     steps:
       - name: Checkout repository
@@ -90,12 +92,18 @@ jobs:
               "examples/InstalledLdx12/*",
               "tests/cmake/*"
           )
+          $nugetChanged = Test-PathChange @(
+              "nuget/*",
+              "tests/nuget/*",
+              "LICENSE*"
+          )
 
           "engine=$($engineChanged.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
           "tests=$($testsChanged.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
           "app=$($appChanged.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
           "examples=$($examplesChanged.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
           "cmake=$($cmakeChanged.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+          "nuget=$($nugetChanged.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
 
           $changedFiles | ForEach-Object { Write-Host "Changed: $_" }
 
@@ -190,13 +198,97 @@ jobs:
         run: ctest --test-dir build-install-consumer --output-on-failure
 
       - name: Configure FetchContent consumer
-        run: cmake -S examples/InstalledLdx12 -B build-fetch-consumer -G Ninja -DCMAKE_BUILD_TYPE=Debug -DLDX12_USE_FETCHCONTENT=ON
+        run: cmake -S tests/cmake/fetch-consumer -B build-fetch-consumer -G Ninja -DCMAKE_BUILD_TYPE=Debug
 
       - name: Build FetchContent consumer
         run: cmake --build build-fetch-consumer --parallel
 
       - name: Run FetchContent consumer
         run: ctest --test-dir build-fetch-consumer --output-on-failure
+
+  nuget-package:
+    name: NuGet Package and VS2022 Consumer
+    needs: changes
+    if: needs.changes.outputs.engine == 'true' || needs.changes.outputs.nuget == 'true' || startsWith(github.ref, 'refs/tags/v')
+    runs-on: windows-2025
+    timeout-minutes: 20
+    outputs:
+      version: ${{ steps.package.outputs.version }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Configure NuGet.exe
+        uses: NuGet/setup-nuget@v4
+        with:
+          nuget-version: latest
+
+      - name: Build NuGet package
+        id: package
+        shell: pwsh
+        run: |
+          if ( $env:GITHUB_REF_TYPE -eq "tag" ) {
+              $version = $env:GITHUB_REF_NAME -replace '^v', ''
+          } else {
+              $version = "0.1.0-ci.$env:GITHUB_RUN_NUMBER"
+          }
+
+          $licenseExpression = "${{ vars.NUGET_LICENSE_EXPRESSION }}"
+          if ( [string]::IsNullOrWhiteSpace( $licenseExpression ) ) {
+              $licenseExpression = "UNLICENSED"
+          }
+          if ( $env:GITHUB_REF_TYPE -eq "tag" -and $licenseExpression -eq "UNLICENSED" ) {
+              throw "Set the NUGET_LICENSE_EXPRESSION repository variable before publishing a tag."
+          }
+
+          ./nuget/Pack.ps1 -Version $version -LicenseExpression $licenseExpression -NuGetExe ( Get-Command nuget.exe ).Source
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Test package in a VS2022 project
+        shell: pwsh
+        run: ./nuget/TestPackage.ps1 -Version "${{ steps.package.outputs.version }}" -NuGetExe ( Get-Command nuget.exe ).Source
+
+      - name: Upload NuGet package
+        uses: actions/upload-artifact@v7
+        with:
+          name: Ldx12-nuget-${{ steps.package.outputs.version }}
+          path: packages/Ldx12.${{ steps.package.outputs.version }}.nupkg
+          if-no-files-found: error
+
+  publish-nuget:
+    name: Publish NuGet.org Package
+    needs:
+      - changes
+      - nuget-package
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: windows-2025
+    timeout-minutes: 10
+    environment: release
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Download NuGet package
+        uses: actions/download-artifact@v7
+        with:
+          name: Ldx12-nuget-${{ needs.nuget-package.outputs.version }}
+          path: packages
+
+      - name: NuGet login
+        id: login
+        uses: NuGet/login@v1
+        with:
+          user: ${{ secrets.NUGET_USER }}
+
+      - name: Publish package
+        shell: pwsh
+        run: >-
+          dotnet nuget push
+          "packages/Ldx12.${{ needs.nuget-package.outputs.version }}.nupkg"
+          --api-key "${{ steps.login.outputs.NUGET_API_KEY }}"
+          --source https://api.nuget.org/v3/index.json
 
   app:
     name: App and Tests
