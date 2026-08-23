@@ -51,7 +51,8 @@ Install-Package Ldx12 -Version 0.1.0
 
 Installing `Ldx12` in a native x64 `.vcxproj` automatically provides:
 
-- `build/native/include` as an include directory;
+- `build/native/include` for both compilation and Visual Studio IntelliSense;
+- the public `.hpp` files in the Visual Studio project model under `Ldx12 Headers`;
 - C++20 and Ldx12 public preprocessor definitions;
 - `Ldx12d.lib` for Debug or `Ldx12.lib` for Release;
 - the required Direct3D 12 system libraries.

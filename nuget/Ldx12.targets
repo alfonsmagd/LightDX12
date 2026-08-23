@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <IncludePath>$(Ldx12IncludeDirectory);$(IncludePath)</IncludePath>
+  </PropertyGroup>
   <Target Name="Ldx12ValidateNativePackage" BeforeTargets="PrepareForBuild">
     <Error Condition="'$(Platform)' != 'x64'" Text="The Ldx12 NuGet package currently supports only the x64 Visual Studio platform." />
   </Target>
