@@ -2,7 +2,6 @@
 param(
     [ValidatePattern( '^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$' )]
     [string] $Version = '0.1.0-local',
-    [string] $LicenseExpression = 'UNLICENSED',
     [string] $NuGetExe = ''
 )
 
@@ -63,7 +62,6 @@ Invoke-Checked $NuGetExe @(
     '-BasePath', $repositoryRoot,
     '-OutputDirectory', $outputDirectory,
     '-Version', $Version,
-    '-Properties', "licenseExpression=$LicenseExpression",
     '-NonInteractive'
 )
 

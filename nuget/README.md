@@ -21,7 +21,7 @@ To inspect it in the Visual Studio package manager before publishing:
 
 ## Publish to NuGet.org
 
-The repository currently has no declared license. The local package therefore uses `UNLICENSED`. Before publishing publicly, add a repository license and set the GitHub repository variable `NUGET_LICENSE_EXPRESSION` to its matching SPDX expression, for example `MIT` only if the repository has actually been licensed under MIT.
+Ldx12 and the NuGet package use the MIT License. Third-party attribution is included in `THIRD_PARTY_NOTICES.md`, and both files are embedded in the package.
 
 Configure a NuGet.org Trusted Publishing policy with:
 

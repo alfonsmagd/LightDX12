@@ -8,7 +8,7 @@
     <description>Lightweight native Direct3D 12 rendering library for Windows and Visual Studio 2022.</description>
     <projectUrl>https://github.com/alfonsmagd/LightDX12</projectUrl>
     <repository type="git" url="https://github.com/alfonsmagd/LightDX12.git" />
-    <license type="expression">$licenseExpression$</license>
+    <license type="expression">MIT</license>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <readme>README.md</readme>
     <tags>native nativepackage c++ cpp directx12 d3d12 graphics rendering</tags>
@@ -18,6 +18,8 @@
   </metadata>
   <files>
     <file src="README.md" target="README.md" />
+    <file src="LICENSE" target="LICENSE" />
+    <file src="THIRD_PARTY_NOTICES.md" target="THIRD_PARTY_NOTICES.md" />
     <file src="build\nuget-install\include\**\*" target="build\native\include" />
     <file src="build\nuget-install\lib\Ldx12.lib" target="build\native\lib\x64" />
     <file src="build\nuget-install\lib\Ldx12d.lib" target="build\native\lib\x64" />

@@ -234,15 +234,7 @@ jobs:
               $version = "0.1.0-ci.$env:GITHUB_RUN_NUMBER"
           }
 
-          $licenseExpression = "${{ vars.NUGET_LICENSE_EXPRESSION }}"
-          if ( [string]::IsNullOrWhiteSpace( $licenseExpression ) ) {
-              $licenseExpression = "UNLICENSED"
-          }
-          if ( $env:GITHUB_REF_TYPE -eq "tag" -and $licenseExpression -eq "UNLICENSED" ) {
-              throw "Set the NUGET_LICENSE_EXPRESSION repository variable before publishing a tag."
-          }
-
-          ./nuget/Pack.ps1 -Version $version -LicenseExpression $licenseExpression -NuGetExe ( Get-Command nuget.exe ).Source
+          ./nuget/Pack.ps1 -Version $version -NuGetExe ( Get-Command nuget.exe ).Source
           "version=$version" >> $env:GITHUB_OUTPUT
 
       - name: Test package in a VS2022 project

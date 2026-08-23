@@ -136,6 +136,12 @@ if(LDX12_INSTALL)
     )
     install(DIRECTORY "${LDX12_ROOT}/include/" DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
     install(
+        FILES
+            "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE"
+            "${CMAKE_CURRENT_SOURCE_DIR}/THIRD_PARTY_NOTICES.md"
+        DESTINATION "${CMAKE_INSTALL_DATADIR}/Ldx12"
+    )
+    install(
         EXPORT Ldx12Targets
         FILE Ldx12Targets.cmake
         NAMESPACE Ldx12::

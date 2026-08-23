@@ -267,3 +267,7 @@ The following paths are deliberately **not directly supported**:
 - **Mesh and amplification shaders:** no dedicated pipeline descriptors or dispatch API are exposed.
 - **Traditional resource binding:** there is no legacy per-draw descriptor-table binding path. The public resource-binding model is bindless.
 - **Portable native windows:** the public swapchain accepts Win32 `HWND` only.
+
+## License
+
+Ldx12 is available under the [MIT License](LICENSE). Third-party attribution is documented in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
