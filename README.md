@@ -247,30 +247,32 @@ Test descriptions and commands are available in the [tests documentation](tests/
 - Reusable graphics command buffers, submission batches, fences, waits and deferred GPU-safe destruction.
 - D3D12 debug layer, GPU labels, optional PIX capture attachment and explicit native D3D12 access.
 
-## Technical limits
+## Technical capacities
 
-| Configurable capacity | Default | Maximum |
+| Descriptor heap | Default capacity | Maximum capacity |
 | --- | ---: | ---: |
-| Shared CBV/SRV/UAV descriptors | 4096 | 4096 |
-| Dynamic CBV/SRV/UAV descriptors | 4070 | 4070 |
-| RTV descriptors | 256 | 256 |
-| DSV descriptors | 64 | 64 |
+| Shared CBV/SRV/UAV | 4,096 descriptors | 4,096 descriptors |
+| Dynamic portion of CBV/SRV/UAV | 4,070 descriptors | 4,070 descriptors |
+| RTV | 256 descriptors | 256 descriptors |
+| DSV | 64 descriptors | 64 descriptors |
 
-| Hard limit | Value |
+The following values are Ldx12 software capacities, not minimum GPU requirements. Ldx12 does not create these resources until the application requests them.
+
+| API capacity | Maximum capacity |
 | --- | ---: |
-| Live buffers | 4096 |
-| Live textures | 4096 |
-| Live swapchains | 16 |
-| Backbuffers per swapchain | 1-3 (3 by default) |
-| Simultaneous color attachments | 8 |
-| Vertex input elements | 16 |
-| Active graphics command buffers | 64 |
-| Command buffers per submission batch | 4 |
-| Textures tracked by one command buffer | 256 |
-| Shader include directories | 8 |
-| Push constants | 63 x 32-bit (252 bytes) |
+| Simultaneously live buffers | 4,096 buffers |
+| Simultaneously live textures | 4,096 textures |
+| Simultaneously live swapchains | 16 swapchains |
+| Backbuffers per swapchain | 1-3 backbuffers (3 by default) |
+| Color attachments per render pass | 8 attachments |
+| Vertex input elements per graphics pipeline | 16 elements |
+| Acquired graphics command buffers awaiting submission | 64 command buffers |
+| Command buffers per submission batch | 4 command buffers |
+| Texture states tracked per command buffer | 256 textures |
+| Include directories per shader stage | 8 directories |
+| Push-constant block | 63 values x 32 bits (252 bytes) |
 
-`ContextDesc` can reduce the CBV/SRV/UAV, RTV and DSV capacities. CBV, SRV and UAV descriptors share one heap; they do not each receive 4096 entries. Descriptor index 0 is invalid, indices 1-25 are predefined and indices 26-4095 provide the 4070 dynamic entries shown above.
+`ContextDesc` can reduce the CBV/SRV/UAV, RTV and DSV capacities. CBV, SRV and UAV descriptors share one heap; they do not each receive 4,096 entries. Descriptor index 0 is invalid, indices 1-25 are predefined and indices 26-4095 provide the 4,070 dynamic entries shown above.
 
 The predefined positions are conveniences, not resource limits:
 
