@@ -23,6 +23,12 @@ namespace
 		uint32_t fullscreen = 0;
 	};
 
+	enum class Shape
+	{
+		Triangle,
+		FullscreenTriangle,
+	};
+
 	LRESULT CALLBACK WindowProc( HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam )
 	{
 		auto* app = reinterpret_cast<AppState*>( GetWindowLongPtr( hwnd, GWLP_USERDATA ) );
@@ -128,9 +134,9 @@ float4 main() : SV_Target0
 		return device.CreateRenderPipeline( desc );
 	}
 
-	void DrawShape( ICommandBuffer& commands, uint32_t colorIndex, bool fullscreen )
+	void DrawShape( ICommandBuffer& commands, uint32_t colorIndex, Shape shape )
 	{
-		const DrawConstants constants{ colorIndex, fullscreen ? 1u : 0u };
+		const DrawConstants constants{ colorIndex, shape == Shape::FullscreenTriangle ? 1u : 0u };
 		commands.CmdPushConstants( &constants, sizeof( constants ) );
 		commands.CmdDraw( 3 );
 	}
@@ -168,8 +174,8 @@ float4 main() : SV_Target0
 			{
 				const int32_t top = margin + static_cast<int32_t>( index ) * ( leftViewportHeight + gap );
 				commands.CmdSetViewport( static_cast<float>( margin ), static_cast<float>( top ), static_cast<float>( leftViewportWidth ), static_cast<float>( leftViewportHeight ) );
-				DrawShape( commands, 0, true );
-				DrawShape( commands, index + 1u, false );
+				DrawShape( commands, 0, Shape::FullscreenTriangle );
+				DrawShape( commands, index + 1u, Shape::Triangle );
 			}
 
 			const int32_t rightLeft = halfWidth + margin;
@@ -180,16 +186,16 @@ float4 main() : SV_Target0
 			const int32_t rightHeight = rightBottom - rightTop;
 			commands.CmdSetViewport( static_cast<float>( rightLeft ), static_cast<float>( rightTop ), static_cast<float>( rightWidth ), static_cast<float>( rightHeight ) );
 			commands.CmdSetScissor( rightLeft, rightTop, rightRight, rightBottom );
-			DrawShape( commands, 4, true );
-			DrawShape( commands, 5, false );
+			DrawShape( commands, 4, Shape::FullscreenTriangle );
+			DrawShape( commands, 5, Shape::Triangle );
 
 			const int32_t scissorLeft = rightLeft + rightWidth / 4;
 			const int32_t scissorTop = rightTop + rightHeight / 4;
 			const int32_t scissorRight = rightRight - rightWidth / 4;
 			const int32_t scissorBottom = rightBottom - rightHeight / 4;
 			commands.CmdSetScissor( scissorLeft, scissorTop, scissorRight, scissorBottom );
-			DrawShape( commands, 7, true );
-			DrawShape( commands, 6, false );
+			DrawShape( commands, 7, Shape::FullscreenTriangle );
+			DrawShape( commands, 6, Shape::Triangle );
 		}
 
 		commands.CmdEndRendering();
