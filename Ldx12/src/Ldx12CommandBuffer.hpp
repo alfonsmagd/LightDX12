@@ -18,6 +18,8 @@ namespace ldx12
 
 		void CmdBeginRendering( const RenderPass& renderPass, const Framebuffer& framebuffer ) override;
 		void CmdEndRendering() override;
+		void CmdSetViewport( float x, float y, float width, float height, float minDepth = 0.0f, float maxDepth = 1.0f ) override;
+		void CmdSetScissor( int32_t left, int32_t top, int32_t right, int32_t bottom ) override;
 		void CmdTransitionTexture( TextureHandle texture, D3D12_RESOURCE_STATES newState ) override;
 		void CmdBindRenderPipeline( const RenderPipelineState& pipeline ) override;
 		void CmdBindComputePipeline( const ComputePipelineState& pipeline ) override;

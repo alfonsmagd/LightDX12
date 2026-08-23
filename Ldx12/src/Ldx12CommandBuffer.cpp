@@ -496,15 +496,8 @@ namespace ldx12
 			depthStencilDescPtr,
 			D3D12_RENDER_PASS_FLAG_NONE );
 
-		D3D12_VIEWPORT viewport{};
-		viewport.Width = static_cast<float>( viewportTexture->width_ );
-		viewport.Height = static_cast<float>( viewportTexture->height_ );
-		viewport.MinDepth = 0.0f;
-		viewport.MaxDepth = 1.0f;
-		wrapper_.commandList_->RSSetViewports( 1, &viewport );
-
-		D3D12_RECT scissor{ 0, 0, static_cast<LONG>( viewportTexture->width_ ), static_cast<LONG>( viewportTexture->height_ ) };
-		wrapper_.commandList_->RSSetScissorRects( 1, &scissor );
+		CmdSetViewport( 0.0f, 0.0f, static_cast<float>( viewportTexture->width_ ), static_cast<float>( viewportTexture->height_ ) );
+		CmdSetScissor( 0, 0, static_cast<int32_t>( viewportTexture->width_ ), static_cast<int32_t>( viewportTexture->height_ ) );
 		isRendering_ = true;
 	}
 
@@ -517,6 +510,23 @@ namespace ldx12
 
 		wrapper_.commandList_->EndRenderPass();
 		isRendering_ = false;
+	}
+
+	void CommandBufferImpl::CmdSetViewport( float x, float y, float width, float height, float minDepth, float maxDepth )
+	{
+		assert( width >= 0.0f && height >= 0.0f );
+		assert( minDepth >= 0.0f && minDepth <= maxDepth && maxDepth <= 1.0f );
+
+		const D3D12_VIEWPORT viewport{ x, y, width, height, minDepth, maxDepth };
+		wrapper_.commandList_->RSSetViewports( 1, &viewport );
+	}
+
+	void CommandBufferImpl::CmdSetScissor( int32_t left, int32_t top, int32_t right, int32_t bottom )
+	{
+		assert( right >= left && bottom >= top );
+
+		const D3D12_RECT scissor{ left, top, right, bottom };
+		wrapper_.commandList_->RSSetScissorRects( 1, &scissor );
 	}
 
 	void CommandBufferImpl::CmdTransitionTexture( TextureHandle texture, D3D12_RESOURCE_STATES newState )

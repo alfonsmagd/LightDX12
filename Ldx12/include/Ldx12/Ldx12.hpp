@@ -376,6 +376,8 @@ namespace ldx12
 
 		virtual void CmdBeginRendering( const RenderPass& renderPass, const Framebuffer& framebuffer ) = 0;
 		virtual void CmdEndRendering() = 0;
+		virtual void CmdSetViewport( float x, float y, float width, float height, float minDepth = 0.0f, float maxDepth = 1.0f ) = 0;
+		virtual void CmdSetScissor( int32_t left, int32_t top, int32_t right, int32_t bottom ) = 0;
 		virtual void CmdTransitionTexture( TextureHandle texture, D3D12_RESOURCE_STATES newState ) = 0;
 		virtual void CmdBindRenderPipeline( const RenderPipelineState& pipeline ) = 0;
 		virtual void CmdBindComputePipeline( const ComputePipelineState& pipeline ) = 0;

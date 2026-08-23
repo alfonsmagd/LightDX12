@@ -85,6 +85,8 @@ namespace ldx12::tests
 		device.Destroy( batchTexture );
 
 		ICommandBuffer& commandBuffer = device.AcquireCommandBuffer();
+		commandBuffer.CmdSetViewport( 4.0f, 8.0f, 32.0f, 16.0f, 0.25f, 0.75f );
+		commandBuffer.CmdSetScissor( 4, 8, 36, 24 );
 		const SubmitHandle submission = device.Submit( commandBuffer );
 		Require( !submission.Empty(),
 			"Submitting a command buffer returned an empty submission handle." );

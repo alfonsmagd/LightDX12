@@ -21,7 +21,7 @@ Ldx12 is built around a few deliberately simple rules:
 - **Use bindless resource access as the normal path.** Shader resources live in a shared descriptor heap and can be addressed dynamically or assigned to well-known CBV, SRV and UAV slots.
 - **Make the frame flow readable.** A frame should look like acquire, record, submit and present—not like a large framework lifecycle.
 - **Keep experiments cheap.** Runtime HLSL compilation and compact descriptors make it quick to change shaders, pipelines and resource layouts.
-- **Keep the repository focused.** The current tree contains the core library and three focused samples. It relies on the Windows SDK rather than a package manager or Git submodules.
+- **Keep the repository focused.** The current tree contains the core library and four focused samples. It relies on the Windows SDK rather than a package manager or Git submodules.
 
 This is intentionally not a full engine. There is no scene graph, material system, asset pipeline or editor imposed on the application. Those layers can be built above the rendering API when a project actually needs them.
 
@@ -107,6 +107,7 @@ DeviceManager::ShutdownSingleton();
 | Sample | What it demonstrates |
 | --- | --- |
 | `Triangle` | Win32 setup, device and swapchain creation, runtime HLSL compilation, pipeline creation, command recording and presentation. |
+| `ViewportScissor` | Three viewport regions on the left and a visibly clipped scissor region on the right, without an application framework. |
 | `CBSRVCubes` | Instanced procedural cubes, a structured buffer exposed through an SRV, constant-buffer data exposed through a CBV, fixed bindless slots, push constants and depth rendering. |
 | `ImGuiNodeEditor` | Typed visual node graph implemented with ImGui: constants, arithmetic, `Vector3(X,Y,Z)`, links, cycle validation and live evaluation. |
 
@@ -204,6 +205,7 @@ Ldx12/
 |-- Ldx12/               Core library, public headers and internal shaders
 |-- samples/
 |   |-- Triangle/        Minimal draw-and-present path
+|   |-- ViewportScissor/ Explicit viewport and scissor regions
 |   |-- CBSRVCubes/      Bindless CBV/SRV resource example
 |   `-- ImGuiNodeEditor/ Typed visual node graph example
 |-- examples/
@@ -229,7 +231,7 @@ Test descriptions and commands are available in the [tests documentation](tests/
 | Distribution | C++20 static library through `add_subdirectory`, `FetchContent` or an installed CMake package. |
 | Windows and presentation | Win32 `HWND` swapchains, up to three backbuffers, VSync and tearing configuration. |
 | Graphics shaders | Runtime DXC compilation of Shader Model 6.6 vertex and pixel shaders. |
-| Graphics pipelines | Color/depth attachments, vertex and index buffers, push constants, draw, indexed draw, instancing and indirect indexed draw. |
+| Graphics pipelines | Color/depth attachments, viewport and scissor control, vertex and index buffers, push constants, draw, indexed draw, instancing and indirect indexed draw. |
 | Resources | Typed generational handles, buffers, 2D/3D textures, uploads, 2D texture downloads and external D3D12 texture import. |
 | Binding | Shared bindless CBV/SRV/UAV heap with fixed and dynamic slots, plus RTV and DSV descriptors. |
 | Commands and synchronization | Reusable graphics command buffers, submissions, batches of up to four command buffers, fences, waits and deferred GPU-safe destruction. |
