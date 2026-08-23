@@ -231,32 +231,61 @@ Ldx12/
 `-- GenerateSolution.bat
 ```
 
-## Current scope
-
-Ldx12 is a compact, evolving renderer abstraction rather than a compatibility promise or finished general-purpose engine. Its goal is to keep modern Direct3D 12 experiments understandable: explicit enough to teach the underlying model, small enough to change without fighting a framework.
-
 ## Tests
 
 Test descriptions and commands are available in the [tests documentation](tests/README.md).
 
-## Supported scope
+## Features
 
-| Area | Current support |
-| --- | --- |
-| Platform and backend | Windows 10/11 with Direct3D 12, feature level 12.0 or newer. |
-| Distribution | C++20 static library through `add_subdirectory`, `FetchContent` or an installed CMake package. |
-| Windows and presentation | Win32 `HWND` swapchains, up to three backbuffers, VSync and tearing configuration. |
-| Graphics shaders | Runtime DXC compilation of Shader Model 6.6 vertex and pixel shaders. |
-| Graphics pipelines | Color/depth attachments, viewport and scissor control, vertex and index buffers, push constants, draw, indexed draw, instancing and indirect indexed draw. |
-| Resources | Typed generational handles, buffers, 2D/3D textures, uploads, 2D texture downloads and external D3D12 texture import. |
-| Binding | Shared bindless CBV/SRV/UAV heap with fixed and dynamic slots, plus RTV and DSV descriptors. |
-| Commands and synchronization | Reusable graphics command buffers, submissions, batches of up to four command buffers, fences, waits and deferred GPU-safe destruction. |
-| Diagnostics | D3D12 debug layer, scoped GPU labels and optional PIX capture attachment. |
+- Windows 10/11, Direct3D 12 feature level 12.0 or newer and bindless resource binding tier 2 or newer.
+- C++20 static library available through CMake, `FetchContent` or installation.
+- Win32 `HWND` swapchains with VSync and tearing configuration.
+- Runtime DXC compilation of Shader Model 6.6 vertex and pixel shaders.
+- Graphics pipelines with color/depth attachments, viewport, scissor, vertex/index buffers, push constants, instancing and indirect indexed draws.
+- Typed generational handles for buffers, 2D/3D textures and swapchains.
+- Resource uploads, 2D texture downloads and mip generation.
+- Reusable graphics command buffers, submission batches, fences, waits and deferred GPU-safe destruction.
+- D3D12 debug layer, GPU labels, optional PIX capture attachment and explicit native D3D12 access.
 
-The following paths are deliberately **not directly supported**:
+## Technical limits
 
-- **Dedicated compute shaders:** there is no public compute command-buffer, compute-queue or compute-submit path. The current low-level `CreateComputePipeline`, `CmdBindComputePipeline` and `CmdDispatch` primitives run inside the graphics command-buffer path; they are not a complete independent compute API.
-- **Ray tracing:** there is no DXR pipeline, acceleration-structure management, shader-table abstraction or `DispatchRays` API.
-- **Mesh and amplification shaders:** no dedicated pipeline descriptors or dispatch API are exposed.
-- **Traditional resource binding:** there is no legacy per-draw descriptor-table binding path. The public resource-binding model is bindless.
-- **Portable native windows:** the public swapchain accepts Win32 `HWND` only.
+| Configurable capacity | Default | Maximum |
+| --- | ---: | ---: |
+| Shared CBV/SRV/UAV descriptors | 4096 | 4096 |
+| Dynamic CBV/SRV/UAV descriptors | 4070 | 4070 |
+| RTV descriptors | 256 | 256 |
+| DSV descriptors | 64 | 64 |
+
+| Hard limit | Value |
+| --- | ---: |
+| Live buffers | 4096 |
+| Live textures | 4096 |
+| Live swapchains | 16 |
+| Backbuffers per swapchain | 1-3 (3 by default) |
+| Simultaneous color attachments | 8 |
+| Vertex input elements | 16 |
+| Active graphics command buffers | 64 |
+| Command buffers per submission batch | 4 |
+| Textures tracked by one command buffer | 256 |
+| Shader include directories | 8 |
+| Push constants | 63 x 32-bit (252 bytes) |
+
+`ContextDesc` can reduce the CBV/SRV/UAV, RTV and DSV capacities. CBV, SRV and UAV descriptors share one heap; they do not each receive 4096 entries. Descriptor index 0 is invalid, indices 1-25 are predefined and indices 26-4095 provide the 4070 dynamic entries shown above.
+
+The predefined positions are conveniences, not resource limits:
+
+| Descriptor | Application positions | Internal positions |
+| --- | ---: | ---: |
+| CBV | 5 (`FreeCB0`-`FreeCB4`) | 5 |
+| SRV | 5 (`FreeSRV0`-`FreeSRV4`) | 5 |
+| UAV | 3 (`FreeRW0`-`FreeRW2`) | 2 |
+
+Use a predefined position when several shaders should know the descriptor index in advance. Otherwise create the view without a slot and obtain its dynamic index through `GetConstantBufferIndex`, `GetBindlessIndex` or `GetUnorderedAccessIndex`.
+
+## Not supported
+
+- Dedicated compute queues, command buffers or submissions. Compute dispatch currently uses the graphics command path.
+- Ray tracing.
+- Mesh and amplification shaders.
+- Traditional per-draw descriptor-table binding; resource binding is bindless-only.
+- Swapchains created directly from a native window type other than Win32 `HWND`.
