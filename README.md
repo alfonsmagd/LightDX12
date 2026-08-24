@@ -4,6 +4,8 @@
 
 Ldx12 is a C++20 static library that removes repetitive Direct3D 12 setup while keeping rendering explicit. It follows modern design patterns through bindless resources, typed generational handles, reusable command buffers and GPU-safe deferred destruction.
 
+Its philosophy is conceptually inspired by [lightweightvk](https://github.com/corporateshark/lightweightvk): a small, modern and bindless-oriented graphics API. Ldx12 applies that spirit to Direct3D 12 through an independent design and implementation.
+
 It is intended for graphics experiments, tools and renderer prototypes—not as a full game engine.
 
 ## Highlights
@@ -150,6 +152,6 @@ Stress and functional tests are described in the [tests documentation](tests/REA
 
 ## Origin and license
 
-Ldx12 began inside **IFNITY** and later became a standalone project. Its lightweight philosophy is conceptually inspired by [lightweightvk](https://github.com/corporateshark/lightweightvk), while its implementation and API are independently designed for Direct3D 12.
+Ldx12 began inside **IFNITY** and later became a standalone project.
 
 Ldx12 is licensed under MIT.
