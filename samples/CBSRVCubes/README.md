@@ -1,9 +1,8 @@
-# CB + SRV Cubes
+# CBV + SRV Cubes
 
-Small sample for comparing two bindless buffer paths:
+This sample gives each bindless buffer one clear responsibility:
 
-- `MatrixRows` records are uploaded to a `StructuredBuffer` exposed as an SRV.
-- `CubeColorConstants` is uploaded to a constant buffer exposed as a CBV.
-- The shader lives in `shaders/CBSRVCubes.hlsl`, includes `Ldx12_Defines.hlsli`, and reads both resources from fixed slots in `ResourceDescriptorHeap`.
+- The CBV contains `SceneConstants`, shared by every cube: aspect ratio, view distance and light direction.
+- The SRV contains `CubeData[]`, with one model matrix and color per cube.
 
-This is intentionally simple: cube geometry is generated in the vertex shader with `SV_VertexID`, and instances are selected with `SV_InstanceID`.
+`CmdDraw( 36, cubeCount )` draws every cube in one instanced call. The vertex shader uses `SV_InstanceID` to read `CubeData[instanceID]` directly from the SRV.

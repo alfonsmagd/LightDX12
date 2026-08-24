@@ -1,19 +1,7 @@
 #include "Ldx12_Defines.hlsli"
 
-#define SAMPLE_MATRIX_SRV_SLOT LDX12_SRV_SLOT_FREESRV0
-#define SAMPLE_COLOR_CBV_SLOT LDX12_CBV_SLOT_FREECB0
-
-cbuffer PushConstants : register(b0)
-{
-    uint gCubeCount;
-    uint gMatrixBaseIndex;
-    uint gColorFrameIndex;
-    float gAspectRatio;
-    float gViewDistance;
-};
-
-static const uint kMaxCubeColors = 32;
-static const uint kRingFrameCount = 3;
+#define SAMPLE_SCENE_CBV_SLOT LDX12_CBV_SLOT_FREECB0
+#define SAMPLE_CUBES_SRV_SLOT LDX12_SRV_SLOT_FREESRV0
 
 struct MatrixRows
 {
@@ -23,23 +11,25 @@ struct MatrixRows
     float4 row3;
 };
 
-struct CubeColorFrame
+struct SceneConstants
 {
-    float4 colors[kMaxCubeColors];
-    uint colorCount;
-    uint3 padding;
+    float aspectRatio;
+    float viewDistance;
+    float2 padding;
+    float4 lightDirection;
 };
 
-struct CubeColorConstants
+struct CubeData
 {
-    CubeColorFrame frames[kRingFrameCount];
+    MatrixRows model;
+    float4 color;
 };
 
 struct VSOutput
 {
     float4 position : SV_Position;
     float3 normal : NORMAL0;
-    nointerpolation uint colorIndex : COLOR_INDEX;
+    nointerpolation float3 color : COLOR0;
 };
 
 float4 TransformPoint(MatrixRows matrix, float3 localPosition)
@@ -51,6 +41,7 @@ float4 TransformPoint(MatrixRows matrix, float3 localPosition)
         dot(matrix.row2, value),
         dot(matrix.row3, value));
 }
+
 float3 TransformNormal(MatrixRows matrix, float3 localNormal)
 {
     return normalize(float3(
@@ -103,32 +94,30 @@ VSOutput VSMain(uint vertexID : SV_VertexID, uint instanceID : SV_InstanceID)
         float3(-1.0,  0.0,  0.0), float3(-1.0,  0.0,  0.0), float3(-1.0,  0.0,  0.0)
     };
 
-    StructuredBuffer<MatrixRows> matrices = ResourceDescriptorHeap[SAMPLE_MATRIX_SRV_SLOT];
-    const uint safeInstanceID = min(instanceID, max(gCubeCount, 1u) - 1u);
-    const MatrixRows matrix = matrices[gMatrixBaseIndex + safeInstanceID];
+    ConstantBuffer<SceneConstants> scene = ResourceDescriptorHeap[SAMPLE_SCENE_CBV_SLOT];
+    StructuredBuffer<CubeData> cubes = ResourceDescriptorHeap[SAMPLE_CUBES_SRV_SLOT];
+    const CubeData cube = cubes[instanceID];
 
-    float3 worldPosition = TransformPoint(matrix, positions[vertexID]).xyz;
-    worldPosition.z += gViewDistance;
+    float3 worldPosition = TransformPoint(cube.model, positions[vertexID]).xyz;
+    worldPosition.z += scene.viewDistance;
 
-    const float perspectiveScale = 2.25 / max(worldPosition.z, 0.001);
-    const float2 clipXY = float2(worldPosition.x * perspectiveScale / gAspectRatio, worldPosition.y * perspectiveScale);
-    const float clipZ = saturate((worldPosition.z - 1.0) / (gViewDistance + 18.0));
+    const float perspectiveScale = 2.25 / worldPosition.z;
+    const float2 clipXY = float2(
+        worldPosition.x * perspectiveScale / scene.aspectRatio,
+        worldPosition.y * perspectiveScale);
+    const float clipZ = (worldPosition.z - 1.0) / (scene.viewDistance + 18.0);
 
     VSOutput output;
     output.position = float4(clipXY, clipZ, 1.0);
-    output.normal = TransformNormal(matrix, normals[vertexID]);
-    output.colorIndex = safeInstanceID;
+    output.normal = TransformNormal(cube.model, normals[vertexID]);
+    output.color = cube.color.rgb;
     return output;
 }
 
 float4 PSMain(VSOutput input) : SV_Target0
 {
-    ConstantBuffer<CubeColorConstants> colorConstants = ResourceDescriptorHeap[SAMPLE_COLOR_CBV_SLOT];
-    const uint frameIndex = min(gColorFrameIndex, kRingFrameCount - 1u);
-    const uint colorCount = max(colorConstants.frames[frameIndex].colorCount, 1u);
-    const float3 baseColor = colorConstants.frames[frameIndex].colors[input.colorIndex % colorCount].rgb;
-
-    const float3 lightDirection = normalize(float3(-0.35, 0.8, -0.45));
-    const float lambert = saturate(dot(normalize(input.normal), lightDirection)) * 0.72 + 0.28;
-    return float4(baseColor * lambert, 1.0);
+    ConstantBuffer<SceneConstants> scene = ResourceDescriptorHeap[SAMPLE_SCENE_CBV_SLOT];
+    const float3 lightDirection = normalize(scene.lightDirection.xyz);
+    const float lighting = saturate(dot(normalize(input.normal), lightDirection)) * 0.72 + 0.28;
+    return float4(input.color * lighting, 1.0);
 }

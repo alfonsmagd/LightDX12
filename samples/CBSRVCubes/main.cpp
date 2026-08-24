@@ -1,33 +1,23 @@
 #include "Ldx12/Ldx12.hpp"
 #include "Ldx12/HLSLLoader.hpp"
 
-#include <algorithm>
 #include <array>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <filesystem>
 #include <stdexcept>
-#include <vector>
 
 using namespace ldx12;
 
 namespace
 {
-	constexpr uint32_t kMaxCubeColors = 32;
-	constexpr uint32_t kMaxCubeCount = 256;
-	constexpr uint32_t kRingFrameCount = 3;
-
-	struct ScenePushConstants
-	{
-		uint32_t cubeCount = 0;
-		uint32_t matrixBaseIndex = 0;
-		uint32_t colorFrameIndex = 0;
-		float aspectRatio = 1.0f;
-		float viewDistance = 12.0f;
-	};
-
-	static_assert( sizeof( ScenePushConstants ) / sizeof( uint32_t ) <= 63 );
+	constexpr uint32_t kCubeColumns = 8;
+	constexpr uint32_t kCubeRows = 4;
+	constexpr uint32_t kCubeCount = kCubeColumns * kCubeRows;
+	constexpr float kCubeSpacing = 1.7f;
+	constexpr float kCubeScale = 0.38f;
+	constexpr float kViewDistance = 18.0f;
 
 	struct alignas( 16 ) MatrixRows
 	{
@@ -39,21 +29,23 @@ namespace
 
 	static_assert( sizeof( MatrixRows ) == 64 );
 
-	struct alignas( 16 ) CubeColorFrame
+	struct alignas( 16 ) SceneConstants
 	{
-		std::array<std::array<float, 4>, kMaxCubeColors> colors = {};
-		uint32_t colorCount = 1;
-		std::array<uint32_t, 3> padding = {};
+		float aspectRatio = 1.0f;
+		float viewDistance = kViewDistance;
+		std::array<float, 2> padding = {};
+		std::array<float, 4> lightDirection = { -0.35f, 0.8f, -0.45f, 0.0f };
 	};
 
-	static_assert( sizeof( CubeColorFrame ) == ( kMaxCubeColors + 1u ) * 16u );
+	static_assert( sizeof( SceneConstants ) == 32 );
 
-	struct alignas( 16 ) CubeColorConstants
+	struct alignas( 16 ) CubeData
 	{
-		std::array<CubeColorFrame, kRingFrameCount> frames = {};
+		MatrixRows model;
+		std::array<float, 4> color = {};
 	};
 
-	static_assert( sizeof( CubeColorConstants ) <= 64u * 1024u );
+	static_assert( sizeof( CubeData ) == 80 );
 
 	struct Vec3
 	{
@@ -74,53 +66,42 @@ namespace
 		DeviceManager* deviceManager = nullptr;
 		RenderPipelineState pipeline;
 		DepthTarget depthTarget;
-		BufferHandle matrixBuffer = {};
-		BufferHandle colorBuffer = {};
+		BufferHandle sceneBuffer = {};
+		BufferHandle cubeBuffer = {};
 		bool running = true;
 		bool minimized = false;
-		bool pauseAnimation = false;
-		int cubeCount = 36;
-		int colorCount = 8;
-		float spacing = 2.0f;
-		float cubeScale = 0.42f;
-		float rotationSpeed = 1.0f;
-		float simulationTime = 0.0f;
-		uint32_t frameIndex = 0;
-		uint32_t ringFrameIndex = 0;
 	};
 
-	float Fract( float value )
-	{
-		return value - std::floor( value );
-	}
-
-	std::array<float, 3> HueToRgb( float hue )
-	{
-		const float r = std::clamp( std::abs( Fract( hue + 1.0f ) * 6.0f - 3.0f ) - 1.0f, 0.0f, 1.0f );
-		const float g = std::clamp( std::abs( Fract( hue + 2.0f / 3.0f ) * 6.0f - 3.0f ) - 1.0f, 0.0f, 1.0f );
-		const float b = std::clamp( std::abs( Fract( hue + 1.0f / 3.0f ) * 6.0f - 3.0f ) - 1.0f, 0.0f, 1.0f );
-		return { r, g, b };
-	}
+	constexpr std::array<std::array<float, 4>, 8> kCubeColors = {
+		std::array<float, 4>{ 0.12f, 0.55f, 1.00f, 1.0f },
+		std::array<float, 4>{ 0.10f, 0.95f, 0.55f, 1.0f },
+		std::array<float, 4>{ 0.85f, 0.20f, 1.00f, 1.0f },
+		std::array<float, 4>{ 1.00f, 0.35f, 0.18f, 1.0f },
+		std::array<float, 4>{ 1.00f, 0.80f, 0.15f, 1.0f },
+		std::array<float, 4>{ 0.15f, 0.90f, 1.00f, 1.0f },
+		std::array<float, 4>{ 0.45f, 0.30f, 1.00f, 1.0f },
+		std::array<float, 4>{ 1.00f, 0.25f, 0.65f, 1.0f }
+	};
 
 	Vec3 RotateX( Vec3 value, float angle )
 	{
-		const float c = std::cos( angle );
-		const float s = std::sin( angle );
-		return { value.x, value.y * c - value.z * s, value.y * s + value.z * c };
+		const float cosine = std::cos( angle );
+		const float sine = std::sin( angle );
+		return { value.x, value.y * cosine - value.z * sine, value.y * sine + value.z * cosine };
 	}
 
 	Vec3 RotateY( Vec3 value, float angle )
 	{
-		const float c = std::cos( angle );
-		const float s = std::sin( angle );
-		return { value.x * c + value.z * s, value.y, -value.x * s + value.z * c };
+		const float cosine = std::cos( angle );
+		const float sine = std::sin( angle );
+		return { value.x * cosine + value.z * sine, value.y, -value.x * sine + value.z * cosine };
 	}
 
 	Vec3 RotateZ( Vec3 value, float angle )
 	{
-		const float c = std::cos( angle );
-		const float s = std::sin( angle );
-		return { value.x * c - value.y * s, value.x * s + value.y * c, value.z };
+		const float cosine = std::cos( angle );
+		const float sine = std::sin( angle );
+		return { value.x * cosine - value.y * sine, value.x * sine + value.y * cosine, value.z };
 	}
 
 	Vec3 RotateXYZ( Vec3 value, float angleX, float angleY, float angleZ )
@@ -128,30 +109,39 @@ namespace
 		return RotateZ( RotateY( RotateX( value, angleX ), angleY ), angleZ );
 	}
 
-	MatrixRows BuildCubeMatrix( uint32_t cubeIndex, uint32_t cubeCount, const AppState& app )
+	MatrixRows BuildCubeMatrix( uint32_t cubeIndex, float animationTime )
 	{
-		const int columns = std::max( 1, static_cast<int>( std::ceil( std::sqrt( static_cast<float>( cubeCount ) ) ) ) );
-		const int rows = std::max( 1, ( static_cast<int>( cubeCount ) + columns - 1 ) / columns );
-		const int x = static_cast<int>( cubeIndex ) % columns;
-		const int z = static_cast<int>( cubeIndex ) / columns;
-		const float centeredX = ( static_cast<float>( x ) - static_cast<float>( columns - 1 ) * 0.5f ) * app.spacing;
-		const float centeredZ = ( static_cast<float>( z ) - static_cast<float>( rows - 1 ) * 0.5f ) * app.spacing;
-		const float waveY = std::sin( app.simulationTime * 1.25f + static_cast<float>( cubeIndex ) * 0.41f ) * 0.45f;
+		const uint32_t column = cubeIndex % kCubeColumns;
+		const uint32_t row = cubeIndex / kCubeColumns;
+		const float x = ( static_cast<float>( column ) - static_cast<float>( kCubeColumns - 1 ) * 0.5f ) * kCubeSpacing;
+		const float z = ( static_cast<float>( row ) - static_cast<float>( kCubeRows - 1 ) * 0.5f ) * kCubeSpacing;
+		const float y = std::sin( animationTime * 1.25f + static_cast<float>( cubeIndex ) * 0.41f ) * 0.45f;
+		const float angle = animationTime + static_cast<float>( cubeIndex ) * 0.19f;
 
-		const float baseAngle = app.simulationTime * app.rotationSpeed + static_cast<float>( cubeIndex ) * 0.19f;
-		const Vec3 basisX = RotateXYZ( { app.cubeScale, 0.0f, 0.0f }, baseAngle * 0.6f, baseAngle, baseAngle * 0.35f );
-		const Vec3 basisY = RotateXYZ( { 0.0f, app.cubeScale, 0.0f }, baseAngle * 0.6f, baseAngle, baseAngle * 0.35f );
-		const Vec3 basisZ = RotateXYZ( { 0.0f, 0.0f, app.cubeScale }, baseAngle * 0.6f, baseAngle, baseAngle * 0.35f );
+		const Vec3 basisX = RotateXYZ( { kCubeScale, 0.0f, 0.0f }, angle * 0.6f, angle, angle * 0.35f );
+		const Vec3 basisY = RotateXYZ( { 0.0f, kCubeScale, 0.0f }, angle * 0.6f, angle, angle * 0.35f );
+		const Vec3 basisZ = RotateXYZ( { 0.0f, 0.0f, kCubeScale }, angle * 0.6f, angle, angle * 0.35f );
 
 		MatrixRows matrix{};
-		matrix.row0 = { basisX.x, basisY.x, basisZ.x, centeredX };
-		matrix.row1 = { basisX.y, basisY.y, basisZ.y, waveY };
-		matrix.row2 = { basisX.z, basisY.z, basisZ.z, centeredZ };
+		matrix.row0 = { basisX.x, basisY.x, basisZ.x, x };
+		matrix.row1 = { basisX.y, basisY.y, basisZ.y, y };
+		matrix.row2 = { basisX.z, basisY.z, basisZ.z, z };
 		matrix.row3 = { 0.0f, 0.0f, 0.0f, 1.0f };
 		return matrix;
 	}
 
-	RenderPipelineState CreateCBSRVCubesPipeline( RenderDevice& ctx, DXGI_FORMAT colorFormat, DXGI_FORMAT depthFormat )
+	std::array<CubeData, kCubeCount> BuildCubeData( float animationTime )
+	{
+		std::array<CubeData, kCubeCount> cubes{};
+		for( uint32_t cubeIndex = 0; cubeIndex < kCubeCount; ++cubeIndex )
+		{
+			cubes[ cubeIndex ].model = BuildCubeMatrix( cubeIndex, animationTime );
+			cubes[ cubeIndex ].color = kCubeColors[ cubeIndex % kCubeColors.size() ];
+		}
+		return cubes;
+	}
+
+	RenderPipelineState CreatePipeline( RenderDevice& device, DXGI_FORMAT colorFormat, DXGI_FORMAT depthFormat )
 	{
 		RenderPipelineDesc desc{};
 		desc.vertexShader = HLSLLoader::LoadStage( "shaders/CBSRVCubes.hlsl", "vs_6_6", "VSMain" );
@@ -163,24 +153,23 @@ namespace
 		desc.depthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
 		desc.depthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
 		desc.depthStencilState.StencilEnable = FALSE;
-		return ctx.CreateRenderPipeline( desc );
+		return device.CreateRenderPipeline( desc );
 	}
 
-	void DestroyDepthTarget( RenderDevice& ctx, DepthTarget& depthTarget )
+	void DestroyDepthTarget( RenderDevice& device, DepthTarget& depthTarget )
 	{
 		if( depthTarget.texture.Valid() )
 		{
-			ctx.Destroy( depthTarget.texture );
+			device.Destroy( depthTarget.texture );
 			depthTarget.texture = {};
 		}
-
 		depthTarget.width = 0;
 		depthTarget.height = 0;
 	}
 
 	void RecreateDepthTarget( AppState& app )
 	{
-		RenderDevice& ctx = *app.deviceManager->GetRenderDevice();
+		RenderDevice& device = *app.deviceManager->GetRenderDevice();
 		const uint32_t width = app.deviceManager->GetWidth();
 		const uint32_t height = app.deviceManager->GetHeight();
 		if( app.depthTarget.texture.Valid() && app.depthTarget.width == width && app.depthTarget.height == height )
@@ -188,103 +177,63 @@ namespace
 			return;
 		}
 
-		DestroyDepthTarget( ctx, app.depthTarget );
+		DestroyDepthTarget( device, app.depthTarget );
 
-		TextureDesc depthDesc{};
-		depthDesc.debugName = "CB SRV Cubes Depth";
-		depthDesc.width = width;
-		depthDesc.height = height;
-		depthDesc.format = DXGI_FORMAT_D32_FLOAT;
-		depthDesc.usage = TextureUsage::DepthStencil;
-		depthDesc.useClearValue = true;
-		depthDesc.clearValue.Format = depthDesc.format;
-		depthDesc.clearValue.DepthStencil.Depth = 1.0f;
-		depthDesc.clearValue.DepthStencil.Stencil = 0;
-		app.depthTarget.texture = ctx.CreateTexture( depthDesc );
+		TextureDesc desc{};
+		desc.debugName = "CB SRV Cubes Depth";
+		desc.width = width;
+		desc.height = height;
+		desc.format = DXGI_FORMAT_D32_FLOAT;
+		desc.usage = TextureUsage::DepthStencil;
+		desc.useClearValue = true;
+		desc.clearValue.Format = desc.format;
+		desc.clearValue.DepthStencil.Depth = 1.0f;
+		app.depthTarget.texture = device.CreateTexture( desc );
 		app.depthTarget.width = width;
 		app.depthTarget.height = height;
 	}
 
-	void DestroyMatrixBuffer( RenderDevice& ctx, AppState& app )
+	void UpdateSceneCbv( AppState& app )
 	{
-		if( app.matrixBuffer.Valid() )
+		RenderDevice& device = *app.deviceManager->GetRenderDevice();
+		if( !app.sceneBuffer.Valid() )
 		{
-			ctx.Destroy( app.matrixBuffer );
-			app.matrixBuffer = {};
+			BufferDesc desc{};
+			desc.debugName = "CB SRV Cubes Scene CBV";
+			desc.size = sizeof( SceneConstants );
+			app.sceneBuffer = device.CreateBuffer( desc, ConstantBufferSlot::FreeCB0 );
 		}
+
+		SceneConstants scene{};
+		scene.aspectRatio =
+			static_cast<float>( app.deviceManager->GetWidth() ) /
+			static_cast<float>( app.deviceManager->GetHeight() );
+		device.WriteBuffer( app.sceneBuffer, 0, &scene, sizeof( scene ) );
 	}
 
-	void DestroyColorBuffer( RenderDevice& ctx, AppState& app )
+	void UpdateCubeSrv( AppState& app, float animationTime )
 	{
-		if( app.colorBuffer.Valid() )
+		RenderDevice& device = *app.deviceManager->GetRenderDevice();
+		if( !app.cubeBuffer.Valid() )
 		{
-			ctx.Destroy( app.colorBuffer );
-			app.colorBuffer = {};
+			BufferDesc desc{};
+			desc.debugName = "CB SRV Cubes Data SRV";
+			desc.size = sizeof( CubeData ) * kCubeCount;
+			desc.stride = sizeof( CubeData );
+			app.cubeBuffer = device.CreateBuffer( desc, ShaderResourceSlot::FreeSRV0 );
 		}
+
+		const std::array<CubeData, kCubeCount> cubes = BuildCubeData( animationTime );
+		device.WriteBuffer( app.cubeBuffer, 0, cubes.data(), sizeof( cubes ) );
 	}
 
-	std::vector<MatrixRows> BuildMatrices( const AppState& app, uint32_t cubeCount )
+	void DestroyBuffer( RenderDevice& device, BufferHandle& buffer )
 	{
-		std::vector<MatrixRows> matrices;
-		matrices.reserve( cubeCount );
-		for( uint32_t cubeIndex = 0; cubeIndex < cubeCount; ++cubeIndex )
+		if( buffer.Valid() )
 		{
-			matrices.push_back( BuildCubeMatrix( cubeIndex, cubeCount, app ) );
+			device.Destroy( buffer );
+			buffer = {};
 		}
-		return matrices;
-	}
-
-	void UpdateMatrixSrv( AppState& app, uint32_t ringFrameIndex )
-	{
-		RenderDevice& ctx = *app.deviceManager->GetRenderDevice();
-
-		const uint32_t cubeCount = static_cast<uint32_t>( std::clamp( app.cubeCount, 1, static_cast<int>( kMaxCubeCount ) ) );
-		const std::vector<MatrixRows> matrices = BuildMatrices( app, cubeCount );
-		const uint64_t matrixDataSize = static_cast<uint64_t>( matrices.size() * sizeof( MatrixRows ) );
-		const uint64_t ringOffset =
-			static_cast<uint64_t>( ringFrameIndex ) * kMaxCubeCount * sizeof( MatrixRows );
-
-		if( !app.matrixBuffer.Valid() )
-		{
-			BufferDesc matrixBufferDesc{};
-			matrixBufferDesc.debugName = "CB SRV Cubes Matrices SRV";
-			matrixBufferDesc.size =
-				static_cast<uint64_t>( kRingFrameCount ) * kMaxCubeCount * sizeof( MatrixRows );
-			matrixBufferDesc.stride = sizeof( MatrixRows );
-			app.matrixBuffer = ctx.CreateBuffer( matrixBufferDesc, ShaderResourceSlot::FreeSRV0 );
-		}
-
-		ctx.WriteBuffer( app.matrixBuffer, ringOffset, matrices.data(), matrixDataSize );
-	}
-
-	CubeColorFrame BuildColorFrame( const AppState& app )
-	{
-		CubeColorFrame frame{};
-		frame.colorCount = static_cast<uint32_t>( std::clamp( app.colorCount, 1, static_cast<int>( kMaxCubeColors ) ) );
-		for( uint32_t colorIndex = 0; colorIndex < kMaxCubeColors; ++colorIndex )
-		{
-			const float hue = Fract( static_cast<float>( colorIndex ) / static_cast<float>( kMaxCubeColors ) + 0.58f );
-			const auto rgb = HueToRgb( hue );
-			frame.colors[ colorIndex ] = { rgb[ 0 ], rgb[ 1 ], rgb[ 2 ], 1.0f };
-		}
-		return frame;
-	}
-
-	void UpdateColorCbv( AppState& app, uint32_t ringFrameIndex )
-	{
-		RenderDevice& ctx = *app.deviceManager->GetRenderDevice();
-		const CubeColorFrame frame = BuildColorFrame( app );
-
-		BufferDesc colorBufferDesc{};
-		colorBufferDesc.debugName = "CB SRV Cubes Colors CBV";
-		colorBufferDesc.size = sizeof( CubeColorConstants );
-		if( !app.colorBuffer.Valid() )
-		{
-			app.colorBuffer = ctx.CreateBuffer( colorBufferDesc, ConstantBufferSlot::FreeCB0 );
-		}
-
-		const uint64_t ringOffset = static_cast<uint64_t>( ringFrameIndex ) * sizeof( CubeColorFrame );
-		ctx.WriteBuffer( app.colorBuffer, ringOffset, &frame, sizeof( frame ) );
 	}
 
 	LRESULT CALLBACK WindowProc( HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam )
@@ -294,8 +243,7 @@ namespace
 		switch( message )
 		{
 			case WM_SIZE:
-			{
-				if( app != nullptr && app->deviceManager )
+				if( app != nullptr && app->deviceManager != nullptr )
 				{
 					const uint32_t width = LOWORD( lParam );
 					const uint32_t height = HIWORD( lParam );
@@ -306,17 +254,13 @@ namespace
 					}
 				}
 				return 0;
-			}
 
 			case WM_CLOSE:
-			{
 				if( app != nullptr )
 				{
 					app->running = false;
-					app->minimized = true;
 				}
 				return 0;
-			}
 
 			case WM_DESTROY:
 				PostQuitMessage( 0 );
@@ -327,6 +271,7 @@ namespace
 		}
 	}
 }
+
 int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 {
 	try
@@ -341,11 +286,10 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 
 		constexpr uint32_t kInitialWidth = 1280;
 		constexpr uint32_t kInitialHeight = 800;
-
 		HWND hwnd = CreateWindowExW(
 			0,
 			windowClass.lpszClassName,
-			L"Ldx12 CB + SRV Cubes",
+			L"Ldx12 CBV + SRV Cubes",
 			WS_OVERLAPPEDWINDOW,
 			CW_USEDEFAULT,
 			CW_USEDEFAULT,
@@ -366,12 +310,10 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 
 		AppState app{};
 		SetWindowLongPtr( hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>( &app ) );
-
 		HLSLLoader::SetRootDirectory( std::filesystem::path( __FILE__ ).parent_path() );
 
 		ContextDesc contextDesc{};
 		contextDesc.enableDebugLayer = true;
-		contextDesc.swapchainBufferCount = 3;
 
 		SwapchainDesc swapchainDesc{};
 		swapchainDesc.window = MakeWin32WindowHandle( hwnd );
@@ -380,12 +322,11 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		swapchainDesc.vsync = true;
 
 		app.deviceManager = &DeviceManager::Initialize( contextDesc, swapchainDesc );
-		app.pipeline = CreateCBSRVCubesPipeline( *app.deviceManager->GetRenderDevice(), contextDesc.swapchainFormat, DXGI_FORMAT_D32_FLOAT );
+		RenderDevice& device = *app.deviceManager->GetRenderDevice();
+		app.pipeline = CreatePipeline( device, contextDesc.swapchainFormat, DXGI_FORMAT_D32_FLOAT );
 		RecreateDepthTarget( app );
-		UpdateMatrixSrv( app, app.ringFrameIndex );
-		UpdateColorCbv( app, app.ringFrameIndex );
 
-		auto lastFrameTime = std::chrono::steady_clock::now();
+		const auto animationStart = std::chrono::steady_clock::now();
 		MSG message{};
 		while( app.running )
 		{
@@ -396,41 +337,23 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 					app.running = false;
 					break;
 				}
-
 				TranslateMessage( &message );
 				DispatchMessage( &message );
 			}
 
-			RenderDevice* ctx = app.deviceManager ? app.deviceManager->GetRenderDevice() : nullptr;
-			if( !app.running || app.minimized || ctx == nullptr )
+			if( !app.running || app.minimized )
 			{
 				continue;
 			}
 
-			const auto now = std::chrono::steady_clock::now();
-			float deltaSeconds = std::chrono::duration<float>( now - lastFrameTime ).count();
-			lastFrameTime = now;
-			deltaSeconds = std::clamp( deltaSeconds, 0.0f, 0.05f );
-			if( !app.pauseAnimation )
-			{
-				app.simulationTime += deltaSeconds;
-			}
-
+			const float animationTime =
+				std::chrono::duration<float>( std::chrono::steady_clock::now() - animationStart ).count();
 			RecreateDepthTarget( app );
-			app.ringFrameIndex = app.frameIndex % kRingFrameCount;
+			UpdateSceneCbv( app );
+			UpdateCubeSrv( app, animationTime );
 
-			UpdateMatrixSrv( app, app.ringFrameIndex );
-			UpdateColorCbv( app, app.ringFrameIndex );
-
-			auto& commandBuffer = ctx->AcquireCommandBuffer();
-			const TextureHandle currentTexture = ctx->GetCurrentSwapchainTexture();
-
-			ScenePushConstants pushConstants{};
-			pushConstants.cubeCount = static_cast<uint32_t>( app.cubeCount );
-			pushConstants.matrixBaseIndex = app.ringFrameIndex * kMaxCubeCount;
-			pushConstants.colorFrameIndex = app.ringFrameIndex;
-			pushConstants.aspectRatio = static_cast<float>( app.deviceManager->GetWidth() ) / static_cast<float>( app.deviceManager->GetHeight() );
-			pushConstants.viewDistance = std::max( 14.0f, std::sqrt( static_cast<float>( app.cubeCount ) ) * app.spacing * 1.6f + 8.0f );
+			ICommandBuffer& commands = device.AcquireCommandBuffer();
+			const TextureHandle backbuffer = device.GetCurrentSwapchainTexture();
 
 			RenderPass renderPass{};
 			renderPass.color[ 0 ].loadOp = LoadOp::Clear;
@@ -439,31 +362,25 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 			renderPass.depthStencil.clearDepth = 1.0f;
 
 			Framebuffer framebuffer{};
-			framebuffer.color[ 0 ].texture = currentTexture;
+			framebuffer.color[ 0 ].texture = backbuffer;
 			framebuffer.depthStencil.texture = app.depthTarget.texture;
 
-			commandBuffer.CmdBeginRendering( renderPass, framebuffer );
-			commandBuffer.CmdBindRenderPipeline( app.pipeline );
-			commandBuffer.CmdPushConstants( &pushConstants, sizeof( pushConstants ) );
-			commandBuffer.CmdDraw( 36, static_cast<uint32_t>( app.cubeCount ) );
-			commandBuffer.CmdEndRendering();
-
-			ctx->Submit( commandBuffer, currentTexture );
-			++app.frameIndex;
+			commands.CmdBeginRendering( renderPass, framebuffer );
+			commands.CmdBindRenderPipeline( app.pipeline );
+			commands.CmdDraw( 36, kCubeCount );
+			commands.CmdEndRendering();
+			device.Submit( commands, backbuffer );
 		}
 
 		SetWindowLongPtr( hwnd, GWLP_USERDATA, 0 );
-		if( app.deviceManager )
-		{
-			RenderDevice* ctx = app.deviceManager->GetRenderDevice();
-			app.deviceManager->WaitIdle();
-			DestroyDepthTarget( *ctx, app.depthTarget );
-			DestroyMatrixBuffer( *ctx, app );
-			DestroyColorBuffer( *ctx, app );
-		}
+		app.deviceManager->WaitIdle();
+		DestroyDepthTarget( device, app.depthTarget );
+		DestroyBuffer( device, app.sceneBuffer );
+		DestroyBuffer( device, app.cubeBuffer );
 		app.pipeline = {};
 		DeviceManager::ShutdownSingleton();
 		app.deviceManager = nullptr;
+
 		if( IsWindow( hwnd ) != FALSE )
 		{
 			DestroyWindow( hwnd );
@@ -474,7 +391,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 	catch( const std::exception& error )
 	{
 		DeviceManager::ShutdownSingleton();
-		MessageBoxA( nullptr, error.what(), "Ldx12 CB + SRV Cubes failed", MB_ICONERROR | MB_OK );
+		MessageBoxA( nullptr, error.what(), "Ldx12 CBV + SRV Cubes failed", MB_ICONERROR | MB_OK );
 		return 1;
 	}
 }
