@@ -743,15 +743,10 @@ namespace ldx12
 
 	void DeviceManager::Shutdown() noexcept
 	{
-		auto resetActiveBuffers = []( QueueContext& context )
+		if( graphicsQueue_.immediateCommands_ != nullptr )
 		{
-			for( auto& activeCommandBuffer : context.activeCommandBuffers_ )
-			{
-				activeCommandBuffer.reset();
-			}
-		};
-
-		resetActiveBuffers( graphicsQueue_ );
+			graphicsQueue_.immediateCommands_->ReleaseAllCommandBuffers();
+		}
 
 		try
 		{

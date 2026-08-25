@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Ldx12Internal.hpp"
+#include "Ldx12CommandBuffer.hpp"
 
 #include <array>
 
@@ -9,22 +9,15 @@ namespace ldx12
 	class ImmediateCommands final
 	{
 	public:
-		struct CommandListWrapper
-		{
-			ComPtr<ID3D12CommandAllocator> allocator_;
-			ComPtr<ID3D12GraphicsCommandList4> commandList_;
-			ComPtr<ID3D12Fence> fence_;
-			SubmitHandle handle_{};
-			HANDLE fenceEvent_ = nullptr;
-			uint64_t fenceValue_ = 0;
-			bool isEncoding_ = false;
-		};
-
 		ImmediateCommands( ID3D12Device* device, ID3D12CommandQueue* queue, uint32_t numContexts );
 		~ImmediateCommands();
 		ImmediateCommands( const ImmediateCommands& ) = delete;
 		ImmediateCommands& operator=( const ImmediateCommands& ) = delete;
 
+		CommandBufferImpl& AcquireCommandBuffer( DeviceManager& manager );
+		CommandBufferImpl* FindActiveCommandBuffer( ICommandBuffer* commandBuffer ) noexcept;
+		void ReleaseCommandBuffer( CommandBufferImpl& commandBuffer ) noexcept;
+		void ReleaseAllCommandBuffers() noexcept;
 		CommandListWrapper& Acquire();
 		SubmitHandle Submit( CommandListWrapper& wrapper );
 		SubmitHandle SubmitBatch( CommandListWrapper* const* wrappers, uint32_t commandListCount );
@@ -43,6 +36,7 @@ namespace ldx12
 		ID3D12Device* device_ = nullptr;
 		ID3D12CommandQueue* queue_ = nullptr;
 		std::array<CommandListWrapper, ourMaxImmediateCommandBuffers> buffers_ = {};
+		std::array<CommandBufferImpl, ourMaxActiveCommandBuffers> commandBuffers_ = {};
 		uint32_t bufferCount_ = 0;
 		SubmitHandle lastSubmitHandle_ = {};
 		SubmitHandle nextSubmitHandle_ = {};

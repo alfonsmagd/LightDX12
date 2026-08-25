@@ -659,7 +659,6 @@ namespace ldx12
 			HANDLE queueIdleEvent_ = nullptr;
 			uint64_t queueIdleFenceValue_ = 0;
 			std::unique_ptr<ImmediateCommands> immediateCommands_;
-			std::array<std::unique_ptr<CommandBufferImpl>, ourMaxActiveCommandBuffers> activeCommandBuffers_ = {};
 			std::deque<DeferredRelease> deferredReleases_;
 		};
 

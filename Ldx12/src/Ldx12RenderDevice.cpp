@@ -491,30 +491,8 @@ namespace ldx12
 	{
 		DeviceManager& manager = *manager_;
 		DeviceManager::QueueContext& graphicsQueue = manager.GetGraphicsQueueContext();
-		std::unique_ptr<CommandBufferImpl>* availableSlot = nullptr;
-		for( std::unique_ptr<CommandBufferImpl>& activeCommandBuffer :
-			 graphicsQueue.activeCommandBuffers_ )
-		{
-			if( activeCommandBuffer == nullptr )
-			{
-				availableSlot = &activeCommandBuffer;
-				break;
-			}
-		}
-
-		if( availableSlot == nullptr )
-		{
-			throw std::length_error(
-				"A maximum of " +
-				std::to_string( ourMaxActiveCommandBuffers ) +
-				" active command buffers are allowed per render device." );
-		}
-
 		manager.ProcessDeferredReleases();
-		ImmediateCommands::CommandListWrapper& wrapper =
-			graphicsQueue.immediateCommands_->Acquire();
-		*availableSlot = std::make_unique<CommandBufferImpl>( manager, wrapper );
-		return **availableSlot;
+		return graphicsQueue.immediateCommands_->AcquireCommandBuffer( manager );
 	}
 
 	TextureHandle

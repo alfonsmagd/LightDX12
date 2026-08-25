@@ -55,6 +55,8 @@ namespace ldx12
 
 	ImmediateCommands::~ImmediateCommands()
 	{
+		ReleaseAllCommandBuffers();
+
 		for( uint32_t index = 0; index < bufferCount_; ++index )
 		{
 			CommandListWrapper& buffer = buffers_[ index ];
@@ -87,7 +89,57 @@ namespace ldx12
 		}
 	}
 
-	ImmediateCommands::CommandListWrapper& ImmediateCommands::Acquire()
+	CommandBufferImpl& ImmediateCommands::AcquireCommandBuffer( DeviceManager& manager )
+	{
+		for( CommandBufferImpl& commandBuffer : commandBuffers_ )
+		{
+			if( commandBuffer.IsActive() )
+			{
+				continue;
+			}
+
+			CommandListWrapper& wrapper = Acquire();
+			commandBuffer.Begin( manager, wrapper );
+			return commandBuffer;
+		}
+
+		throw std::length_error(
+			"A maximum of " +
+			std::to_string( ourMaxActiveCommandBuffers ) +
+			" active command buffers are allowed per render device." );
+	}
+
+	CommandBufferImpl* ImmediateCommands::FindActiveCommandBuffer( ICommandBuffer* commandBuffer ) noexcept
+	{
+		for( CommandBufferImpl& candidate : commandBuffers_ )
+		{
+			if( candidate.IsActive() && static_cast<ICommandBuffer*>( &candidate ) == commandBuffer )
+			{
+				return &candidate;
+			}
+		}
+
+		return nullptr;
+	}
+
+	void ImmediateCommands::ReleaseCommandBuffer( CommandBufferImpl& commandBuffer ) noexcept
+	{
+		assert( FindActiveCommandBuffer( &commandBuffer ) == &commandBuffer );
+		commandBuffer.Release();
+	}
+
+	void ImmediateCommands::ReleaseAllCommandBuffers() noexcept
+	{
+		for( CommandBufferImpl& commandBuffer : commandBuffers_ )
+		{
+			if( commandBuffer.IsActive() )
+			{
+				commandBuffer.Release();
+			}
+		}
+	}
+
+	CommandListWrapper& ImmediateCommands::Acquire()
 	{
 		if( numAvailableCommandBuffers_ == 0 )
 		{
@@ -248,7 +300,7 @@ namespace ldx12
 		Purge();
 	}
 
-	ImmediateCommands::CommandListWrapper* ImmediateCommands::FindOldestSubmittedBuffer() noexcept
+	CommandListWrapper* ImmediateCommands::FindOldestSubmittedBuffer() noexcept
 	{
 		if( bufferCount_ == 0 )
 		{

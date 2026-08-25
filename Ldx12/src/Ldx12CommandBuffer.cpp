@@ -1,5 +1,5 @@
 #include "Ldx12CommandBuffer.hpp"
-
+#include "Ldx12ImmediateCommands.hpp"
 
 #include <cstdlib>
 #include <cassert>
@@ -285,10 +285,26 @@ namespace ldx12
 		}
 	}
 
-	CommandBufferImpl::CommandBufferImpl( DeviceManager& manager, ImmediateCommands::CommandListWrapper& wrapper ):
-		manager_( manager ),
-		wrapper_( wrapper )
+	void CommandBufferImpl::Begin( DeviceManager& manager, CommandListWrapper& wrapper ) noexcept
 	{
+		assert( !active_ );
+		manager_ = &manager;
+		wrapper_ = &wrapper;
+		isRendering_ = false;
+		active_ = true;
+		debugGroupDepth_ = 0;
+		trackedTextureCount_ = 0;
+	}
+
+	void CommandBufferImpl::Release() noexcept
+	{
+		assert( active_ );
+		assert( !isRendering_ );
+		manager_ = nullptr;
+		wrapper_ = nullptr;
+		active_ = false;
+		debugGroupDepth_ = 0;
+		trackedTextureCount_ = 0;
 	}
 
 	CommandBufferImpl::TrackedTextureState& CommandBufferImpl::GetTrackedTextureState( TextureHandle texture )
@@ -302,7 +318,7 @@ namespace ldx12
 			}
 		}
 
-		const TextureResource& resource = manager_.GetTextureResource( texture );
+		const TextureResource& resource = manager_->GetTextureResource( texture );
 		TrackedTextureState trackedTexture;
 		trackedTexture.handle_ = texture;
 		trackedTexture.initialState_ = resource.currentState_;
@@ -329,11 +345,11 @@ namespace ldx12
 			resource.resource_.Get(),
 			trackedTexture.currentState_,
 			newState );
-		wrapper_.commandList_->ResourceBarrier( 1, &barrier );
+		wrapper_->commandList_->ResourceBarrier( 1, &barrier );
 		trackedTexture.currentState_ = newState;
 	}
 
-	ImmediateCommands::CommandListWrapper* CommandBufferImpl::BuildSubmitFixup( CommandBufferImpl* const* previousCommandBuffers, uint32_t previousCommandBufferCount )
+	CommandListWrapper* CommandBufferImpl::BuildSubmitFixup( CommandBufferImpl* const* previousCommandBuffers, uint32_t previousCommandBufferCount )
 	{
 		const auto getCurrentState = [this, previousCommandBuffers, previousCommandBufferCount]( TextureHandle texture )
 			{
@@ -352,7 +368,7 @@ namespace ldx12
 					}
 				}
 
-				return manager_.GetTextureResource( texture ).currentState_;
+				return manager_->GetTextureResource( texture ).currentState_;
 			};
 
 		bool requiresFixup = false;
@@ -371,12 +387,12 @@ namespace ldx12
 			return nullptr;
 		}
 
-		ImmediateCommands::CommandListWrapper& fixup = manager_.GetGraphicsQueueContext().immediateCommands_->Acquire();
+		CommandListWrapper& fixup = manager_->GetGraphicsQueueContext().immediateCommands_->Acquire();
 
 		for( uint32_t index = 0; index < trackedTextureCount_; ++index )
 		{
 			const TrackedTextureState& trackedTexture = trackedTextures_[ index ];
-			const TextureResource& resource = manager_.GetTextureResource( trackedTexture.handle_ );
+			const TextureResource& resource = manager_->GetTextureResource( trackedTexture.handle_ );
 			const D3D12_RESOURCE_STATES currentState = getCurrentState( trackedTexture.handle_ );
 			if( currentState == trackedTexture.initialState_ )
 			{
@@ -398,7 +414,7 @@ namespace ldx12
 		for( uint32_t index = 0; index < trackedTextureCount_; ++index )
 		{
 			const TrackedTextureState& trackedTexture = trackedTextures_[ index ];
-			TextureResource& resource = manager_.GetTextureResource( trackedTexture.handle_ );
+			TextureResource& resource = manager_->GetTextureResource( trackedTexture.handle_ );
 			resource.currentState_ = trackedTexture.currentState_;
 		}
 	}
@@ -422,7 +438,7 @@ namespace ldx12
 				continue;
 			}
 
-			auto& colorTexture = manager_.GetTextureResource( framebuffer.color[ index ].texture );
+			auto& colorTexture = manager_->GetTextureResource( framebuffer.color[ index ].texture );
 			if( colorTexture.rtvHandle_.ptr == 0 )
 			{
 				throw std::runtime_error( "Color attachment does not have an RTV." );
@@ -449,7 +465,7 @@ namespace ldx12
 
 		if( framebuffer.depthStencil.texture.Valid() )
 		{
-			auto& depthTexture = manager_.GetTextureResource( framebuffer.depthStencil.texture );
+			auto& depthTexture = manager_->GetTextureResource( framebuffer.depthStencil.texture );
 			if( depthTexture.dsvHandle_.ptr == 0 )
 			{
 				throw std::runtime_error( "Depth attachment does not have a DSV." );
@@ -489,7 +505,7 @@ namespace ldx12
 			throw std::runtime_error( "Framebuffer does not contain any attachments." );
 		}
 
-		wrapper_.commandList_->BeginRenderPass(
+		wrapper_->commandList_->BeginRenderPass(
 			numRenderTargets,
 			numRenderTargets > 0 ? renderTargetDescs.data() : nullptr,
 			depthStencilDescPtr,
@@ -507,7 +523,7 @@ namespace ldx12
 			return;
 		}
 
-		wrapper_.commandList_->EndRenderPass();
+		wrapper_->commandList_->EndRenderPass();
 		isRendering_ = false;
 	}
 
@@ -517,7 +533,7 @@ namespace ldx12
 		assert( minDepth >= 0.0f && minDepth <= maxDepth && maxDepth <= 1.0f );
 
 		const D3D12_VIEWPORT viewport{ x, y, width, height, minDepth, maxDepth };
-		wrapper_.commandList_->RSSetViewports( 1, &viewport );
+		wrapper_->commandList_->RSSetViewports( 1, &viewport );
 	}
 
 	void CommandBufferImpl::CmdSetScissor( int32_t left, int32_t top, int32_t right, int32_t bottom )
@@ -525,35 +541,35 @@ namespace ldx12
 		assert( right >= left && bottom >= top );
 
 		const D3D12_RECT scissor{ left, top, right, bottom };
-		wrapper_.commandList_->RSSetScissorRects( 1, &scissor );
+		wrapper_->commandList_->RSSetScissorRects( 1, &scissor );
 	}
 
 	void CommandBufferImpl::CmdTransitionTexture( TextureHandle texture, D3D12_RESOURCE_STATES newState )
 	{
-		TextureResource& resource = manager_.GetTextureResource( texture );
+		TextureResource& resource = manager_->GetTextureResource( texture );
 		TransitionTexture( texture, resource, newState );
 	}
 
 	void CommandBufferImpl::CmdBindRenderPipeline( const RenderPipelineState& pipeline )
 	{
-		ID3D12DescriptorHeap* heaps[] = { manager_.bindlessHeap_.Get() };
-		wrapper_.commandList_->SetDescriptorHeaps( 1, heaps );
-		wrapper_.commandList_->SetGraphicsRootSignature( manager_.rootSignature_.Get() );
-		wrapper_.commandList_->SetPipelineState( pipeline.pipelineState_.Get() );
-		wrapper_.commandList_->IASetPrimitiveTopology( pipeline.topology_ );
+		ID3D12DescriptorHeap* heaps[] = { manager_->bindlessHeap_.Get() };
+		wrapper_->commandList_->SetDescriptorHeaps( 1, heaps );
+		wrapper_->commandList_->SetGraphicsRootSignature( manager_->rootSignature_.Get() );
+		wrapper_->commandList_->SetPipelineState( pipeline.pipelineState_.Get() );
+		wrapper_->commandList_->IASetPrimitiveTopology( pipeline.topology_ );
 	}
 
 	void CommandBufferImpl::CmdBindComputePipeline( const ComputePipelineState& pipeline )
 	{
-		ID3D12DescriptorHeap* heaps[] = { manager_.bindlessHeap_.Get() };
-		wrapper_.commandList_->SetDescriptorHeaps( 1, heaps );
-		wrapper_.commandList_->SetComputeRootSignature( manager_.rootSignature_.Get() );
-		wrapper_.commandList_->SetPipelineState( pipeline.pipelineState_.Get() );
+		ID3D12DescriptorHeap* heaps[] = { manager_->bindlessHeap_.Get() };
+		wrapper_->commandList_->SetDescriptorHeaps( 1, heaps );
+		wrapper_->commandList_->SetComputeRootSignature( manager_->rootSignature_.Get() );
+		wrapper_->commandList_->SetPipelineState( pipeline.pipelineState_.Get() );
 	}
 
 	void CommandBufferImpl::CmdBindVertexBuffer( BufferHandle buffer, uint32_t stride, uint32_t offset, uint32_t slot )
 	{
-		const auto& resource = manager_.GetBufferResource( buffer );
+		const auto& resource = manager_->GetBufferResource( buffer );
 		if( resource.bufferType_ != BufferDesc::BufferType::VertexBuffer )
 		{
 			throw std::runtime_error( "This buffer was not created as a vertex buffer." );
@@ -565,12 +581,12 @@ namespace ldx12
 		}
 		view.BufferLocation += offset;
 		view.SizeInBytes -= offset;
-		wrapper_.commandList_->IASetVertexBuffers( slot, 1, &view );
+		wrapper_->commandList_->IASetVertexBuffers( slot, 1, &view );
 	}
 
 	void CommandBufferImpl::CmdBindIndexBuffer( BufferHandle buffer, DXGI_FORMAT format, uint32_t offset )
 	{
-		const auto& resource = manager_.GetBufferResource( buffer );
+		const auto& resource = manager_->GetBufferResource( buffer );
 		if( resource.bufferType_ != BufferDesc::BufferType::IndexBuffer )
 		{
 			throw std::runtime_error( "This buffer was not created as an index buffer." );
@@ -582,15 +598,15 @@ namespace ldx12
 		}
 		view.BufferLocation += offset;
 		view.SizeInBytes -= offset;
-		wrapper_.commandList_->IASetIndexBuffer( &view );
+		wrapper_->commandList_->IASetIndexBuffer( &view );
 	}
 
 	void CommandBufferImpl::CmdPushConstants( const void* data, uint32_t sizeBytes, uint32_t offset32BitValues )
 	{
-		wrapper_.commandList_->SetGraphicsRootSignature( manager_.rootSignature_.Get() );
-		wrapper_.commandList_->SetComputeRootSignature( manager_.rootSignature_.Get() );
-		wrapper_.commandList_->SetGraphicsRoot32BitConstants( 0, sizeBytes / 4u, data, offset32BitValues );
-		wrapper_.commandList_->SetComputeRoot32BitConstants( 0, sizeBytes / 4u, data, offset32BitValues );
+		wrapper_->commandList_->SetGraphicsRootSignature( manager_->rootSignature_.Get() );
+		wrapper_->commandList_->SetComputeRootSignature( manager_->rootSignature_.Get() );
+		wrapper_->commandList_->SetGraphicsRoot32BitConstants( 0, sizeBytes / 4u, data, offset32BitValues );
+		wrapper_->commandList_->SetComputeRoot32BitConstants( 0, sizeBytes / 4u, data, offset32BitValues );
 	}
 
 	void CommandBufferImpl::CmdPushDebugGroupLabel( const char* label, uint32_t color )
@@ -598,7 +614,7 @@ namespace ldx12
 		if( label != nullptr && label[ 0 ] != '\0' )
 		{
 			#if LDX12_INTERNAL_PIX_ENABLED
-				GetPixRuntime().BeginEvent( wrapper_.commandList_.Get(), static_cast<uint64_t>( color ), label );
+				GetPixRuntime().BeginEvent( wrapper_->commandList_.Get(), static_cast<uint64_t>( color ), label );
 			#else
 				(void)color;
 			#endif
@@ -611,7 +627,7 @@ namespace ldx12
 		if( debugGroupDepth_ > 0 )
 		{
 			#if LDX12_INTERNAL_PIX_ENABLED
-				GetPixRuntime().EndEvent( wrapper_.commandList_.Get() );
+				GetPixRuntime().EndEvent( wrapper_->commandList_.Get() );
 			#endif
 			debugGroupDepth_--;
 		}
@@ -619,19 +635,19 @@ namespace ldx12
 
 	void CommandBufferImpl::CmdDraw( uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance )
 	{
-		wrapper_.commandList_->DrawInstanced( vertexCount, instanceCount, firstVertex, firstInstance );
+		wrapper_->commandList_->DrawInstanced( vertexCount, instanceCount, firstVertex, firstInstance );
 	}
 
 	void CommandBufferImpl::CmdDrawIndexed( uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex, int32_t vertexOffset, uint32_t firstInstance )
 	{
-		wrapper_.commandList_->DrawIndexedInstanced( indexCount, instanceCount, firstIndex, vertexOffset, firstInstance );
+		wrapper_->commandList_->DrawIndexedInstanced( indexCount, instanceCount, firstIndex, vertexOffset, firstInstance );
 	}
 
 	void CommandBufferImpl::CmdDrawIndexedIndirect( BufferHandle indirectBuffer, uint32_t drawCount, uint64_t byteOffset )
 	{
-		const auto& resource = manager_.GetBufferResource( indirectBuffer );
-		wrapper_.commandList_->ExecuteIndirect(
-			manager_.commandSignature_.Get(),
+		const auto& resource = manager_->GetBufferResource( indirectBuffer );
+		wrapper_->commandList_->ExecuteIndirect(
+			manager_->commandSignature_.Get(),
 			drawCount,
 			resource.resource_.Get(),
 			byteOffset,
@@ -641,12 +657,12 @@ namespace ldx12
 
 	void CommandBufferImpl::CmdDispatch( uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ )
 	{
-		wrapper_.commandList_->Dispatch( groupCountX, groupCountY, groupCountZ );
+		wrapper_->commandList_->Dispatch( groupCountX, groupCountY, groupCountZ );
 	}
 
 	ID3D12GraphicsCommandList* CommandBufferImpl::GetNativeGraphicsCommandList()
 	{
-		return wrapper_.commandList_.Get();
+		return wrapper_->commandList_.Get();
 	}
 }
 

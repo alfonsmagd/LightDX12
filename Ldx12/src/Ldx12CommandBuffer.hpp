@@ -1,18 +1,30 @@
 #pragma once
 
 #include "Ldx12Internal.hpp"
-#include "Ldx12ImmediateCommands.hpp"
 
 #include <array>
 
 namespace ldx12
 {
+	struct CommandListWrapper final
+	{
+		ComPtr<ID3D12CommandAllocator> allocator_;
+		ComPtr<ID3D12GraphicsCommandList4> commandList_;
+		ComPtr<ID3D12Fence> fence_;
+		SubmitHandle handle_{};
+		HANDLE fenceEvent_ = nullptr;
+		uint64_t fenceValue_ = 0;
+		bool isEncoding_ = false;
+	};
+
 	class CommandBufferImpl final: public ICommandBuffer
 	{
 	public:
 		static constexpr uint32_t ourMaxTrackedTextures = 256;
 
-		CommandBufferImpl( DeviceManager& manager, ImmediateCommands::CommandListWrapper& wrapper );
+		CommandBufferImpl() = default;
+		void Begin( DeviceManager& manager, CommandListWrapper& wrapper ) noexcept;
+		void Release() noexcept;
 
 		void CmdBeginRendering( const RenderPass& renderPass, const Framebuffer& framebuffer ) override;
 		void CmdEndRendering() override;
@@ -38,9 +50,14 @@ namespace ldx12
 			D3D12_RESOURCE_STATES currentState_ = D3D12_RESOURCE_STATE_COMMON;
 		};
 
-		ImmediateCommands::CommandListWrapper& Wrapper() noexcept
+		CommandListWrapper& Wrapper() noexcept
 		{
-			return wrapper_;
+			return *wrapper_;
+		}
+
+		bool IsActive() const noexcept
+		{
+			return active_;
 		}
 
 		bool IsRendering() const noexcept
@@ -58,7 +75,7 @@ namespace ldx12
 			return trackedTextureCount_;
 		}
 
-		ImmediateCommands::CommandListWrapper* BuildSubmitFixup( CommandBufferImpl* const* previousCommandBuffers = nullptr, uint32_t previousCommandBufferCount = 0 );
+		CommandListWrapper* BuildSubmitFixup( CommandBufferImpl* const* previousCommandBuffers = nullptr, uint32_t previousCommandBufferCount = 0 );
 		void CommitSubmittedTextureStates();
 
 	private:
@@ -66,9 +83,10 @@ namespace ldx12
 		TrackedTextureState& GetTrackedTextureState( TextureHandle texture );
 		void TransitionTexture( TextureHandle texture, TextureResource& resource, D3D12_RESOURCE_STATES newState );
 
-		DeviceManager& manager_;
-		ImmediateCommands::CommandListWrapper& wrapper_;
+		DeviceManager* manager_ = nullptr;
+		CommandListWrapper* wrapper_ = nullptr;
 		bool isRendering_ = false;
+		bool active_ = false;
 		uint32_t debugGroupDepth_ = 0;
 		std::array<TrackedTextureState, ourMaxTrackedTextures> trackedTextures_ = {};
 		uint32_t trackedTextureCount_ = 0;

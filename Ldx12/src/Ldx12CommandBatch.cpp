@@ -1,6 +1,7 @@
 #include "Ldx12CommandBatch.hpp"
 
 #include "Ldx12CommandBuffer.hpp"
+#include "Ldx12ImmediateCommands.hpp"
 #include "Ldx12Swapchain.hpp"
 
 #include <cassert>
@@ -11,7 +12,6 @@ namespace ldx12
 	{
 		DeviceManager::QueueContext& graphicsQueue = manager.GetGraphicsQueueContext();
 		std::array<CommandBufferImpl*, ourMaxCommandBufferBatch> validatedCommandBuffers = {};
-		std::array<std::unique_ptr<CommandBufferImpl>*, ourMaxCommandBufferBatch> activeSlots = {};
 		if( commandBufferCount == 0 )
 		{
 			throw std::invalid_argument( "SubmitBatch requires at least one command buffer." );
@@ -32,7 +32,7 @@ namespace ldx12
 				throw std::invalid_argument( "SubmitBatch cannot contain null command buffers." );
 			}
 
-			CommandBufferImpl* commandBuffer = dynamic_cast<CommandBufferImpl*>( commandBuffers[ index ] );
+			CommandBufferImpl* commandBuffer = graphicsQueue.immediateCommands_->FindActiveCommandBuffer( commandBuffers[ index ] );
 			if( commandBuffer == nullptr )
 			{
 				throw std::invalid_argument( "A command buffer in the batch does not belong to this render device." );
@@ -48,19 +48,6 @@ namespace ldx12
 				{
 					throw std::invalid_argument( "SubmitBatch cannot contain the same command buffer more than once." );
 				}
-			}
-
-			for( std::unique_ptr<CommandBufferImpl>& activeCommandBuffer : graphicsQueue.activeCommandBuffers_ )
-			{
-				if( activeCommandBuffer.get() == commandBuffer )
-				{
-					activeSlots[ index ] = &activeCommandBuffer;
-					break;
-				}
-			}
-			if( activeSlots[ index ] == nullptr )
-			{
-				throw std::invalid_argument( "A command buffer in the batch does not belong to this render device." );
 			}
 
 			validatedCommandBuffers[ index ] = commandBuffer;
@@ -79,14 +66,14 @@ namespace ldx12
 			validatedCommandBuffers[ commandBufferCount - 1 ]->CmdTransitionTexture( presentTexture, D3D12_RESOURCE_STATE_PRESENT );
 		}
 
-		std::array<ImmediateCommands::CommandListWrapper*, ourMaxCommandBufferBatch * 2> wrappers = {};
+		std::array<CommandListWrapper*, ourMaxCommandBufferBatch * 2> wrappers = {};
 		uint32_t wrapperCount = 0;
 
 		for( uint32_t index = 0; index < commandBufferCount; ++index )
 		{
 			CommandBufferImpl* commandBuffer = validatedCommandBuffers[ index ];
 			assert( commandBuffer != nullptr );
-			if( ImmediateCommands::CommandListWrapper* fixup = commandBuffer->BuildSubmitFixup( validatedCommandBuffers.data(), index ) )
+			if( CommandListWrapper* fixup = commandBuffer->BuildSubmitFixup( validatedCommandBuffers.data(), index ) )
 			{
 				wrappers[ wrapperCount++ ] = fixup;
 			}
@@ -99,10 +86,8 @@ namespace ldx12
 		for( uint32_t index = 0; index < commandBufferCount; ++index )
 		{
 			assert( validatedCommandBuffers[ index ] != nullptr );
-			assert( activeSlots[ index ] != nullptr );
 			validatedCommandBuffers[ index ]->CommitSubmittedTextureStates();
-
-			activeSlots[ index ]->reset();
+			graphicsQueue.immediateCommands_->ReleaseCommandBuffer( *validatedCommandBuffers[ index ] );
 		}
 
 		if( owningSwapchain != nullptr )

@@ -86,6 +86,34 @@ namespace ldx12::tests
 			"A waited command-buffer batch was not reported as ready." );
 		device.Destroy( batchTexture );
 
+		std::array<ICommandBuffer*, ourMaxActiveCommandBuffers> activeCommandBuffers{};
+		for( ICommandBuffer*& activeCommandBuffer : activeCommandBuffers )
+		{
+			activeCommandBuffer = &device.AcquireCommandBuffer();
+		}
+		bool activeCommandBufferLimitReached = false;
+		try
+		{
+			device.AcquireCommandBuffer();
+		}
+		catch( const std::length_error& )
+		{
+			activeCommandBufferLimitReached = true;
+		}
+		Require( activeCommandBufferLimitReached,
+			"AcquireCommandBuffer exceeded the fixed active-command-buffer pool." );
+
+		SubmitHandle poolSubmission{};
+		for( uint32_t offset = 0; offset < ourMaxActiveCommandBuffers; offset += ourMaxCommandBufferBatch )
+		{
+			poolSubmission = device.SubmitBatch(
+				activeCommandBuffers.data() + offset,
+				ourMaxCommandBufferBatch );
+		}
+		device.Wait( poolSubmission );
+		Require( device.IsReady( poolSubmission ),
+			"The fixed command-buffer pool did not complete its submissions." );
+
 		ICommandBuffer& commandBuffer = device.AcquireCommandBuffer();
 		Require( native.GetCommandList( commandBuffer ) != nullptr,
 			"Command buffer does not expose its native D3D12 command list." );
