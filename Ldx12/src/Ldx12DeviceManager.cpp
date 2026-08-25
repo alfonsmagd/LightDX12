@@ -19,19 +19,20 @@ namespace ldx12
 		std::unique_ptr<DeviceManager> gDeviceManagerSingleton;
 		uint32_t gDeviceManagerSingletonReferenceCount = 0;
 
-		bool ContextDescsAreCompatible( const ContextDesc& left, const ContextDesc& right ) noexcept
+		bool ContextDescsAreCompatible( const ContextDesc& existingDesc, const ContextDesc& requestedDesc ) noexcept
 		{
-			return left.enableDebugLayer == right.enableDebugLayer &&
-				left.preferHighPerformanceAdapter == right.preferHighPerformanceAdapter &&
-				left.allowTearing == right.allowTearing &&
-				left.enablePixGpuCapture == right.enablePixGpuCapture &&
-				left.framesInFlight == right.framesInFlight &&
-				left.bindlessCapacity == right.bindlessCapacity &&
-				left.rtvCapacity == right.rtvCapacity &&
-				left.dsvCapacity == right.dsvCapacity &&
-				left.swapchainBufferCount == right.swapchainBufferCount &&
-				left.swapchainFormat == right.swapchainFormat &&
-				left.minimumFeatureLevel == right.minimumFeatureLevel;
+			return existingDesc.enableDebugLayer == requestedDesc.enableDebugLayer &&
+				existingDesc.preferHighPerformanceAdapter == requestedDesc.preferHighPerformanceAdapter &&
+				existingDesc.allowTearing == requestedDesc.allowTearing &&
+				existingDesc.pixSettings.enableGpuCapture == requestedDesc.pixSettings.enableGpuCapture &&
+				existingDesc.pixSettings.showGpuCaptureHud == requestedDesc.pixSettings.showGpuCaptureHud &&
+				existingDesc.framesInFlight == requestedDesc.framesInFlight &&
+				existingDesc.bindlessCapacity == requestedDesc.bindlessCapacity &&
+				existingDesc.rtvCapacity == requestedDesc.rtvCapacity &&
+				existingDesc.dsvCapacity == requestedDesc.dsvCapacity &&
+				existingDesc.swapchainBufferCount == requestedDesc.swapchainBufferCount &&
+				existingDesc.swapchainFormat == requestedDesc.swapchainFormat &&
+				existingDesc.minimumFeatureLevel == requestedDesc.minimumFeatureLevel;
 		}
 
 		void ReleaseDeviceManagerSingleton() noexcept
@@ -54,7 +55,6 @@ namespace ldx12
 			singletonToDestroy.reset();
 		}
 
-#if defined( LDX12_ENABLE_PIX )
 		std::array<uint32_t, 4> ParseVersionComponents( const std::wstring& versionText )
 		{
 			std::array<uint32_t, 4> components = {};
@@ -163,7 +163,27 @@ namespace ldx12
 
 			return false;
 		}
-#endif
+
+		bool TrySetPixGpuCaptureHudVisibility( bool visible ) noexcept
+		{
+			HMODULE capturerModule = ::GetModuleHandleW( L"WinPixGpuCapturer.dll" );
+			if( capturerModule == nullptr )
+			{
+				return false;
+			}
+
+			using SetHudOptionsFn = HRESULT( WINAPI* )( uint32_t );
+			auto setHudOptions = reinterpret_cast<SetHudOptionsFn>(
+				::GetProcAddress( capturerModule, "SetHUDOptions" ) );
+			if( setHudOptions == nullptr )
+			{
+				return false;
+			}
+
+			constexpr uint32_t kShowOnAllWindows = 0x1;
+			constexpr uint32_t kShowOnNoWindows = 0x4;
+			return SUCCEEDED( setHudOptions( visible ? kShowOnAllWindows : kShowOnNoWindows ) );
+		}
 	}
 
 	SwapchainResource::SwapchainResource() = default;
@@ -180,28 +200,23 @@ namespace ldx12
 
 	bool TryLoadPixGpuCapturer() noexcept
 	{
-#if defined( LDX12_ENABLE_PIX )
 		return TryLoadPixGpuCapturerInternal();
-#else
-		return false;
-#endif
 	}
 
 	bool IsPixGpuCapturerLoaded() noexcept
 	{
-#if defined( LDX12_ENABLE_PIX )
 		return ::GetModuleHandleW( L"WinPixGpuCapturer.dll" ) != nullptr;
-#else
-		return false;
-#endif
 	}
 
 	void DeviceManager::Initialize()
 	{
-		if( desc_.enablePixGpuCapture )
+		if( desc_.pixSettings.enableGpuCapture )
 		{
 			// PIX GPU capture attach only works if the capturer DLL is loaded before any D3D12 device creation.
-			TryLoadPixGpuCapturer();
+			if( TryLoadPixGpuCapturer() )
+			{
+				TrySetPixGpuCaptureHudVisibility( desc_.pixSettings.showGpuCaptureHud );
+			}
 		}
 
 		InitializeFactory();

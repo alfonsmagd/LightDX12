@@ -70,7 +70,7 @@ namespace ldx12
 	}
 
 	// Call this before creating DeviceManager if you want PIX GPU capture attach support.
-	// When PIX support is disabled or the capturer DLL is unavailable, this safely returns false.
+	// Returns false when WinPixGpuCapturer.dll cannot be found in the installed PIX versions.
 	bool TryLoadPixGpuCapturer() noexcept;
 	bool IsPixGpuCapturerLoaded() noexcept;
 
@@ -317,12 +317,18 @@ namespace ldx12
 		D3D12_CLEAR_VALUE clearValue{};
 	};
 
+	struct PixSettings
+	{
+		bool enableGpuCapture = false;
+		bool showGpuCaptureHud = false;
+	};
+
 	struct ContextDesc
 	{
 		bool enableDebugLayer = true;
 		bool preferHighPerformanceAdapter = true;
 		bool allowTearing = true;
-		bool enablePixGpuCapture = false;
+		PixSettings pixSettings = {};
 		uint32_t framesInFlight = 3;
 		uint32_t bindlessCapacity = ourMaxBindlessDescriptors;
 		uint32_t rtvCapacity = ourMaxRtvDescriptors;
