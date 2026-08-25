@@ -154,4 +154,4 @@ Stress and functional tests are described in the [tests documentation](tests/REA
 
 Ldx12 began inside **IFNITY** and later became a standalone project.
 
-Ldx12 is licensed under MIT.
+Ldx12 is available under the [MIT License](LICENSE). Third-party attribution is documented in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

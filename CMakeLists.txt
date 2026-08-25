@@ -85,6 +85,8 @@ add_library(Ldx12 STATIC
 
 add_library(Ldx12::Ldx12 ALIAS Ldx12)
 
+set_target_properties(Ldx12 PROPERTIES DEBUG_POSTFIX "d")
+
 target_compile_features(Ldx12 PUBLIC cxx_std_20)
 target_compile_definitions(Ldx12
     PUBLIC
@@ -133,6 +135,12 @@ if(LDX12_INSTALL)
         ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
     )
     install(DIRECTORY "${LDX12_ROOT}/include/" DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
+    install(
+        FILES
+            "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE"
+            "${CMAKE_CURRENT_SOURCE_DIR}/THIRD_PARTY_NOTICES.md"
+        DESTINATION "${CMAKE_INSTALL_DATADIR}/Ldx12"
+    )
     install(
         EXPORT Ldx12Targets
         FILE Ldx12Targets.cmake

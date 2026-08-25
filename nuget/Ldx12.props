@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Ldx12PackageRoot>$(MSBuildThisFileDirectory)</Ldx12PackageRoot>
+    <Ldx12IncludeDirectory>$(Ldx12PackageRoot)include</Ldx12IncludeDirectory>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(Ldx12IncludeDirectory);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32_LEAN_AND_MEAN;NOMINMAX;UNICODE;_UNICODE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClInclude Include="$(Ldx12IncludeDirectory)\Ldx12\*.hpp">
+      <Link>Ldx12 Headers\%(Filename)%(Extension)</Link>
+    </ClInclude>
+  </ItemGroup>
+</Project>
