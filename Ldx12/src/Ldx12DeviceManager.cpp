@@ -424,7 +424,7 @@ namespace ldx12
 	{
 		D3D12_ROOT_PARAMETER1 parameters[ 2 ] = {};
 		parameters[ 0 ].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
-		parameters[ 0 ].Constants.Num32BitValues = 63;
+		parameters[ 0 ].Constants.Num32BitValues = ourMaxPushConstant32BitValues;
 		parameters[ 0 ].Constants.ShaderRegister = 0;
 		parameters[ 0 ].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 

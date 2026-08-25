@@ -127,7 +127,7 @@ CBV, SRV and UAV descriptors share one heap. Index 0 is invalid, indices 1-25 ar
 | Live buffers | 4,096 buffers |
 | Live textures | 4,096 textures |
 | Live swapchains | 16 swapchains |
-| Backbuffers per swapchain | 1-3 backbuffers |
+| Backbuffers per swapchain | 2-3 backbuffers |
 | Color attachments per render pass | 8 attachments |
 | Vertex input elements per pipeline | 16 elements |
 | Acquired command buffers awaiting submission | 64 command buffers |

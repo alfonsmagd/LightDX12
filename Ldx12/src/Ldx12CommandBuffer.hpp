@@ -20,8 +20,6 @@ namespace ldx12
 	class CommandBufferImpl final: public ICommandBuffer
 	{
 	public:
-		static constexpr uint32_t ourMaxTrackedTextures = 256;
-
 		CommandBufferImpl() = default;
 		void Begin( DeviceManager& manager, CommandListWrapper& wrapper ) noexcept;
 		void Release() noexcept;
@@ -88,7 +86,7 @@ namespace ldx12
 		bool isRendering_ = false;
 		bool active_ = false;
 		uint32_t debugGroupDepth_ = 0;
-		std::array<TrackedTextureState, ourMaxTrackedTextures> trackedTextures_ = {};
+		std::array<TrackedTextureState, ourMaxTrackedTexturesPerCommandBuffer> trackedTextures_ = {};
 		uint32_t trackedTextureCount_ = 0;
 	};
 }

@@ -1,6 +1,15 @@
 # Ldx12 tests
 
-Ldx12 includes regular tests for its public API and three stress tests for its main resource and submission paths.
+Ldx12 includes regular tests for its public API, three stress tests for its main resource and submission paths, and a full-capacity test.
+
+## Capacity test
+
+`Ldx12FullCapacityTests` reaches the documented limits for live buffers, textures and swapchains. It also validates backbuffer counts, eight color attachments, 16 vertex inputs, 64 acquired command buffers, four-buffer batches, 256 tracked textures and 63 push-constant values.
+
+```bat
+cmake --build build --config Debug --target Ldx12FullCapacityTests --parallel
+ctest --test-dir build -C Debug -R Ldx12FullCapacityTests --output-on-failure --verbose
+```
 
 ## Stress tests
 

@@ -604,8 +604,28 @@ namespace ldx12
 
 	void CommandBufferImpl::CmdPushConstants( const void* data, uint32_t sizeBytes, uint32_t offset32BitValues )
 	{
-		wrapper_->commandList_->SetGraphicsRoot32BitConstants( 0, sizeBytes / 4u, data, offset32BitValues );
-		wrapper_->commandList_->SetComputeRoot32BitConstants( 0, sizeBytes / 4u, data, offset32BitValues );
+		if( sizeBytes == 0 )
+		{
+			return;
+		}
+		if( data == nullptr )
+		{
+			throw std::invalid_argument( "CmdPushConstants requires valid data." );
+		}
+		if( sizeBytes % sizeof( uint32_t ) != 0 )
+		{
+			throw std::invalid_argument( "CmdPushConstants size must be aligned to 32-bit values." );
+		}
+
+		const uint32_t valueCount = sizeBytes / sizeof( uint32_t );
+		if( offset32BitValues > ourMaxPushConstant32BitValues ||
+			valueCount > ourMaxPushConstant32BitValues - offset32BitValues )
+		{
+			throw std::length_error( "CmdPushConstants cannot exceed 63 32-bit values." );
+		}
+
+		wrapper_->commandList_->SetGraphicsRoot32BitConstants( 0, valueCount, data, offset32BitValues );
+		wrapper_->commandList_->SetComputeRoot32BitConstants( 0, valueCount, data, offset32BitValues );
 	}
 
 	void CommandBufferImpl::CmdPushDebugGroupLabel( const char* label, uint32_t color )

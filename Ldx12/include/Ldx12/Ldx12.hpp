@@ -37,6 +37,8 @@ namespace ldx12
 	static constexpr uint32_t ourMaxActiveCommandBuffers = 64;
 	static constexpr uint32_t ourMaxCommandBufferBatch = 4;
 	static constexpr uint32_t ourMaxImmediateCommandBuffers = ourMaxActiveCommandBuffers + ourMaxCommandBufferBatch;
+	static constexpr uint32_t ourMaxTrackedTexturesPerCommandBuffer = 256;
+	static constexpr uint32_t ourMaxPushConstant32BitValues = 63;
 
 	struct BufferResource;
 	struct TextureResource;

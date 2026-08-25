@@ -9,9 +9,9 @@ namespace ldx12
 		ctx_( ctx ),
 		swapchainHandle_( swapchainHandle )
 	{
-		if( ctx_.desc_.swapchainBufferCount == 0 || ctx_.desc_.swapchainBufferCount > ourMaxSwapchainBuffers )
+		if( ctx_.desc_.swapchainBufferCount < 2 || ctx_.desc_.swapchainBufferCount > ourMaxSwapchainBuffers )
 		{
-			throw std::runtime_error( "Swapchain buffer count exceeds fixed back buffer storage." );
+			throw std::runtime_error( "Swapchains require between 2 and 3 backbuffers." );
 		}
 
 		DXGI_SWAP_CHAIN_DESC1 swapchainDesc{};
