@@ -294,6 +294,13 @@ namespace ldx12
 		active_ = true;
 		debugGroupDepth_ = 0;
 		trackedTextureCount_ = 0;
+
+		ID3D12DescriptorHeap* heaps[] = { manager_->bindlessHeap_.Get() };
+		wrapper_->commandList_->SetDescriptorHeaps( 1, heaps );
+
+		ID3D12RootSignature* rootSignature = manager_->rootSignature_.Get();
+		wrapper_->commandList_->SetGraphicsRootSignature( rootSignature );
+		wrapper_->commandList_->SetComputeRootSignature( rootSignature );
 	}
 
 	void CommandBufferImpl::Release() noexcept
@@ -552,18 +559,12 @@ namespace ldx12
 
 	void CommandBufferImpl::CmdBindRenderPipeline( const RenderPipelineState& pipeline )
 	{
-		ID3D12DescriptorHeap* heaps[] = { manager_->bindlessHeap_.Get() };
-		wrapper_->commandList_->SetDescriptorHeaps( 1, heaps );
-		wrapper_->commandList_->SetGraphicsRootSignature( manager_->rootSignature_.Get() );
 		wrapper_->commandList_->SetPipelineState( pipeline.pipelineState_.Get() );
 		wrapper_->commandList_->IASetPrimitiveTopology( pipeline.topology_ );
 	}
 
 	void CommandBufferImpl::CmdBindComputePipeline( const ComputePipelineState& pipeline )
 	{
-		ID3D12DescriptorHeap* heaps[] = { manager_->bindlessHeap_.Get() };
-		wrapper_->commandList_->SetDescriptorHeaps( 1, heaps );
-		wrapper_->commandList_->SetComputeRootSignature( manager_->rootSignature_.Get() );
 		wrapper_->commandList_->SetPipelineState( pipeline.pipelineState_.Get() );
 	}
 
@@ -603,8 +604,6 @@ namespace ldx12
 
 	void CommandBufferImpl::CmdPushConstants( const void* data, uint32_t sizeBytes, uint32_t offset32BitValues )
 	{
-		wrapper_->commandList_->SetGraphicsRootSignature( manager_->rootSignature_.Get() );
-		wrapper_->commandList_->SetComputeRootSignature( manager_->rootSignature_.Get() );
 		wrapper_->commandList_->SetGraphicsRoot32BitConstants( 0, sizeBytes / 4u, data, offset32BitValues );
 		wrapper_->commandList_->SetComputeRoot32BitConstants( 0, sizeBytes / 4u, data, offset32BitValues );
 	}
