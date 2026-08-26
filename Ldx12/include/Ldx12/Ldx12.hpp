@@ -131,13 +131,6 @@ namespace ldx12
 		}
 	};
 
-	enum class QueueType : uint8_t
-	{
-		Graphics,
-		Compute,
-		Copy
-	};
-
 	enum class LoadOp : uint8_t
 	{
 		Load,
@@ -331,7 +324,6 @@ namespace ldx12
 		bool preferHighPerformanceAdapter = true;
 		bool allowTearing = true;
 		PixSettings pixSettings = {};
-		uint32_t framesInFlight = 3;
 		uint32_t bindlessCapacity = ourMaxBindlessDescriptors;
 		uint32_t rtvCapacity = ourMaxRtvDescriptors;
 		uint32_t dsvCapacity = ourMaxDsvDescriptors;
@@ -656,12 +648,10 @@ namespace ldx12
 		struct QueueContext final
 		{
 			QueueContext();
-			explicit QueueContext( QueueType type ) noexcept;
 			~QueueContext();
 			QueueContext( const QueueContext& ) = delete;
 			QueueContext& operator=( const QueueContext& ) = delete;
 
-			QueueType type_ = QueueType::Graphics;
 			ComPtr<ID3D12CommandQueue> commandQueue_;
 			ComPtr<ID3D12Fence> queueIdleFence_;
 			HANDLE queueIdleEvent_ = nullptr;
@@ -693,8 +683,6 @@ namespace ldx12
 		void InitializeDescriptorHeaps();
 		void InitializeRootSignature();
 		void InitializeCommandSignature();
-		QueueContext& GetQueueContext( QueueType type ) noexcept;
-		const QueueContext& GetQueueContext( QueueType type ) const noexcept;
 		QueueContext& GetGraphicsQueueContext() noexcept;
 		const QueueContext& GetGraphicsQueueContext() const noexcept;
 		SwapchainHandle CreateSwapchainInternal( const SwapchainDesc& desc );
@@ -745,7 +733,7 @@ namespace ldx12
 		ComPtr<IDXGIFactory6> factory_;
 		ComPtr<IDXGIAdapter1> adapter_;
 		ComPtr<ID3D12Device> device_;
-		QueueContext graphicsQueue_ = QueueContext( QueueType::Graphics );
+		QueueContext graphicsQueue_;
 		ComPtr<ID3D12DescriptorHeap> bindlessHeap_;
 		ComPtr<ID3D12DescriptorHeap> rtvHeap_;
 		ComPtr<ID3D12DescriptorHeap> dsvHeap_;

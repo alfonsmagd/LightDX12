@@ -157,7 +157,7 @@ endif()
 
 set(APP_PUBLIC_HEADERS)
 set(APP_SOURCES)
-if(LDX12_BUILD_APP)
+if(LDX12_BUILD_APP OR LDX12_BUILD_EXAMPLES)
     set(IMGUI_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui")
     add_library(DearImGui STATIC
         "${IMGUI_ROOT}/imconfig.h"
@@ -172,13 +172,28 @@ if(LDX12_BUILD_APP)
         "${IMGUI_ROOT}/imstb_truetype.h"
         "${IMGUI_ROOT}/backends/imgui_impl_win32.h"
         "${IMGUI_ROOT}/backends/imgui_impl_win32.cpp"
-        "${IMGUI_ROOT}/backends/imgui_impl_dx12.h"
-        "${IMGUI_ROOT}/backends/imgui_impl_dx12.cpp"
     )
     target_compile_features(DearImGui PUBLIC cxx_std_20)
     target_include_directories(DearImGui PUBLIC "${IMGUI_ROOT}")
     target_compile_definitions(DearImGui PUBLIC WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE)
     target_link_libraries(DearImGui PUBLIC d3d12 dxgi)
+
+    add_library(Ldx12ImGui STATIC
+        "${CMAKE_CURRENT_SOURCE_DIR}/App/include/App/imgui_impl_ldx12.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/App/src/imgui_impl_ldx12.cpp"
+    )
+    add_library(Ldx12::ImGui ALIAS Ldx12ImGui)
+    target_compile_features(Ldx12ImGui PUBLIC cxx_std_20)
+    target_include_directories(Ldx12ImGui PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/App/include")
+    target_compile_definitions(Ldx12ImGui PUBLIC WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE)
+    target_link_libraries(Ldx12ImGui PUBLIC Ldx12::Ldx12 DearImGui)
+    if(MSVC)
+        target_compile_options(Ldx12ImGui PRIVATE /W4 /EHsc /permissive- /MP)
+    endif()
+
+endif()
+
+if(LDX12_BUILD_APP)
 
     set(APP_PUBLIC_HEADERS
         "${CMAKE_CURRENT_SOURCE_DIR}/App/include/App/ImGuiLayer.hpp"
@@ -193,7 +208,7 @@ if(LDX12_BUILD_APP)
     target_compile_features(App PUBLIC cxx_std_20)
     target_include_directories(App PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/App/include")
     target_compile_definitions(App PUBLIC WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE)
-    target_link_libraries(App PRIVATE DearImGui)
+    target_link_libraries(App PUBLIC Ldx12::ImGui)
     if(MSVC)
         target_compile_options(App PRIVATE /W4 /EHsc /permissive- /MP)
     endif()
@@ -224,8 +239,17 @@ if(LDX12_BUILD_EXAMPLES)
     add_ldx12_sample(ViewportScissor "${VIEWPORT_SCISSOR_SOURCE}")
     add_ldx12_sample(CBSRVCubes "${CBSRVCUBES_SOURCE}" "${CBSRVCUBES_README}" "${CBSRVCUBES_SHADER}")
     add_ldx12_sample(CookbookChapter02 "${COOKBOOK_CHAPTER02_SOURCE}" "${COOKBOOK_CHAPTER02_README}" "${COOKBOOK_CHAPTER02_SHADER}")
-    set(LDX12_EXAMPLE_TARGETS Triangle ViewportScissor CBSRVCubes CookbookChapter02)
-    set(LDX12_EXAMPLE_SOURCES "${TRIANGLE_SOURCE}" "${VIEWPORT_SCISSOR_SOURCE}" "${CBSRVCUBES_SOURCE}" "${CBSRVCUBES_README}" "${CBSRVCUBES_SHADER}" "${COOKBOOK_CHAPTER02_SOURCE}" "${COOKBOOK_CHAPTER02_README}" "${COOKBOOK_CHAPTER02_SHADER}")
+
+    set(IMGUI_DEMO_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/samples/ImGuiDemo/main.cpp")
+    add_executable(ImGuiDemo WIN32 "${IMGUI_DEMO_SOURCE}")
+    target_compile_features(ImGuiDemo PRIVATE cxx_std_20)
+    target_link_libraries(ImGuiDemo PRIVATE Ldx12::ImGui)
+    if(MSVC)
+        target_compile_options(ImGuiDemo PRIVATE /W4 /EHsc /permissive- /MP)
+    endif()
+
+    set(LDX12_EXAMPLE_TARGETS Triangle ViewportScissor CBSRVCubes CookbookChapter02 ImGuiDemo)
+    set(LDX12_EXAMPLE_SOURCES "${TRIANGLE_SOURCE}" "${VIEWPORT_SCISSOR_SOURCE}" "${CBSRVCUBES_SOURCE}" "${CBSRVCUBES_README}" "${CBSRVCUBES_SHADER}" "${COOKBOOK_CHAPTER02_SOURCE}" "${COOKBOOK_CHAPTER02_README}" "${COOKBOOK_CHAPTER02_SHADER}" "${IMGUI_DEMO_SOURCE}")
 
     if(LDX12_BUILD_APP)
         set(IMGUI_NODE_EDITOR_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/samples/ImGuiNodeEditor/main.cpp")

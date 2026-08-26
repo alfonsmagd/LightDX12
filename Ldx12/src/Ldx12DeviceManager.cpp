@@ -26,7 +26,6 @@ namespace ldx12
 				existingDesc.allowTearing == requestedDesc.allowTearing &&
 				existingDesc.pixSettings.enableGpuCapture == requestedDesc.pixSettings.enableGpuCapture &&
 				existingDesc.pixSettings.showGpuCaptureHud == requestedDesc.pixSettings.showGpuCaptureHud &&
-				existingDesc.framesInFlight == requestedDesc.framesInFlight &&
 				existingDesc.bindlessCapacity == requestedDesc.bindlessCapacity &&
 				existingDesc.rtvCapacity == requestedDesc.rtvCapacity &&
 				existingDesc.dsvCapacity == requestedDesc.dsvCapacity &&
@@ -192,10 +191,6 @@ namespace ldx12
 	SwapchainResource& SwapchainResource::operator=( SwapchainResource&& other ) noexcept = default;
 
 	DeviceManager::QueueContext::QueueContext() = default;
-	DeviceManager::QueueContext::QueueContext( QueueType type ) noexcept:
-		type_( type )
-	{
-	}
 	DeviceManager::QueueContext::~QueueContext() = default;
 
 	bool TryLoadPixGpuCapturer() noexcept
@@ -341,26 +336,14 @@ namespace ldx12
 			ourMaxImmediateCommandBuffers );
 	}
 
-	DeviceManager::QueueContext& DeviceManager::GetQueueContext( QueueType type ) noexcept
-	{
-		static_cast<void>( type );
-		return graphicsQueue_;
-	}
-
-	const DeviceManager::QueueContext& DeviceManager::GetQueueContext( QueueType type ) const noexcept
-	{
-		static_cast<void>( type );
-		return graphicsQueue_;
-	}
-
 	DeviceManager::QueueContext& DeviceManager::GetGraphicsQueueContext() noexcept
 	{
-		return GetQueueContext( QueueType::Graphics );
+		return graphicsQueue_;
 	}
 
 	const DeviceManager::QueueContext& DeviceManager::GetGraphicsQueueContext() const noexcept
 	{
-		return GetQueueContext( QueueType::Graphics );
+		return graphicsQueue_;
 	}
 
 	void DeviceManager::InitializeDescriptorHeaps()

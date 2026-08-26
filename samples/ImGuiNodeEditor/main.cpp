@@ -1,9 +1,10 @@
+#define IMGUI_DEFINE_MATH_OPERATORS
+
 #include "App/ImGuiLayer.hpp"
 #include "App/NodeGraph.hpp"
+#include "App/imgui_impl_ldx12.h"
 #include "Ldx12/Ldx12.hpp"
-#include "Ldx12/Ldx12Native.hpp"
 
-#define IMGUI_DEFINE_MATH_OPERATORS
 #include "imgui.h"
 
 #include <algorithm>
@@ -50,7 +51,7 @@ namespace
 		bool valueEditorHovered = false;
 		bool cpuInvertRequested = false;
 		App::TextureReference demoTexture{ 1, 256, 256 };
-		uint64_t imguiTextureId = 0;
+		TextureHandle imguiTexture{};
 	};
 
 	struct WindowState
@@ -222,8 +223,8 @@ namespace
 			const ImVec2 imageMinimum( layout.minimum.x + 10.0f, pinsBottom + 4.0f );
 			const ImVec2 imageMaximum( layout.maximum.x - 10.0f, pinsBottom + 118.0f );
 			const auto* texture = result.valid ? std::get_if<App::TextureReference>( &result.value ) : nullptr;
-			if( texture && texture->resourceId != 0 && editor.imguiTextureId != 0 )
-				drawList->AddImage( ImTextureRef( static_cast<ImTextureID>( editor.imguiTextureId ) ), imageMinimum, imageMaximum );
+			if( texture && texture->resourceId != 0 && editor.imguiTexture.Valid() )
+				drawList->AddImage( ImGui_ImplLdx12_Texture( editor.imguiTexture ), imageMinimum, imageMaximum );
 			else
 			{
 				drawList->AddRectFilled( imageMinimum, imageMaximum, IM_COL32( 17, 19, 24, 255 ), 4.0f );
@@ -525,10 +526,9 @@ namespace
 		}
 
 		device.WaitIdle();
-		state.imgui->UnregisterTexture( state.editor.imguiTextureId );
 		device.Destroy( state.demoTexture );
 		state.demoTexture = UploadCpuTexture( device, state.cpuPixels );
-		state.editor.imguiTextureId = state.imgui->RegisterTexture( device.GetNative().GetResource( state.demoTexture ), DXGI_FORMAT_R8G8B8A8_UNORM );
+		state.editor.imguiTexture = state.demoTexture;
 		state.editor.status = "Textura invertida recorriendo 65.536 pixels en CPU.";
 		state.editor.cpuInvertRequested = false;
 	}
@@ -582,7 +582,6 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 
 		ContextDesc contextDesc{};
 		contextDesc.enableDebugLayer = true;
-		contextDesc.framesInFlight = kFramesInFlight;
 		contextDesc.swapchainBufferCount = kFramesInFlight;
 		SwapchainDesc swapchainDesc{};
 		swapchainDesc.window = MakeWin32WindowHandle( window );
@@ -591,11 +590,10 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		swapchainDesc.vsync = true;
 		state.deviceManager = &DeviceManager::Initialize( contextDesc, swapchainDesc );
 		RenderDevice& device = *state.deviceManager->GetRenderDevice();
-		D3D12Native native = device.GetNative();
-		state.imgui = std::make_unique<App::ImGuiLayer>( window, native.GetDevice(), native.GetCommandQueue(), contextDesc.swapchainFormat, DXGI_FORMAT_UNKNOWN, kFramesInFlight );
+		state.imgui = std::make_unique<App::ImGuiLayer>( window, device, contextDesc.swapchainFormat, DXGI_FORMAT_UNKNOWN, kFramesInFlight );
 		state.cpuPixels = CreateDemoPixels();
 		state.demoTexture = UploadCpuTexture( device, state.cpuPixels );
-		state.editor.imguiTextureId = state.imgui->RegisterTexture( native.GetResource( state.demoTexture ), DXGI_FORMAT_R8G8B8A8_UNORM );
+		state.editor.imguiTexture = state.demoTexture;
 		BuildExampleGraph( state.editor );
 
 		MSG message{};
@@ -624,15 +622,14 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 			Framebuffer framebuffer{};
 			framebuffer.color[0].texture = backBuffer;
 			commands.CmdBeginRendering( renderPass, framebuffer );
-			state.imgui->Render( native.GetCommandList( commands ) );
+			state.imgui->Render( commands );
 			commands.CmdEndRendering();
 			state.frameSubmissions[ state.frameIndex ] = device.Submit( commands, backBuffer );
 			state.frameIndex = ( state.frameIndex + 1 ) % kFramesInFlight;
 		}
 
 		state.deviceManager->WaitIdle();
-		state.imgui->UnregisterTexture( state.editor.imguiTextureId );
-		state.editor.imguiTextureId = 0;
+		state.editor.imguiTexture = {};
 		device.Destroy( state.demoTexture );
 		state.demoTexture = {};
 		state.imgui.reset();

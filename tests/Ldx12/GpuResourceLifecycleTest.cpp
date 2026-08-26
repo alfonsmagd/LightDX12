@@ -10,7 +10,6 @@ namespace ldx12::tests
 		ContextDesc context{};
 		context.enableDebugLayer = true;
 		context.preferHighPerformanceAdapter = false;
-		context.framesInFlight = 3;
 		context.bindlessCapacity = 128;
 		context.rtvCapacity = 16;
 		context.dsvCapacity = 8;

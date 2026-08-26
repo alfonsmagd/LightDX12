@@ -21,7 +21,6 @@ namespace
 		ContextDesc context{};
 		context.enableDebugLayer = true;
 		context.preferHighPerformanceAdapter = false;
-		context.framesInFlight = ourFramesInFlight;
 		context.bindlessCapacity = LDX12_BINDLESS_DYNAMIC_SLOT_FIRST + 32u;
 		context.rtvCapacity = ourFramesInFlight;
 		context.dsvCapacity = 1;
