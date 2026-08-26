@@ -53,8 +53,8 @@ namespace ldx12
 			throw std::runtime_error( "BaseMips requires a valid SRV and destination mip UAV range." );
 		}
 
-		auto& queue = manager_.GetGraphicsQueueContext();
-		auto& wrapper = queue.immediateCommands_->Acquire();
+		DeviceManager::QueueContext& queue = manager_.GetGraphicsQueueContext();
+		CommandListWrapper& wrapper = queue.immediateCommands_->Acquire();
 		ID3D12GraphicsCommandList4* commandList = wrapper.commandList_.Get();
 
 		ID3D12DescriptorHeap* descriptorHeaps[] = { manager_.bindlessHeap_.Get() };
@@ -146,7 +146,7 @@ namespace ldx12
 			return;
 		}
 
-		const auto barrier = CD3DX12_RESOURCE_BARRIER::Transition( resource, before, after, subresource );
+		const D3D12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition( resource, before, after, subresource );
 		commandList->ResourceBarrier( 1, &barrier );
 	}
 }

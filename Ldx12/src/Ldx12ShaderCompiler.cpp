@@ -223,7 +223,7 @@ namespace ldx12
 
 			std::filesystem::path bestCompilerPath;
 			VersionParts bestVersionParts = {};
-			for( const auto& entry : std::filesystem::directory_iterator( sdkBinDirectory, error ) )
+			for( const std::filesystem::directory_entry& entry : std::filesystem::directory_iterator( sdkBinDirectory, error ) )
 			{
 				if( error || !entry.is_directory( error ) )
 				{
@@ -355,7 +355,7 @@ namespace ldx12
 			throw std::runtime_error( "Shader source or profile is invalid." );
 		}
 
-		const auto createInstance = LoadDxcCreateInstance();
+		const DxcCreateInstanceProc createInstance = LoadDxcCreateInstance();
 
 		ComPtr<IDxcUtils> utils;
 		ComPtr<IDxcCompiler3> compiler;

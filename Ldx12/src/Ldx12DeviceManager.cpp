@@ -132,7 +132,7 @@ namespace ldx12
 			std::filesystem::path latestCapturerPath;
 			std::array<uint32_t, 4> latestVersion = {};
 
-			for( const auto& entry : std::filesystem::directory_iterator( pixInstallRoot ) )
+			for( const std::filesystem::directory_entry& entry : std::filesystem::directory_iterator( pixInstallRoot ) )
 			{
 				if( !entry.is_directory() )
 				{
@@ -173,7 +173,7 @@ namespace ldx12
 			}
 
 			using SetHudOptionsFn = HRESULT( WINAPI* )( uint32_t );
-			auto setHudOptions = reinterpret_cast<SetHudOptionsFn>(
+			SetHudOptionsFn setHudOptions = reinterpret_cast<SetHudOptionsFn>(
 				::GetProcAddress( capturerModule, "SetHUDOptions" ) );
 			if( setHudOptions == nullptr )
 			{
@@ -652,7 +652,7 @@ namespace ldx12
 
 	BufferResource& DeviceManager::GetBufferResource( BufferHandle handle )
 	{
-		auto* resource = slotMapBuffers_.Get( handle );
+		BufferResource* resource = slotMapBuffers_.Get( handle );
 		if( resource == nullptr )
 		{
 			throw std::runtime_error( "Invalid buffer handle." );
@@ -662,7 +662,7 @@ namespace ldx12
 
 	const BufferResource& DeviceManager::GetBufferResource( BufferHandle handle ) const
 	{
-		const auto* resource = slotMapBuffers_.Get( handle );
+		const BufferResource* resource = slotMapBuffers_.Get( handle );
 		if( resource == nullptr )
 		{
 			throw std::runtime_error( "Invalid buffer handle." );
@@ -672,7 +672,7 @@ namespace ldx12
 
 	TextureResource& DeviceManager::GetTextureResource( TextureHandle handle )
 	{
-		auto* resource = slotMapTextures_.Get( handle );
+		TextureResource* resource = slotMapTextures_.Get( handle );
 		if( resource == nullptr )
 		{
 			throw std::runtime_error( "Invalid texture handle." );
@@ -682,7 +682,7 @@ namespace ldx12
 
 	const TextureResource& DeviceManager::GetTextureResource( TextureHandle handle ) const
 	{
-		const auto* resource = slotMapTextures_.Get( handle );
+		const TextureResource* resource = slotMapTextures_.Get( handle );
 		if( resource == nullptr )
 		{
 			throw std::runtime_error( "Invalid texture handle." );
@@ -860,7 +860,7 @@ namespace ldx12
 		SwapchainResource swapchainResource{};
 		swapchainResource.desc_ = desc;
 		const SwapchainHandle handle = slotMapSwapchains_.Create( std::move( swapchainResource ) );
-		auto* resource = slotMapSwapchains_.Get( handle );
+		SwapchainResource* resource = slotMapSwapchains_.Get( handle );
 		if( resource == nullptr )
 		{
 			throw std::runtime_error( "Failed to allocate swapchain slot." );
@@ -886,7 +886,7 @@ namespace ldx12
 
 	void DeviceManager::DestroySwapchainInternal( SwapchainHandle swapchain ) noexcept
 	{
-		auto* resource = slotMapSwapchains_.Get( swapchain );
+		SwapchainResource* resource = slotMapSwapchains_.Get( swapchain );
 		if( resource == nullptr )
 		{
 			return;
@@ -910,19 +910,19 @@ namespace ldx12
 
 	SwapchainDesc* DeviceManager::GetSwapchainDesc( SwapchainHandle swapchain ) noexcept
 	{
-		auto* resource = slotMapSwapchains_.Get( swapchain );
+		SwapchainResource* resource = slotMapSwapchains_.Get( swapchain );
 		return resource != nullptr ? &resource->desc_ : nullptr;
 	}
 
 	const SwapchainDesc* DeviceManager::GetSwapchainDesc( SwapchainHandle swapchain ) const noexcept
 	{
-		const auto* resource = slotMapSwapchains_.Get( swapchain );
+		const SwapchainResource* resource = slotMapSwapchains_.Get( swapchain );
 		return resource != nullptr ? &resource->desc_ : nullptr;
 	}
 
 	Swapchain* DeviceManager::GetOwningSwapchain( TextureHandle texture ) noexcept
 	{
-		const auto* resource = slotMapTextures_.Get( texture );
+		const TextureResource* resource = slotMapTextures_.Get( texture );
 		if( resource == nullptr || !resource->swapchain_.Valid() )
 		{
 			return nullptr;

@@ -65,32 +65,32 @@ namespace ldx12
 
 	void HLSLLoader::SetRootDirectory( const std::filesystem::path& rootDirectory )
 	{
-		auto& state = GetState();
+		HlslLoaderState& state = GetState();
 		std::lock_guard lock( state.mutex );
 		state.rootDirectory = NormalizePath( rootDirectory );
 	}
 
 	std::filesystem::path HLSLLoader::GetRootDirectory()
 	{
-		auto& state = GetState();
+		HlslLoaderState& state = GetState();
 		std::lock_guard lock( state.mutex );
 		return state.rootDirectory;
 	}
 
 	std::filesystem::path HLSLLoader::ResolvePath( const std::filesystem::path& shaderPath )
 	{
-		auto& state = GetState();
+		HlslLoaderState& state = GetState();
 		std::lock_guard lock( state.mutex );
 		return ResolvePathUnlocked( state, shaderPath );
 	}
 
 	const char* HLSLLoader::LoadSource( const std::filesystem::path& shaderPath )
 	{
-		auto& state = GetState();
+		HlslLoaderState& state = GetState();
 		std::lock_guard lock( state.mutex );
 		const std::filesystem::path resolvedPath = ResolvePathUnlocked( state, shaderPath );
 
-		auto it = state.cache.find( resolvedPath );
+		std::unordered_map<std::filesystem::path, std::string>::iterator it = state.cache.find( resolvedPath );
 		if( it == state.cache.end() )
 		{
 			it = state.cache.emplace( resolvedPath, ReadTextFile( resolvedPath ) ).first;
@@ -114,7 +114,7 @@ namespace ldx12
 
 	void HLSLLoader::ClearCache() noexcept
 	{
-		auto& state = GetState();
+		HlslLoaderState& state = GetState();
 		std::lock_guard lock( state.mutex );
 		state.cache.clear();
 	}

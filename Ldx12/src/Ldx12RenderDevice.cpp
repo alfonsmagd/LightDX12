@@ -740,8 +740,7 @@ namespace ldx12
 		resource.gpuAddress_ = resource.resource_->GetGPUVirtualAddress();
 		if( desc.heapType == D3D12_HEAP_TYPE_UPLOAD )
 		{
-			C_RESULT( resource.resource_->Map( 0, nullptr, &resource.mappedPtr_ ),
-					  "Failed to map upload buffer." );
+			resource.resource_->Map( 0, nullptr, &resource.mappedPtr_ );
 		}
 
 		if( desc.createShaderResourceView )

@@ -124,7 +124,7 @@ namespace ldx12
 		for( uint32_t index = 0; index < properties_.numSwapchainImages_; ++index )
 		{
 			const TextureHandle handle = backBufferHandles_[ index ];
-			auto* texture = ctx_.slotMapTextures_.Get( handle );
+			TextureResource* texture = ctx_.slotMapTextures_.Get( handle );
 			if( texture != nullptr )
 			{
 				ctx_.FreeRtvDescriptor( texture->rtvIndex_ );

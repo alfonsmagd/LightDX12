@@ -160,7 +160,7 @@ namespace ldx12
 				return nullptr;
 			}
 
-			auto& slot = slots_[ index ];
+			Slot& slot = slots_[ index ];
 			if( !slot.occupied )
 			{
 				return nullptr;
@@ -176,7 +176,7 @@ namespace ldx12
 				return nullptr;
 			}
 
-			const auto& slot = slots_[ index ];
+			const Slot& slot = slots_[ index ];
 			if( !slot.occupied )
 			{
 				return nullptr;

@@ -36,16 +36,16 @@ namespace ldx12
 			"Failed to create staging buffer." );
 
 		void* mapped = nullptr;
-		C_RESULT( stagingBuffer->Map( 0, nullptr, &mapped ), "Failed to map staging buffer." );
+		stagingBuffer->Map( 0, nullptr, &mapped );
 		std::memcpy( mapped, data, size );
 		stagingBuffer->Unmap( 0, nullptr );
 
-		auto& queue = manager_.GetGraphicsQueueContext();
-		auto& cmd = queue.immediateCommands_->Acquire();
-		const auto previousState = buffer.currentState_;
+		DeviceManager::QueueContext& queue = manager_.GetGraphicsQueueContext();
+		CommandListWrapper& cmd = queue.immediateCommands_->Acquire();
+		const D3D12_RESOURCE_STATES previousState = buffer.currentState_;
 		if( previousState != D3D12_RESOURCE_STATE_COPY_DEST )
 		{
-			const auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+			const CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
 				buffer.resource_.Get(),
 				previousState,
 				D3D12_RESOURCE_STATE_COPY_DEST );
@@ -57,7 +57,7 @@ namespace ldx12
 
 		if( previousState != D3D12_RESOURCE_STATE_COPY_DEST )
 		{
-			const auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+			const CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
 				buffer.resource_.Get(),
 				D3D12_RESOURCE_STATE_COPY_DEST,
 				previousState );
@@ -122,10 +122,10 @@ namespace ldx12
 			"Failed to create texture staging buffer." );
 
 		void* mapped = nullptr;
-		C_RESULT( stagingBuffer->Map( 0, nullptr, &mapped ), "Failed to map texture staging buffer." );
+		stagingBuffer->Map( 0, nullptr, &mapped );
 
-		auto* dstBytes = static_cast<uint8_t*>( mapped );
-		const auto* srcBytes = static_cast<const uint8_t*>( data );
+		uint8_t* dstBytes = static_cast<uint8_t*>( mapped );
+		const uint8_t* srcBytes = static_cast<const uint8_t*>( data );
 		for( UINT row = 0; row < numRows; ++row )
 		{
 			std::memcpy(
@@ -136,12 +136,12 @@ namespace ldx12
 
 		stagingBuffer->Unmap( 0, nullptr );
 
-		auto& queue = manager_.GetGraphicsQueueContext();
-		auto& cmd = queue.immediateCommands_->Acquire();
-		const auto previousState = texture.currentState_;
+		DeviceManager::QueueContext& queue = manager_.GetGraphicsQueueContext();
+		CommandListWrapper& cmd = queue.immediateCommands_->Acquire();
+		const D3D12_RESOURCE_STATES previousState = texture.currentState_;
 		if( previousState != D3D12_RESOURCE_STATE_COPY_DEST )
 		{
-			const auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+			const CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
 				texture.resource_.Get(),
 				previousState,
 				D3D12_RESOURCE_STATE_COPY_DEST );
@@ -163,7 +163,7 @@ namespace ldx12
 
 		if( previousState != D3D12_RESOURCE_STATE_COPY_DEST )
 		{
-			const auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+			const CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
 				texture.resource_.Get(),
 				D3D12_RESOURCE_STATE_COPY_DEST,
 				previousState );
@@ -232,12 +232,12 @@ namespace ldx12
 				IID_PPV_ARGS( readbackBuffer.GetAddressOf() ) ),
 			"Failed to create texture readback buffer." );
 
-		auto& queue = manager_.GetGraphicsQueueContext();
-		auto& cmd = queue.immediateCommands_->Acquire();
-		const auto previousState = texture.currentState_;
+		DeviceManager::QueueContext& queue = manager_.GetGraphicsQueueContext();
+		CommandListWrapper& cmd = queue.immediateCommands_->Acquire();
+		const D3D12_RESOURCE_STATES previousState = texture.currentState_;
 		if( previousState != D3D12_RESOURCE_STATE_COPY_SOURCE )
 		{
-			const auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+			const CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
 				texture.resource_.Get(),
 				previousState,
 				D3D12_RESOURCE_STATE_COPY_SOURCE );
@@ -259,7 +259,7 @@ namespace ldx12
 
 		if( previousState != D3D12_RESOURCE_STATE_COPY_SOURCE )
 		{
-			const auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+			const CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
 				texture.resource_.Get(),
 				D3D12_RESOURCE_STATE_COPY_SOURCE,
 				previousState );
@@ -272,10 +272,10 @@ namespace ldx12
 
 		void* mapped = nullptr;
 		const D3D12_RANGE readRange{ layout.Offset, layout.Offset + readbackBufferSize };
-		C_RESULT( readbackBuffer->Map( 0, &readRange, &mapped ), "Failed to map texture readback buffer." );
+		readbackBuffer->Map( 0, &readRange, &mapped );
 
-		const auto* srcBytes = static_cast<const uint8_t*>( mapped );
-		auto* dstBytes = static_cast<uint8_t*>( outData );
+		const uint8_t* srcBytes = static_cast<const uint8_t*>( mapped );
+		uint8_t* dstBytes = static_cast<uint8_t*>( outData );
 		for( UINT row = 0; row < numRows; ++row )
 		{
 			std::memcpy(

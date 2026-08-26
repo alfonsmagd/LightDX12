@@ -79,7 +79,7 @@ namespace ldx12
 				{
 					std::filesystem::path latestRuntimePath;
 					std::array<uint32_t, 4> latestVersion = {};
-					for( const auto& entry : std::filesystem::directory_iterator( runtimeRoot ) )
+					for( const std::filesystem::directory_entry& entry : std::filesystem::directory_iterator( runtimeRoot ) )
 					{
 						if( !entry.is_directory() )
 						{
@@ -342,13 +342,13 @@ namespace ldx12
 
 	void CommandBufferImpl::TransitionTexture( TextureHandle texture, TextureResource& resource, D3D12_RESOURCE_STATES newState )
 	{
-		auto& trackedTexture = GetTrackedTextureState( texture );
+		TrackedTextureState& trackedTexture = GetTrackedTextureState( texture );
 		if( trackedTexture.currentState_ == newState )
 		{
 			return;
 		}
 
-		const auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+		const D3D12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
 			resource.resource_.Get(),
 			trackedTexture.currentState_,
 			newState );
@@ -406,7 +406,7 @@ namespace ldx12
 				continue;
 			}
 
-			const auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+			const D3D12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
 				resource.resource_.Get(),
 				currentState,
 				trackedTexture.initialState_ );
@@ -445,7 +445,7 @@ namespace ldx12
 				continue;
 			}
 
-			auto& colorTexture = manager_->GetTextureResource( framebuffer.color[ index ].texture );
+			TextureResource& colorTexture = manager_->GetTextureResource( framebuffer.color[ index ].texture );
 			if( colorTexture.rtvHandle_.ptr == 0 )
 			{
 				throw std::runtime_error( "Color attachment does not have an RTV." );
@@ -472,7 +472,7 @@ namespace ldx12
 
 		if( framebuffer.depthStencil.texture.Valid() )
 		{
-			auto& depthTexture = manager_->GetTextureResource( framebuffer.depthStencil.texture );
+			TextureResource& depthTexture = manager_->GetTextureResource( framebuffer.depthStencil.texture );
 			if( depthTexture.dsvHandle_.ptr == 0 )
 			{
 				throw std::runtime_error( "Depth attachment does not have a DSV." );
@@ -570,12 +570,12 @@ namespace ldx12
 
 	void CommandBufferImpl::CmdBindVertexBuffer( BufferHandle buffer, uint32_t stride, uint32_t offset, uint32_t slot )
 	{
-		const auto& resource = manager_->GetBufferResource( buffer );
+		const BufferResource& resource = manager_->GetBufferResource( buffer );
 		if( resource.bufferType_ != BufferDesc::BufferType::VertexBuffer )
 		{
 			throw std::runtime_error( "This buffer was not created as a vertex buffer." );
 		}
-		auto view = resource.GetVertexBufferView( stride );
+		D3D12_VERTEX_BUFFER_VIEW view = resource.GetVertexBufferView( stride );
 		if( offset > view.SizeInBytes )
 		{
 			throw std::runtime_error( "Vertex buffer offset exceeds the buffer size." );
@@ -587,12 +587,12 @@ namespace ldx12
 
 	void CommandBufferImpl::CmdBindIndexBuffer( BufferHandle buffer, DXGI_FORMAT format, uint32_t offset )
 	{
-		const auto& resource = manager_->GetBufferResource( buffer );
+		const BufferResource& resource = manager_->GetBufferResource( buffer );
 		if( resource.bufferType_ != BufferDesc::BufferType::IndexBuffer )
 		{
 			throw std::runtime_error( "This buffer was not created as an index buffer." );
 		}
-		auto view = resource.GetIndexBufferView( format );
+		D3D12_INDEX_BUFFER_VIEW view = resource.GetIndexBufferView( format );
 		if( offset > view.SizeInBytes )
 		{
 			throw std::runtime_error( "Index buffer offset exceeds the buffer size." );
@@ -664,7 +664,7 @@ namespace ldx12
 
 	void CommandBufferImpl::CmdDrawIndexedIndirect( BufferHandle indirectBuffer, uint32_t drawCount, uint64_t byteOffset )
 	{
-		const auto& resource = manager_->GetBufferResource( indirectBuffer );
+		const BufferResource& resource = manager_->GetBufferResource( indirectBuffer );
 		wrapper_->commandList_->ExecuteIndirect(
 			manager_->commandSignature_.Get(),
 			drawCount,
