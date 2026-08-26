@@ -172,6 +172,8 @@ if(LDX12_BUILD_APP OR LDX12_BUILD_EXAMPLES)
         "${IMGUI_ROOT}/imstb_truetype.h"
         "${IMGUI_ROOT}/backends/imgui_impl_win32.h"
         "${IMGUI_ROOT}/backends/imgui_impl_win32.cpp"
+        "${IMGUI_ROOT}/backends/imgui_impl_dx12.h"
+        "${IMGUI_ROOT}/backends/imgui_impl_dx12.cpp"
     )
     target_compile_features(DearImGui PUBLIC cxx_std_20)
     target_include_directories(DearImGui PUBLIC "${IMGUI_ROOT}")
@@ -248,8 +250,16 @@ if(LDX12_BUILD_EXAMPLES)
         target_compile_options(ImGuiDemo PRIVATE /W4 /EHsc /permissive- /MP)
     endif()
 
-    set(LDX12_EXAMPLE_TARGETS Triangle ViewportScissor CBSRVCubes CookbookChapter02 ImGuiDemo)
-    set(LDX12_EXAMPLE_SOURCES "${TRIANGLE_SOURCE}" "${VIEWPORT_SCISSOR_SOURCE}" "${CBSRVCUBES_SOURCE}" "${CBSRVCUBES_README}" "${CBSRVCUBES_SHADER}" "${COOKBOOK_CHAPTER02_SOURCE}" "${COOKBOOK_CHAPTER02_README}" "${COOKBOOK_CHAPTER02_SHADER}" "${IMGUI_DEMO_SOURCE}")
+    set(IMGUI_DEMO_NATIVE_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/samples/ImGuiDemoNative/main.cpp")
+    add_executable(ImGuiDemoNative WIN32 "${IMGUI_DEMO_NATIVE_SOURCE}")
+    target_compile_features(ImGuiDemoNative PRIVATE cxx_std_20)
+    target_link_libraries(ImGuiDemoNative PRIVATE DearImGui)
+    if(MSVC)
+        target_compile_options(ImGuiDemoNative PRIVATE /W4 /EHsc /permissive- /MP)
+    endif()
+
+    set(LDX12_EXAMPLE_TARGETS Triangle ViewportScissor CBSRVCubes CookbookChapter02 ImGuiDemo ImGuiDemoNative)
+    set(LDX12_EXAMPLE_SOURCES "${TRIANGLE_SOURCE}" "${VIEWPORT_SCISSOR_SOURCE}" "${CBSRVCUBES_SOURCE}" "${CBSRVCUBES_README}" "${CBSRVCUBES_SHADER}" "${COOKBOOK_CHAPTER02_SOURCE}" "${COOKBOOK_CHAPTER02_README}" "${COOKBOOK_CHAPTER02_SHADER}" "${IMGUI_DEMO_SOURCE}" "${IMGUI_DEMO_NATIVE_SOURCE}")
 
     if(LDX12_BUILD_APP)
         set(IMGUI_NODE_EDITOR_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/samples/ImGuiNodeEditor/main.cpp")
