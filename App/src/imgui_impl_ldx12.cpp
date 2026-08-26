@@ -92,8 +92,6 @@ cbuffer PushConstants : register(b0)
     uint gTextureIndex;
 };
 
-SamplerState gLinearClampSampler : register(s0);
-
 struct PixelInput
 {
     float4 position : SV_Position;
@@ -104,7 +102,8 @@ struct PixelInput
 float4 PSMain(PixelInput input) : SV_Target0
 {
     Texture2D<float4> textureResource = ResourceDescriptorHeap[gTextureIndex];
-    return input.color * textureResource.Sample(gLinearClampSampler, input.uv);
+    SamplerState linearClampSampler = SamplerDescriptorHeap[0];
+    return input.color * textureResource.Sample(linearClampSampler, input.uv);
 }
 )";
 

@@ -58,3 +58,7 @@ Installing `Ldx12` in a native x64 `.vcxproj` automatically provides:
 - the required Direct3D 12 system libraries.
 
 The package reports a clear build error for non-x64 Visual Studio platforms. CMake consumers should continue using the installed CMake package and `find_package(Ldx12 CONFIG REQUIRED)` instead of modifying generated `.vcxproj` files through NuGet.
+
+## Planned CI/CD improvement
+
+- Precompile `Ldx12BaseMipsCS.hlsl` to DXIL during the Ldx12 build and embed the bytecode in the static library. Add a packaged-consumer smoke test proving that internal mip generation initializes without the source shader or a runtime DXC dependency. Runtime DXC remains available for shaders supplied by the user.

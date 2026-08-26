@@ -22,6 +22,34 @@ namespace ldx12::tests
 		Require( native.GetDevice() != nullptr, "D3D12 device creation failed." );
 		Require( native.GetCommandQueue() != nullptr, "D3D12 command queue creation failed." );
 
+		SamplerDesc samplerDesc{};
+		std::array<SamplerHandle, ourCustomSamplerCount> samplers{};
+		for( uint32_t index = 0; index < ourCustomSamplerCount; ++index )
+		{
+			samplers[ index ] = device.CreateSampler( samplerDesc );
+			Require( device.GetSamplerIndex( samplers[ index ] ) ==
+				LDX12_CUSTOM_SAMPLER_SLOT_FIRST + index,
+				"Custom sampler was not created in its reserved descriptor slot." );
+		}
+
+		bool samplerLimitReached = false;
+		try
+		{
+			device.CreateSampler( samplerDesc );
+		}
+		catch( const std::length_error& )
+		{
+			samplerLimitReached = true;
+		}
+		Require( samplerLimitReached, "More than four runtime custom samplers were created." );
+
+		const uint32_t recycledSamplerIndex = device.GetSamplerIndex( samplers[ 1 ] );
+		device.Destroy( samplers[ 1 ] );
+		Require( !device.IsAlive( samplers[ 1 ] ), "Destroyed sampler handle remained alive." );
+		samplers[ 1 ] = device.CreateSampler( samplerDesc );
+		Require( device.GetSamplerIndex( samplers[ 1 ] ) == recycledSamplerIndex,
+			"Destroyed custom sampler slot was not recycled." );
+
 		BufferDesc genericBufferDesc{};
 		genericBufferDesc.debugName = "Ldx12Tests generic buffer";
 		genericBufferDesc.size = 64;
@@ -138,6 +166,10 @@ namespace ldx12::tests
 			"Destroyed fixed descriptor slot could not be reused." );
 		device.Destroy( reusedConstantBuffer );
 		device.Destroy( genericBuffer );
+		for( SamplerHandle sampler : samplers )
+		{
+			device.Destroy( sampler );
+		}
 		device.WaitIdle();
 	}
 }

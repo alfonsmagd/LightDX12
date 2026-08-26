@@ -8,8 +8,6 @@ cbuffer PushConstants : register(b0)
     uint gWriteSrgb;
 };
 
-SamplerState gLinearClampSampler : register(s0);
-
 float SrgbEncode(float value)
 {
     value = saturate(value);
@@ -30,7 +28,8 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
     const float2 destinationSize = float2((float)gDestinationWidth, (float)gDestinationHeight);
     const float2 uv = ((float2)dispatchThreadID.xy + 0.5) / destinationSize;
 
-    float4 color = sourceTexture.SampleLevel(gLinearClampSampler, uv, (float)gSourceMipLevel);
+    SamplerState linearClampSampler = SamplerDescriptorHeap[0];
+    float4 color = sourceTexture.SampleLevel(linearClampSampler, uv, (float)gSourceMipLevel);
     if (gWriteSrgb != 0u)
     {
         color.rgb = float3(

@@ -7,7 +7,9 @@
 #include "Ldx12Swapchain.hpp"
 
 #include <algorithm>
+#include <cstdio>
 #include <cstdlib>
+#include <cwchar>
 #include <filesystem>
 #include <mutex>
 
@@ -18,6 +20,48 @@ namespace ldx12
 		std::mutex gDeviceManagerSingletonMutex;
 		std::unique_ptr<DeviceManager> gDeviceManagerSingleton;
 		uint32_t gDeviceManagerSingletonReferenceCount = 0;
+		constexpr D3D_SHADER_MODEL ourRequiredShaderModel = D3D_SHADER_MODEL_6_6;
+		constexpr D3D12_RESOURCE_BINDING_TIER ourRequiredResourceBindingTier = D3D12_RESOURCE_BINDING_TIER_3;
+
+		std::string ToUtf8( const wchar_t* text )
+		{
+			const int wideLength = static_cast<int>( std::wcslen( text ) );
+			const int utf8Length = WideCharToMultiByte( CP_UTF8, 0, text, wideLength, nullptr, 0, nullptr, nullptr );
+			if( utf8Length <= 0 )
+			{
+				return "Unknown adapter";
+			}
+
+			std::string utf8Text( static_cast<size_t>( utf8Length ), '\0' );
+			WideCharToMultiByte( CP_UTF8, 0, text, wideLength, utf8Text.data(), utf8Length, nullptr, nullptr );
+			return utf8Text;
+		}
+
+		std::string HResultText( HRESULT result )
+		{
+			char text[ 11 ] = {};
+			std::snprintf( text, sizeof( text ), "0x%08lX", static_cast<unsigned long>( result ) );
+			return text;
+		}
+
+		std::string FeatureLevelText( D3D_FEATURE_LEVEL featureLevel )
+		{
+			switch( featureLevel )
+			{
+			case D3D_FEATURE_LEVEL_12_2: return "12.2";
+			case D3D_FEATURE_LEVEL_12_1: return "12.1";
+			case D3D_FEATURE_LEVEL_12_0: return "12.0";
+			case D3D_FEATURE_LEVEL_11_1: return "11.1";
+			case D3D_FEATURE_LEVEL_11_0: return "11.0";
+			default: return "unknown";
+			}
+		}
+
+		std::string ShaderModelText( D3D_SHADER_MODEL shaderModel )
+		{
+			const uint32_t value = static_cast<uint32_t>( shaderModel );
+			return std::to_string( value >> 4u ) + "." + std::to_string( value & 0x0fu );
+		}
 
 		bool ContextDescsAreCompatible( const ContextDesc& existingDesc, const ContextDesc& requestedDesc ) noexcept
 		{
@@ -216,6 +260,11 @@ namespace ldx12
 
 		InitializeFactory();
 		InitializeDevice();
+		std::string capabilityFailure;
+		if( !CheckCapabilities( capabilityFailure ) )
+		{
+			throw std::runtime_error( capabilityFailure );
+		}
 		InitializeCommandQueues();
 		InitializeDescriptorHeaps();
 		InitializeRootSignature();
@@ -245,7 +294,7 @@ namespace ldx12
 	{
 		auto tryAdapter = [ this ]( IDXGIAdapter1* candidate )->bool
 			{
-				return SUCCEEDED( D3D12CreateDevice( candidate, desc_.minimumFeatureLevel, IID_PPV_ARGS( device_.GetAddressOf() ) ) );
+				return SUCCEEDED( D3D12CreateDevice( candidate, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS( device_.GetAddressOf() ) ) );
 			};
 
 		if( desc_.preferHighPerformanceAdapter )
@@ -300,17 +349,118 @@ namespace ldx12
 
 		if( device_ == nullptr )
 		{
-			ComPtr<IDXGIAdapter> warpAdapter;
+			ComPtr<IDXGIAdapter1> warpAdapter;
 			C_RESULT( factory_->EnumWarpAdapter( IID_PPV_ARGS( warpAdapter.GetAddressOf() ) ), "Failed to enumerate WARP adapter." );
 			C_RESULT( D3D12CreateDevice( warpAdapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS( device_.GetAddressOf() ) ), "Failed to create D3D12 device." );
+			adapter_ = warpAdapter;
+		}
+	}
+
+	bool DeviceManager::CheckCapabilities( std::string& failureReason )
+	{
+		DXGI_ADAPTER_DESC1 adapterDesc{};
+		const HRESULT adapterResult = adapter_->GetDesc1( &adapterDesc );
+		if( FAILED( adapterResult ) )
+		{
+			failureReason = "Ldx12 failed to read the selected adapter properties (HRESULT " + HResultText( adapterResult ) + ").";
+			return false;
+		}
+
+		deviceProperties_.adapterName = ToUtf8( adapterDesc.Description );
+		deviceProperties_.dedicatedVideoMemoryBytes = static_cast<uint64_t>( adapterDesc.DedicatedVideoMemory );
+		deviceProperties_.dedicatedSystemMemoryBytes = static_cast<uint64_t>( adapterDesc.DedicatedSystemMemory );
+		deviceProperties_.sharedSystemMemoryBytes = static_cast<uint64_t>( adapterDesc.SharedSystemMemory );
+		const std::string adapterPrefix = "Ldx12 cannot initialize adapter \"" + deviceProperties_.adapterName + "\": ";
+
+		const D3D_FEATURE_LEVEL featureLevels[] = {
+			D3D_FEATURE_LEVEL_12_2,
+			D3D_FEATURE_LEVEL_12_1,
+			D3D_FEATURE_LEVEL_12_0,
+			D3D_FEATURE_LEVEL_11_1,
+			D3D_FEATURE_LEVEL_11_0
+		};
+		D3D12_FEATURE_DATA_FEATURE_LEVELS featureLevelData{};
+		featureLevelData.NumFeatureLevels = static_cast<UINT>( std::size( featureLevels ) );
+		featureLevelData.pFeatureLevelsRequested = featureLevels;
+		const HRESULT featureLevelResult = device_->CheckFeatureSupport(
+			D3D12_FEATURE_FEATURE_LEVELS,
+			&featureLevelData,
+			sizeof( featureLevelData ) );
+		if( FAILED( featureLevelResult ) )
+		{
+			failureReason = adapterPrefix + "the feature-level query failed (HRESULT " + HResultText( featureLevelResult ) + ").";
+			return false;
+		}
+
+		deviceProperties_.featureLevel = featureLevelData.MaxSupportedFeatureLevel;
+		if( deviceProperties_.featureLevel < desc_.minimumFeatureLevel )
+		{
+			failureReason = adapterPrefix + "feature level " + FeatureLevelText( desc_.minimumFeatureLevel ) +
+				" is required, but the adapter supports " + FeatureLevelText( deviceProperties_.featureLevel ) + ".";
+			return false;
+		}
+
+		const D3D_SHADER_MODEL shaderModels[] = {
+			D3D_SHADER_MODEL_6_6,
+			D3D_SHADER_MODEL_6_5,
+			D3D_SHADER_MODEL_6_4,
+			D3D_SHADER_MODEL_6_3,
+			D3D_SHADER_MODEL_6_2,
+			D3D_SHADER_MODEL_6_1,
+			D3D_SHADER_MODEL_6_0,
+			D3D_SHADER_MODEL_5_1
+		};
+		HRESULT shaderModelResult = E_INVALIDARG;
+		for( D3D_SHADER_MODEL shaderModel : shaderModels )
+		{
+			D3D12_FEATURE_DATA_SHADER_MODEL shaderModelData{};
+			shaderModelData.HighestShaderModel = shaderModel;
+			shaderModelResult = device_->CheckFeatureSupport(
+				D3D12_FEATURE_SHADER_MODEL,
+				&shaderModelData,
+				sizeof( shaderModelData ) );
+			if( SUCCEEDED( shaderModelResult ) )
+			{
+				deviceProperties_.shaderModel = shaderModelData.HighestShaderModel;
+				break;
+			}
+		}
+
+		if( FAILED( shaderModelResult ) )
+		{
+			failureReason = adapterPrefix + "the Shader Model query failed (HRESULT " + HResultText( shaderModelResult ) + ").";
+			return false;
+		}
+		if( deviceProperties_.shaderModel < ourRequiredShaderModel )
+		{
+			failureReason = adapterPrefix + "Shader Model " + ShaderModelText( ourRequiredShaderModel ) +
+				" is required, but the adapter supports " + ShaderModelText( deviceProperties_.shaderModel ) + ".";
+			return false;
 		}
 
 		D3D12_FEATURE_DATA_D3D12_OPTIONS options{};
-		if( SUCCEEDED( device_->CheckFeatureSupport( D3D12_FEATURE_D3D12_OPTIONS, &options, sizeof( options ) ) ) )
+		const HRESULT optionsResult = device_->CheckFeatureSupport(
+			D3D12_FEATURE_D3D12_OPTIONS,
+			&options,
+			sizeof( options ) );
+		if( FAILED( optionsResult ) )
 		{
-			bindlessSupported_ = options.ResourceBindingTier >= D3D12_RESOURCE_BINDING_TIER_2;
+			failureReason = adapterPrefix + "the Resource Binding Tier query failed (HRESULT " + HResultText( optionsResult ) + ").";
+			return false;
 		}
 
+		deviceProperties_.resourceBindingTier = options.ResourceBindingTier;
+		if( deviceProperties_.resourceBindingTier < ourRequiredResourceBindingTier )
+		{
+			failureReason = adapterPrefix + "Resource Binding Tier " +
+				std::to_string( static_cast<uint32_t>( ourRequiredResourceBindingTier ) ) +
+				" is required, but the adapter supports Tier " +
+				std::to_string( static_cast<uint32_t>( deviceProperties_.resourceBindingTier ) ) + ".";
+			return false;
+		}
+
+		failureReason.clear();
+		return true;
 	}
 
 	void DeviceManager::InitializeCommandQueues()
@@ -366,6 +516,12 @@ namespace ldx12
 		bindlessDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 		C_RESULT( device_->CreateDescriptorHeap( &bindlessDesc, IID_PPV_ARGS( bindlessHeap_.GetAddressOf() ) ), "Failed to create bindless heap." );
 
+		D3D12_DESCRIPTOR_HEAP_DESC samplerHeapDesc{};
+		samplerHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER;
+		samplerHeapDesc.NumDescriptors = ourMaxSamplers;
+		samplerHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+		C_RESULT( device_->CreateDescriptorHeap( &samplerHeapDesc, IID_PPV_ARGS( samplerHeap_.GetAddressOf() ) ), "Failed to create sampler heap." );
+
 		D3D12_DESCRIPTOR_HEAP_DESC rtvDesc{};
 		rtvDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
 		rtvDesc.NumDescriptors = desc_.rtvCapacity;
@@ -377,8 +533,28 @@ namespace ldx12
 		C_RESULT( device_->CreateDescriptorHeap( &dsvDesc, IID_PPV_ARGS( dsvHeap_.GetAddressOf() ) ), "Failed to create DSV heap." );
 
 		bindlessDescriptorSize_ = device_->GetDescriptorHandleIncrementSize( D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV );
+		samplerDescriptorSize_ = device_->GetDescriptorHandleIncrementSize( D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER );
 		rtvDescriptorSize_ = device_->GetDescriptorHandleIncrementSize( D3D12_DESCRIPTOR_HEAP_TYPE_RTV );
 		dsvDescriptorSize_ = device_->GetDescriptorHandleIncrementSize( D3D12_DESCRIPTOR_HEAP_TYPE_DSV );
+
+		std::array<SamplerDesc, ourBuiltInSamplerCount> samplerDescs{};
+		samplerDescs[ ToSamplerIndex( SamplerSlot::LinearWrap ) ].addressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+		samplerDescs[ ToSamplerIndex( SamplerSlot::LinearWrap ) ].addressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+		samplerDescs[ ToSamplerIndex( SamplerSlot::LinearWrap ) ].addressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+		samplerDescs[ ToSamplerIndex( SamplerSlot::PointClamp ) ].filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
+
+		SamplerDesc& shadowSampler = samplerDescs[ ToSamplerIndex( SamplerSlot::ShadowComparison ) ];
+		shadowSampler.filter = D3D12_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT;
+		shadowSampler.addressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+		shadowSampler.addressV = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+		shadowSampler.addressW = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+		shadowSampler.comparisonFunction = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+		shadowSampler.borderColor = { 1.0f, 1.0f, 1.0f, 1.0f };
+
+		for( uint32_t index = 0; index < ourBuiltInSamplerCount; ++index )
+		{
+			WriteSamplerDescriptor( index, samplerDescs[ index ] );
+		}
 
 		freeBindlessRangeCount_ = 0;
 		const uint32_t dynamicDescriptorCount =
@@ -416,30 +592,14 @@ namespace ldx12
 		parameters[ 1 ].Constants.ShaderRegister = 1;
 		parameters[ 1 ].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
-		D3D12_STATIC_SAMPLER_DESC sampler{};
-		sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
-		// Clamp is a safe engine-wide default for the shared root signature.
-		// UI atlases and preview images can show wrapped glyph bleed if the shared sampler uses WRAP.
-		sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-		sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-		sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-		sampler.MinLOD = 0.0f;
-		sampler.MaxLOD = D3D12_FLOAT32_MAX;
-		sampler.MipLODBias = 0.0f;
-		sampler.ShaderRegister = 0;
-		sampler.RegisterSpace = 0;
-		sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-		sampler.ComparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS;
-
 		D3D12_VERSIONED_ROOT_SIGNATURE_DESC rootDesc{};
 		rootDesc.Version = D3D_ROOT_SIGNATURE_VERSION_1_1;
 		rootDesc.Desc_1_1.NumParameters = 2;
 		rootDesc.Desc_1_1.pParameters = parameters;
-		rootDesc.Desc_1_1.NumStaticSamplers = 1;
-		rootDesc.Desc_1_1.pStaticSamplers = &sampler;
 		rootDesc.Desc_1_1.Flags =
 			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
-			D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED;
+			D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED |
+			D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED;
 
 		ComPtr<ID3DBlob> serialized;
 		ComPtr<ID3DBlob> errors;
@@ -601,6 +761,26 @@ namespace ldx12
 				EraseFreeBindlessRange( insertIndex + 1u );
 			}
 		}
+	}
+
+	void DeviceManager::WriteSamplerDescriptor( uint32_t index, const SamplerDesc& desc )
+	{
+		assert( index < ourMaxSamplers );
+		D3D12_SAMPLER_DESC nativeDesc{};
+		nativeDesc.Filter = desc.filter;
+		nativeDesc.AddressU = desc.addressU;
+		nativeDesc.AddressV = desc.addressV;
+		nativeDesc.AddressW = desc.addressW;
+		nativeDesc.MipLODBias = desc.mipLodBias;
+		nativeDesc.MaxAnisotropy = desc.maxAnisotropy;
+		nativeDesc.ComparisonFunc = desc.comparisonFunction;
+		std::copy( desc.borderColor.begin(), desc.borderColor.end(), nativeDesc.BorderColor );
+		nativeDesc.MinLOD = desc.minLod;
+		nativeDesc.MaxLOD = desc.maxLod;
+
+		D3D12_CPU_DESCRIPTOR_HANDLE handle = samplerHeap_->GetCPUDescriptorHandleForHeapStart();
+		handle.ptr += static_cast<SIZE_T>( index ) * samplerDescriptorSize_;
+		device_->CreateSampler( &nativeDesc, handle );
 	}
 
 	void DeviceManager::EraseFreeBindlessRange( uint32_t rangeIndex ) noexcept
@@ -794,12 +974,14 @@ namespace ldx12
 
 		slotMapTextures_.Clear();
 		slotMapBuffers_.Clear();
+		slotMapSamplers_.Clear();
 		graphicsQueue_.deferredReleases_.clear();
 
 		commandSignature_.Reset();
 		rootSignature_.Reset();
 		dsvHeap_.Reset();
 		rtvHeap_.Reset();
+		samplerHeap_.Reset();
 		bindlessHeap_.Reset();
 		auto releaseQueueContext = []( QueueContext& context )
 		{
@@ -1020,6 +1202,11 @@ namespace ldx12
 	const RenderDevice* DeviceManager::GetRenderDevice() const noexcept
 	{
 		return &renderDevice_;
+	}
+
+	const DeviceProperties& DeviceManager::GetDeviceProperties() const noexcept
+	{
+		return deviceProperties_;
 	}
 
 	SwapchainHandle DeviceManager::RequirePrimarySwapchain() const

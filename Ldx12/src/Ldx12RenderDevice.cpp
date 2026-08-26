@@ -861,6 +861,29 @@ namespace ldx12
 		return handle;
 	}
 
+	SamplerHandle RenderDevice::CreateSampler( const SamplerDesc& desc )
+	{
+		if( desc.maxAnisotropy == 0 || desc.maxAnisotropy > 16 )
+		{
+			throw std::invalid_argument( "Sampler maxAnisotropy must be between 1 and 16." );
+		}
+		if( desc.minLod > desc.maxLod )
+		{
+			throw std::invalid_argument( "Sampler minLod cannot be greater than maxLod." );
+		}
+		if( manager_->slotMapSamplers_.NumObjects() == ourCustomSamplerCount )
+		{
+			throw std::length_error( "All four custom sampler slots are already in use." );
+		}
+
+		const SamplerHandle handle = manager_->slotMapSamplers_.Create( SamplerResource{} );
+		SamplerResource* resource = manager_->slotMapSamplers_.Get( handle );
+		assert( resource != nullptr );
+		resource->descriptorIndex_ = LDX12_CUSTOM_SAMPLER_SLOT_FIRST + handle.Index();
+		manager_->WriteSamplerDescriptor( resource->descriptorIndex_, desc );
+		return handle;
+	}
+
 	void RenderDevice::DownloadTexture2D( TextureHandle texture, void* outData,
 										  uint32_t rowPitch, uint32_t slicePitch )
 	{
@@ -916,9 +939,19 @@ namespace ldx12
 		return ToPublicDescriptorIndex( manager_->GetTextureResource( texture ).uavIndex_ );
 	}
 
+	uint32_t RenderDevice::GetSamplerIndex( SamplerHandle sampler ) const
+	{
+		const SamplerResource* resource = manager_->slotMapSamplers_.Get( sampler );
+		if( resource == nullptr )
+		{
+			throw std::runtime_error( "Invalid sampler handle." );
+		}
+		return resource->descriptorIndex_;
+	}
+
 	bool RenderDevice::BindlessSupported() const noexcept
 	{
-		return manager_->bindlessSupported_;
+		return manager_->deviceProperties_.resourceBindingTier >= D3D12_RESOURCE_BINDING_TIER_3;
 	}
 
 	bool RenderDevice::IsAlive( BufferHandle buffer ) const noexcept
@@ -929,6 +962,11 @@ namespace ldx12
 	bool RenderDevice::IsAlive( TextureHandle texture ) const noexcept
 	{
 		return manager_ != nullptr && manager_->slotMapTextures_.Contains( texture );
+	}
+
+	bool RenderDevice::IsAlive( SamplerHandle sampler ) const noexcept
+	{
+		return manager_ != nullptr && manager_->slotMapSamplers_.Contains( sampler );
 	}
 
 	void RenderDevice::WaitIdle() { manager_->WaitIdle(); }
@@ -1039,5 +1077,18 @@ namespace ldx12
 		}
 
 		return true;
+	}
+
+	bool RenderDevice::Destroy( SamplerHandle sampler )
+	{
+		if( !manager_->slotMapSamplers_.Contains( sampler ) )
+		{
+			ReportInvalidDestroy( "SamplerHandle", sampler.Index(), sampler.Gen() );
+			return false;
+		}
+
+		// The next CreateSampler() may overwrite this descriptor slot.
+		manager_->WaitIdle();
+		return manager_->slotMapSamplers_.Destroy( sampler );
 	}
 } // namespace ldx12

@@ -295,8 +295,11 @@ namespace ldx12
 		debugGroupDepth_ = 0;
 		trackedTextureCount_ = 0;
 
-		ID3D12DescriptorHeap* heaps[] = { manager_->bindlessHeap_.Get() };
-		wrapper_->commandList_->SetDescriptorHeaps( 1, heaps );
+		ID3D12DescriptorHeap* heaps[] = {
+			manager_->bindlessHeap_.Get(),
+			manager_->samplerHeap_.Get()
+		};
+		wrapper_->commandList_->SetDescriptorHeaps( static_cast<UINT>( std::size( heaps ) ), heaps );
 
 		ID3D12RootSignature* rootSignature = manager_->rootSignature_.Get();
 		wrapper_->commandList_->SetGraphicsRootSignature( rootSignature );

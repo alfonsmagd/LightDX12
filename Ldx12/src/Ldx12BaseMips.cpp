@@ -57,8 +57,11 @@ namespace ldx12
 		CommandListWrapper& wrapper = queue.immediateCommands_->Acquire();
 		ID3D12GraphicsCommandList4* commandList = wrapper.commandList_.Get();
 
-		ID3D12DescriptorHeap* descriptorHeaps[] = { manager_.bindlessHeap_.Get() };
-		commandList->SetDescriptorHeaps( 1, descriptorHeaps );
+		ID3D12DescriptorHeap* descriptorHeaps[] = {
+			manager_.bindlessHeap_.Get(),
+			manager_.samplerHeap_.Get()
+		};
+		commandList->SetDescriptorHeaps( static_cast<UINT>( std::size( descriptorHeaps ) ), descriptorHeaps );
 		commandList->SetComputeRootSignature( manager_.rootSignature_.Get() );
 		commandList->SetPipelineState( pipelineState_.Get() );
 

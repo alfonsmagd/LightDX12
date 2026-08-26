@@ -30,6 +30,15 @@
 #define LDX12_BINDLESS_FIXED_SLOT_LAST LDX12_RW_SLOT_LAST
 #define LDX12_BINDLESS_DYNAMIC_SLOT_FIRST ( LDX12_BINDLESS_FIXED_SLOT_LAST + 1u )
 
+#define LDX12_SAMPLER_SLOT_LINEAR_CLAMP 0u
+#define LDX12_SAMPLER_SLOT_LINEAR_WRAP 1u
+#define LDX12_SAMPLER_SLOT_POINT_CLAMP 2u
+#define LDX12_SAMPLER_SLOT_SHADOW_COMPARISON 3u
+#define LDX12_BUILT_IN_SAMPLER_COUNT 4u
+#define LDX12_CUSTOM_SAMPLER_SLOT_FIRST LDX12_BUILT_IN_SAMPLER_COUNT
+#define LDX12_CUSTOM_SAMPLER_COUNT 4u
+#define LDX12_SAMPLER_COUNT 8u
+
 namespace ldx12
 {
 	enum class ConstantBufferSlot : uint32_t
@@ -76,6 +85,14 @@ namespace ldx12
 
 		EngineScratch0 = LDX12_ENGINE_RW_SLOT_FIRST,
 		EngineScratch1,
+	};
+
+	enum class SamplerSlot : uint32_t
+	{
+		LinearClamp = LDX12_SAMPLER_SLOT_LINEAR_CLAMP,
+		LinearWrap = LDX12_SAMPLER_SLOT_LINEAR_WRAP,
+		PointClamp = LDX12_SAMPLER_SLOT_POINT_CLAMP,
+		ShadowComparison = LDX12_SAMPLER_SLOT_SHADOW_COMPARISON,
 	};
 
 	template<typename SlotType>
@@ -145,5 +162,10 @@ namespace ldx12
 	[[nodiscard]] constexpr bool IsValidReadWriteResourceSlot( ReadWriteResourceSlot slot ) noexcept
 	{
 		return IsFreeReadWriteResourceSlot( slot ) || IsEngineReadWriteResourceSlot( slot );
+	}
+
+	[[nodiscard]] constexpr uint32_t ToSamplerIndex( SamplerSlot slot ) noexcept
+	{
+		return static_cast<uint32_t>( slot );
 	}
 }

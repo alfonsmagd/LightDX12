@@ -39,8 +39,12 @@ namespace ldx12
 	static constexpr uint32_t ourMaxImmediateCommandBuffers = ourMaxActiveCommandBuffers + ourMaxCommandBufferBatch;
 	static constexpr uint32_t ourMaxTrackedTexturesPerCommandBuffer = 256;
 	static constexpr uint32_t ourMaxPushConstant32BitValues = 63;
+	static constexpr uint32_t ourBuiltInSamplerCount = LDX12_BUILT_IN_SAMPLER_COUNT;
+	static constexpr uint32_t ourCustomSamplerCount = LDX12_CUSTOM_SAMPLER_COUNT;
+	static constexpr uint32_t ourMaxSamplers = LDX12_SAMPLER_COUNT;
 
 	struct BufferResource;
+	struct SamplerResource;
 	struct TextureResource;
 	struct SwapchainResource;
 	class BaseMips;
@@ -78,6 +82,7 @@ namespace ldx12
 
 	using TextureHandle = Handle<TextureResource>;
 	using BufferHandle = Handle<BufferResource>;
+	using SamplerHandle = Handle<SamplerResource>;
 	using SwapchainHandle = Handle<SwapchainResource>;
 
 	inline std::string BuildScopedCommandLabel( const char* functionSignature )
@@ -318,6 +323,32 @@ namespace ldx12
 		bool showGpuCaptureHud = false;
 	};
 
+	struct DeviceProperties
+	{
+		std::string adapterName;
+		uint64_t dedicatedVideoMemoryBytes = 0;
+		uint64_t dedicatedSystemMemoryBytes = 0;
+		uint64_t sharedSystemMemoryBytes = 0;
+		D3D_FEATURE_LEVEL featureLevel = D3D_FEATURE_LEVEL_11_0;
+		D3D_SHADER_MODEL shaderModel = D3D_SHADER_MODEL_5_1;
+		D3D12_RESOURCE_BINDING_TIER resourceBindingTier = D3D12_RESOURCE_BINDING_TIER_1;
+	};
+
+	struct SamplerDesc
+	{
+		D3D12_FILTER filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+		D3D12_TEXTURE_ADDRESS_MODE addressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+		D3D12_TEXTURE_ADDRESS_MODE addressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+		D3D12_TEXTURE_ADDRESS_MODE addressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+		float mipLodBias = 0.0f;
+		uint32_t maxAnisotropy = 1;
+		D3D12_COMPARISON_FUNC comparisonFunction = D3D12_COMPARISON_FUNC_ALWAYS;
+		std::array<float, 4> borderColor = { 0.0f, 0.0f, 0.0f, 0.0f };
+		float minLod = 0.0f;
+		float maxLod = D3D12_FLOAT32_MAX;
+
+	};
+
 	struct ContextDesc
 	{
 		bool enableDebugLayer = true;
@@ -338,6 +369,11 @@ namespace ldx12
 		uint32_t width = 1;
 		uint32_t height = 1;
 		bool vsync = true;
+	};
+
+	struct SamplerResource final
+	{
+		uint32_t descriptorIndex_ = UINT32_MAX;
 	};
 
 	struct BufferResource final
@@ -577,6 +613,7 @@ namespace ldx12
 		BufferHandle CreateBuffer( const BufferDesc& desc, ShaderResourceSlot slot );
 		void WriteBuffer( BufferHandle buffer, uint64_t offset, const void* data, uint64_t size );
 		TextureHandle CreateTexture( const TextureDesc& desc );
+		SamplerHandle CreateSampler( const SamplerDesc& desc );
 		void DownloadTexture2D( TextureHandle texture, void* outData, uint32_t rowPitch, uint32_t slicePitch );
 		ConstantBufferSlot GetAvailableConstantBuffer();
 		ShaderResourceSlot GetAvailableShaderResource();
@@ -585,13 +622,16 @@ namespace ldx12
 		uint32_t GetBindlessIndex( BufferHandle buffer ) const;
 		uint32_t GetBindlessIndex( TextureHandle texture ) const;
 		uint32_t GetUnorderedAccessIndex( TextureHandle texture ) const;
+		uint32_t GetSamplerIndex( SamplerHandle sampler ) const;
 		[[nodiscard]] D3D12Native GetNative() noexcept;
 		bool BindlessSupported() const noexcept;
 		bool IsAlive( BufferHandle buffer ) const noexcept;
 		bool IsAlive( TextureHandle texture ) const noexcept;
+		bool IsAlive( SamplerHandle sampler ) const noexcept;
 		void WaitIdle();
 		bool Destroy( BufferHandle buffer );
 		bool Destroy( TextureHandle texture );
+		bool Destroy( SamplerHandle sampler );
 
 	private:
 		friend class DeviceManager;
@@ -621,6 +661,7 @@ namespace ldx12
 		void DestroySwapchain( SwapchainHandle swapchain );
 		RenderDevice* GetRenderDevice() noexcept;
 		const RenderDevice* GetRenderDevice() const noexcept;
+		const DeviceProperties& GetDeviceProperties() const noexcept;
 
 		void Resize( uint32_t width, uint32_t height );
 		void Resize( SwapchainHandle swapchain, uint32_t width, uint32_t height );
@@ -678,9 +719,11 @@ namespace ldx12
 		void Initialize();
 		void InitializeFactory();
 		void InitializeDevice();
+		bool CheckCapabilities( std::string& failureReason );
 		void InitializeCommandQueues();
 		void InitializeQueueContext( QueueContext& context, D3D12_COMMAND_LIST_TYPE type );
 		void InitializeDescriptorHeaps();
+		void WriteSamplerDescriptor( uint32_t index, const SamplerDesc& desc );
 		void InitializeRootSignature();
 		void InitializeCommandSignature();
 		QueueContext& GetGraphicsQueueContext() noexcept;
@@ -730,14 +773,17 @@ namespace ldx12
 		friend SubmitHandle SubmitCommandBufferBatch( DeviceManager& manager, ICommandBuffer* const* commandBuffers, uint32_t commandBufferCount, TextureHandle presentTexture );
 
 		ContextDesc desc_;
+		DeviceProperties deviceProperties_;
 		ComPtr<IDXGIFactory6> factory_;
 		ComPtr<IDXGIAdapter1> adapter_;
 		ComPtr<ID3D12Device> device_;
 		QueueContext graphicsQueue_;
 		ComPtr<ID3D12DescriptorHeap> bindlessHeap_;
+		ComPtr<ID3D12DescriptorHeap> samplerHeap_;
 		ComPtr<ID3D12DescriptorHeap> rtvHeap_;
 		ComPtr<ID3D12DescriptorHeap> dsvHeap_;
 		uint32_t bindlessDescriptorSize_ = 0;
+		uint32_t samplerDescriptorSize_ = 0;
 		uint32_t rtvDescriptorSize_ = 0;
 		uint32_t dsvDescriptorSize_ = 0;
 		std::array<DescriptorRange, ourMaxBindlessDescriptors> freeBindlessRanges_ = {};
@@ -752,10 +798,10 @@ namespace ldx12
 		SlotMap<SwapchainResource, ourMaxSwapchains> slotMapSwapchains_;
 		SlotMap<BufferResource, ourMaxBuffers> slotMapBuffers_;
 		SlotMap<TextureResource, ourMaxTextures> slotMapTextures_;
+		SlotMap<SamplerResource, ourCustomSamplerCount> slotMapSamplers_;
 		std::unique_ptr<StagingDevice> stagingDevice_;
 		std::unique_ptr<BaseMips> baseMips_;
 		BindingSlotMasks allocatedFreeBindingSlots_;
-		bool bindlessSupported_ = false;
 		SwapchainHandle primarySwapchain_ = {};
 		RenderDevice renderDevice_;
 	};
