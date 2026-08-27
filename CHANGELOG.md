@@ -18,6 +18,8 @@ This file lists the main user-visible changes in each Ldx12 version.
 
 ### Changed
 
+- Buffer creation now uses a compact typed `BufferDesc` with simple `BufferType` and `BufferMemory` enums instead of exposing raw D3D12 heap, flag and view options.
+- Buffer creation was reorganized into validation, resource creation and descriptor creation steps, with automatic resource states and initial-data handling.
 - Command buffers now reuse a fixed internal pool instead of allocating their implementation dynamically.
 - Descriptor heaps and graphics/compute root signatures are bound once when command recording begins.
 - The CBV + SRV cubes sample was simplified to make its resource layout and rendering flow easier to follow.
