@@ -574,7 +574,7 @@ namespace ldx12
 	void CommandBufferImpl::CmdBindVertexBuffer( BufferHandle buffer, uint32_t stride, uint32_t offset, uint32_t slot )
 	{
 		const BufferResource& resource = manager_->GetBufferResource( buffer );
-		if( resource.bufferType_ != BufferDesc::BufferType::VertexBuffer )
+		if( resource.type_ != BufferType::Vertex )
 		{
 			throw std::runtime_error( "This buffer was not created as a vertex buffer." );
 		}
@@ -591,7 +591,7 @@ namespace ldx12
 	void CommandBufferImpl::CmdBindIndexBuffer( BufferHandle buffer, DXGI_FORMAT format, uint32_t offset )
 	{
 		const BufferResource& resource = manager_->GetBufferResource( buffer );
-		if( resource.bufferType_ != BufferDesc::BufferType::IndexBuffer )
+		if( resource.type_ != BufferType::Index )
 		{
 			throw std::runtime_error( "This buffer was not created as an index buffer." );
 		}
@@ -668,6 +668,17 @@ namespace ldx12
 	void CommandBufferImpl::CmdDrawIndexedIndirect( BufferHandle indirectBuffer, uint32_t drawCount, uint64_t byteOffset )
 	{
 		const BufferResource& resource = manager_->GetBufferResource( indirectBuffer );
+		if( resource.type_ != BufferType::Indirect )
+		{
+			throw std::runtime_error( "This buffer was not created as an indirect buffer." );
+		}
+		constexpr uint64_t indirectCommandSize = sizeof( uint32_t ) + sizeof( D3D12_DRAW_INDEXED_ARGUMENTS );
+		if( byteOffset % sizeof( uint32_t ) != 0 ||
+			byteOffset > resource.bufferSize_ ||
+			drawCount > (resource.bufferSize_ - byteOffset) / indirectCommandSize )
+		{
+			throw std::runtime_error( "Indirect draw range exceeds the buffer." );
+		}
 		wrapper_->commandList_->ExecuteIndirect(
 			manager_->commandSignature_.Get(),
 			drawCount,

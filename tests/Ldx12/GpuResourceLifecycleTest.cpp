@@ -50,14 +50,22 @@ namespace ldx12::tests
 		Require( device.GetSamplerIndex( samplers[ 1 ] ) == recycledSamplerIndex,
 			"Destroyed custom sampler slot was not recycled." );
 
+		const std::array<uint32_t, 16> initialBufferData = {};
 		BufferDesc genericBufferDesc{};
 		genericBufferDesc.debugName = "Ldx12Tests generic buffer";
 		genericBufferDesc.size = 64;
-		genericBufferDesc.heapType = D3D12_HEAP_TYPE_UPLOAD;
+		genericBufferDesc.memory = BufferMemory::CpuToGpu;
+		genericBufferDesc.initialData = initialBufferData.data();
 		const BufferHandle genericBuffer = device.CreateBuffer( genericBufferDesc );
 		Require( genericBuffer.Valid(), "Generic buffer creation returned an invalid handle." );
-		Require( native.GetResource( genericBuffer ) != nullptr,
+		ID3D12Resource* genericNativeResource = native.GetResource( genericBuffer );
+		Require( genericNativeResource != nullptr,
 			"Buffer does not expose a native D3D12 resource." );
+		D3D12_HEAP_PROPERTIES genericHeapProperties{};
+		D3D12_HEAP_FLAGS genericHeapFlags = D3D12_HEAP_FLAG_NONE;
+		Require( SUCCEEDED( genericNativeResource->GetHeapProperties( &genericHeapProperties, &genericHeapFlags ) ) &&
+			genericHeapProperties.Type == D3D12_HEAP_TYPE_UPLOAD,
+			"CpuToGpu buffer was not created in an upload heap." );
 		Require( device.GetBindlessIndex( genericBuffer ) == LDX12_DESCRIPTOR_SLOT_INVALID,
 			"A buffer without an SRV unexpectedly owns a bindless descriptor." );
 		Require( device.GetConstantBufferIndex( genericBuffer ) == LDX12_DESCRIPTOR_SLOT_INVALID,
@@ -76,10 +84,15 @@ namespace ldx12::tests
 		structuredBufferDesc.debugName = "Ldx12Tests structured buffer";
 		structuredBufferDesc.size = 128;
 		structuredBufferDesc.stride = 16;
-		structuredBufferDesc.createShaderResourceView = true;
+		structuredBufferDesc.type = BufferType::Structured;
 		const BufferHandle structuredBuffer = device.CreateBuffer( structuredBufferDesc );
 		const uint32_t structuredSrv = device.GetBindlessIndex( structuredBuffer );
 		Require( structuredBuffer.Valid(), "Structured buffer creation returned an invalid handle." );
+		D3D12_HEAP_PROPERTIES structuredHeapProperties{};
+		D3D12_HEAP_FLAGS structuredHeapFlags = D3D12_HEAP_FLAG_NONE;
+		Require( SUCCEEDED( native.GetResource( structuredBuffer )->GetHeapProperties( &structuredHeapProperties, &structuredHeapFlags ) ) &&
+			structuredHeapProperties.Type == D3D12_HEAP_TYPE_DEFAULT,
+			"GpuLocal buffer was not created in a default heap." );
 		Require( structuredSrv >= LDX12_BINDLESS_DYNAMIC_SLOT_FIRST &&
 			structuredSrv < context.bindlessCapacity,
 			"Structured buffer SRV index is outside the bindless heap." );
@@ -87,12 +100,23 @@ namespace ldx12::tests
 		BufferDesc constantBufferDesc{};
 		constantBufferDesc.debugName = "Ldx12Tests constant buffer";
 		constantBufferDesc.size = 100;
-		constantBufferDesc.heapType = D3D12_HEAP_TYPE_UPLOAD;
+		constantBufferDesc.type = BufferType::Constant;
+		constantBufferDesc.memory = BufferMemory::CpuToGpu;
 		const BufferHandle constantBuffer =
 			device.CreateBuffer( constantBufferDesc, ConstantBufferSlot::FreeCB0 );
 		Require( device.GetConstantBufferIndex( constantBuffer ) ==
 			ToSlotIndex( ConstantBufferSlot::FreeCB0 ),
 			"Constant buffer was not created in its requested fixed slot." );
+		Require( native.GetResource( constantBuffer )->GetDesc().Width == 256,
+			"Constant buffer allocation was not aligned to 256 bytes." );
+
+		BufferDesc rawBufferDesc{};
+		rawBufferDesc.debugName = "Ldx12Tests raw buffer";
+		rawBufferDesc.size = 64;
+		rawBufferDesc.type = BufferType::Raw;
+		const BufferHandle rawBuffer = device.CreateBuffer( rawBufferDesc );
+		Require( device.GetBindlessIndex( rawBuffer ) != LDX12_DESCRIPTOR_SLOT_INVALID,
+			"Raw buffer did not receive a shader-resource descriptor." );
 
 		TextureDesc textureDesc{};
 		textureDesc.debugName = "Ldx12Tests sampled UAV texture";
@@ -158,6 +182,7 @@ namespace ldx12::tests
 
 		device.Destroy( replacementBuffer );
 		device.Destroy( replacementTexture );
+		device.Destroy( rawBuffer );
 		device.Destroy( constantBuffer );
 		const BufferHandle reusedConstantBuffer =
 			device.CreateBuffer( constantBufferDesc, ConstantBufferSlot::FreeCB0 );

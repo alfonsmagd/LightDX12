@@ -6,6 +6,7 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 option(LDX12_BUILD_APP "Build the optional App support library" ${PROJECT_IS_TOP_LEVEL})
 option(LDX12_BUILD_EXAMPLES "Build the Ldx12 examples" ${PROJECT_IS_TOP_LEVEL})
 option(LDX12_BUILD_TESTS "Build the Ldx12 tests" ${PROJECT_IS_TOP_LEVEL})
+option(LDX12_BUILD_UTILS "Build the optional Ldx12 utility library" OFF)
 option(LDX12_INSTALL "Generate installation rules for Ldx12" ${PROJECT_IS_TOP_LEVEL})
 if(LDX12_BUILD_TESTS)
     enable_testing()
@@ -115,6 +116,14 @@ if(MSVC)
     target_compile_options(Ldx12 PRIVATE /W4 /EHsc /permissive- /MP)
 endif()
 
+set(LDX12_UTILS_AVAILABLE OFF)
+set(LDX12_UTILS_PUBLIC_HEADERS)
+set(LDX12_UTILS_SOURCES)
+if(LDX12_BUILD_UTILS OR LDX12_BUILD_EXAMPLES)
+    add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/Utils/Ldx12")
+    set(LDX12_UTILS_AVAILABLE ON)
+endif()
+
 if(LDX12_INSTALL)
     include(CMakePackageConfigHelpers)
     set(LDX12_INSTALL_CMAKEDIR "${CMAKE_INSTALL_LIBDIR}/cmake/Ldx12")
@@ -129,11 +138,20 @@ if(LDX12_INSTALL)
         VERSION "${PROJECT_VERSION}"
         COMPATIBILITY SameMajorVersion
     )
-    install(
-        TARGETS Ldx12
-        EXPORT Ldx12Targets
-        ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-    )
+    if(LDX12_BUILD_UTILS)
+        install(
+            TARGETS Ldx12 Ldx12Utils
+            EXPORT Ldx12Targets
+            ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        )
+        install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/Utils/Ldx12/include/" DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
+    else()
+        install(
+            TARGETS Ldx12
+            EXPORT Ldx12Targets
+            ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        )
+    endif()
     install(DIRECTORY "${LDX12_ROOT}/include/" DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
     install(
         FILES
@@ -244,6 +262,12 @@ if(LDX12_BUILD_EXAMPLES)
     add_ldx12_sample(CBSRVCubes "${CBSRVCUBES_SOURCE}" "${CBSRVCUBES_README}" "${CBSRVCUBES_SHADER}")
     add_ldx12_sample(CookbookChapter02 "${COOKBOOK_CHAPTER02_SOURCE}" "${COOKBOOK_CHAPTER02_README}" "${COOKBOOK_CHAPTER02_SHADER}")
 
+    if(LDX12_UTILS_AVAILABLE)
+        set(WORLD_GEOMETRY_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/samples/WorldGeometry/main.cpp")
+        add_ldx12_sample(WorldGeometry "${WORLD_GEOMETRY_SOURCE}")
+        target_link_libraries(WorldGeometry PRIVATE Ldx12::Utils)
+    endif()
+
     set(IMGUI_DEMO_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/samples/ImGuiDemo/main.cpp")
     add_executable(ImGuiDemo WIN32 "${IMGUI_DEMO_SOURCE}")
     target_compile_features(ImGuiDemo PRIVATE cxx_std_20)
@@ -260,8 +284,8 @@ if(LDX12_BUILD_EXAMPLES)
         target_compile_options(ImGuiDemoNative PRIVATE /W4 /EHsc /permissive- /MP)
     endif()
 
-    set(LDX12_EXAMPLE_TARGETS Triangle ViewportScissor TextureSamplers CBSRVCubes CookbookChapter02 ImGuiDemo ImGuiDemoNative)
-    set(LDX12_EXAMPLE_SOURCES "${TRIANGLE_SOURCE}" "${VIEWPORT_SCISSOR_SOURCE}" "${TEXTURE_SAMPLERS_SOURCE}" "${CBSRVCUBES_SOURCE}" "${CBSRVCUBES_README}" "${CBSRVCUBES_SHADER}" "${COOKBOOK_CHAPTER02_SOURCE}" "${COOKBOOK_CHAPTER02_README}" "${COOKBOOK_CHAPTER02_SHADER}" "${IMGUI_DEMO_SOURCE}" "${IMGUI_DEMO_NATIVE_SOURCE}")
+    set(LDX12_EXAMPLE_TARGETS Triangle ViewportScissor TextureSamplers CBSRVCubes CookbookChapter02 WorldGeometry ImGuiDemo ImGuiDemoNative)
+    set(LDX12_EXAMPLE_SOURCES "${TRIANGLE_SOURCE}" "${VIEWPORT_SCISSOR_SOURCE}" "${TEXTURE_SAMPLERS_SOURCE}" "${CBSRVCUBES_SOURCE}" "${CBSRVCUBES_README}" "${CBSRVCUBES_SHADER}" "${COOKBOOK_CHAPTER02_SOURCE}" "${COOKBOOK_CHAPTER02_README}" "${COOKBOOK_CHAPTER02_SHADER}" "${WORLD_GEOMETRY_SOURCE}" "${IMGUI_DEMO_SOURCE}" "${IMGUI_DEMO_NATIVE_SOURCE}")
 
     if(LDX12_BUILD_APP)
         set(IMGUI_NODE_EDITOR_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/samples/ImGuiNodeEditor/main.cpp")
@@ -348,6 +372,20 @@ if(LDX12_BUILD_TESTS)
     set(LDX12_TEST_TARGETS Ldx12Tests Ldx12StressTests Ldx12FrameStressTests Ldx12CommandStreamStressTests Ldx12FullCapacityTests)
     set(LDX12_TEST_SOURCES ${LDX12_CORE_TEST_SOURCES} "${LDX12_STRESS_TEST_SOURCE}" "${LDX12_FRAME_STRESS_TEST_SOURCE}" "${LDX12_COMMAND_STREAM_STRESS_TEST_SOURCE}" "${LDX12_FULL_CAPACITY_TEST_SOURCE}")
 
+    if(LDX12_UTILS_AVAILABLE)
+        set(LDX12_UTILS_TEST_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/tests/Ldx12UtilsTests.cpp")
+        add_executable(Ldx12UtilsTests "${LDX12_UTILS_TEST_SOURCE}")
+        target_compile_features(Ldx12UtilsTests PRIVATE cxx_std_20)
+        target_link_libraries(Ldx12UtilsTests PRIVATE Ldx12::Utils)
+        if(MSVC)
+            target_compile_options(Ldx12UtilsTests PRIVATE /W4 /EHsc /permissive- /MP)
+        endif()
+        add_test(NAME Ldx12UtilsTests COMMAND Ldx12UtilsTests)
+        set_tests_properties(Ldx12UtilsTests PROPERTIES TIMEOUT 60)
+        list(APPEND LDX12_TEST_TARGETS Ldx12UtilsTests)
+        list(APPEND LDX12_TEST_SOURCES "${LDX12_UTILS_TEST_SOURCE}")
+    endif()
+
     if(LDX12_BUILD_APP)
         set(NODE_GRAPH_TEST_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/tests/NodeGraphTests.cpp")
         add_executable(Ldx12NodeGraphTests "${NODE_GRAPH_TEST_SOURCE}")
@@ -365,6 +403,9 @@ if(LDX12_BUILD_TESTS)
 endif()
 
 set_target_properties(Ldx12 PROPERTIES FOLDER "API")
+if(LDX12_UTILS_AVAILABLE)
+    set_target_properties(Ldx12Utils PROPERTIES FOLDER "Utils")
+endif()
 if(LDX12_BUILD_APP)
     set_target_properties(App PROPERTIES FOLDER "App")
 endif()
@@ -374,6 +415,8 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES
     ${LDX12_PRIVATE_HEADERS}
     ${LDX12_SOURCES}
     ${LDX12_SHADERS}
+    ${LDX12_UTILS_PUBLIC_HEADERS}
+    ${LDX12_UTILS_SOURCES}
     ${APP_PUBLIC_HEADERS}
     ${APP_SOURCES}
     ${LDX12_EXAMPLE_SOURCES}

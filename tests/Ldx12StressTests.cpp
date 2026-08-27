@@ -46,8 +46,8 @@ namespace
 		bufferDesc.debugName = "Ldx12 stress upload SRV buffer";
 		bufferDesc.size = 256;
 		bufferDesc.stride = 16;
-		bufferDesc.heapType = D3D12_HEAP_TYPE_UPLOAD;
-		bufferDesc.createShaderResourceView = true;
+		bufferDesc.type = BufferType::Structured;
+		bufferDesc.memory = BufferMemory::CpuToGpu;
 
 		constexpr std::array<D3D12_RESOURCE_STATES, ourBatchSize> batchStates = {
 			D3D12_RESOURCE_STATE_COPY_DEST,

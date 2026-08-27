@@ -30,7 +30,7 @@ namespace ldx12::tests
 		BufferDesc bufferDesc{};
 		bufferDesc.debugName = "Ldx12Tests invalid-handle buffer";
 		bufferDesc.size = 64;
-		bufferDesc.heapType = D3D12_HEAP_TYPE_UPLOAD;
+		bufferDesc.memory = BufferMemory::CpuToGpu;
 		const BufferHandle staleBuffer = device.CreateBuffer( bufferDesc );
 		Require( device.IsAlive( staleBuffer ),
 			"A newly created buffer was not reported as alive." );

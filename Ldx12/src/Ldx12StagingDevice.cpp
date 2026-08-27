@@ -25,8 +25,7 @@ namespace ldx12
 		CD3DX12_HEAP_PROPERTIES heapProps( D3D12_HEAP_TYPE_UPLOAD );
 		const D3D12_RESOURCE_DESC BufferDesc = CD3DX12_RESOURCE_DESC::Buffer( size );
 
-		C_RESULT(
-			manager_.device_->CreateCommittedResource(
+		C_RESULT(manager_.device_->CreateCommittedResource(
 				&heapProps,
 				D3D12_HEAP_FLAG_NONE,
 				&BufferDesc,
@@ -43,12 +42,14 @@ namespace ldx12
 		DeviceManager::QueueContext& queue = manager_.GetGraphicsQueueContext();
 		CommandListWrapper& cmd = queue.immediateCommands_->Acquire();
 		const D3D12_RESOURCE_STATES previousState = buffer.currentState_;
+
 		if( previousState != D3D12_RESOURCE_STATE_COPY_DEST )
 		{
 			const CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
 				buffer.resource_.Get(),
 				previousState,
 				D3D12_RESOURCE_STATE_COPY_DEST );
+
 			cmd.commandList_->ResourceBarrier( 1, &barrier );
 			buffer.currentState_ = D3D12_RESOURCE_STATE_COPY_DEST;
 		}
@@ -61,6 +62,7 @@ namespace ldx12
 				buffer.resource_.Get(),
 				D3D12_RESOURCE_STATE_COPY_DEST,
 				previousState );
+
 			cmd.commandList_->ResourceBarrier( 1, &barrier );
 			buffer.currentState_ = previousState;
 		}

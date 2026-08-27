@@ -23,6 +23,7 @@ jobs:
       examples: ${{ steps.filter.outputs.examples }}
       cmake: ${{ steps.filter.outputs.cmake }}
       nuget: ${{ steps.filter.outputs.nuget }}
+      utils: ${{ steps.filter.outputs.utils }}
 
     steps:
       - name: Checkout repository
@@ -86,17 +87,23 @@ jobs:
               "tests/NodeGraphTests.cpp"
           )
           $examplesChanged = Test-PathChange @(
-              "samples/*"
+              "samples/*",
+              "Utils/Ldx12/*"
           )
           $cmakeChanged = Test-PathChange @(
               "cmake/Ldx12Config.cmake.in",
               "examples/InstalledLdx12/*",
+              "Utils/Ldx12/CMakeLists.txt",
               "tests/cmake/*"
           )
           $nugetChanged = Test-PathChange @(
               "nuget/*",
               "tests/nuget/*",
               "LICENSE*"
+          )
+          $utilsChanged = Test-PathChange @(
+              "Utils/Ldx12/*",
+              "tests/Ldx12UtilsTests.cpp"
           )
 
           "engine=$($engineChanged.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
@@ -105,6 +112,7 @@ jobs:
           "examples=$($examplesChanged.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
           "cmake=$($cmakeChanged.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
           "nuget=$($nugetChanged.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+          "utils=$($utilsChanged.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
 
           $changedFiles | ForEach-Object { Write-Host "Changed: $_" }
 
@@ -206,6 +214,32 @@ jobs:
 
       - name: Run FetchContent consumer
         run: ctest --test-dir build-fetch-consumer --output-on-failure
+
+  ldx12-utils:
+    name: Ldx12 Utils and Tests
+    needs: changes
+    if: needs.changes.outputs.engine == 'true' || needs.changes.outputs.utils == 'true'
+    runs-on: windows-2025
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Configure Utils tests
+        run: >-
+          cmake -S . -B build-utils-tests
+          -DLDX12_BUILD_APP=OFF
+          -DLDX12_BUILD_EXAMPLES=OFF
+          -DLDX12_BUILD_TESTS=ON
+          -DLDX12_BUILD_UTILS=ON
+          -DLDX12_INSTALL=OFF
+
+      - name: Build Utils tests
+        run: cmake --build build-utils-tests --config Debug --target Ldx12UtilsTests --parallel
+
+      - name: Run Utils tests
+        run: ctest --test-dir build-utils-tests -C Debug -R "^Ldx12UtilsTests$" --output-on-failure
 
   nuget-package:
     name: NuGet Package and VS2022 Consumer

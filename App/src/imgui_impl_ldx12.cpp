@@ -214,8 +214,8 @@ float4 PSMain(PixelInput input) : SV_Target0
 			desc.debugName = "Dear ImGui vertex buffer";
 			desc.size = static_cast<uint64_t>( frame.vertexCapacity ) * sizeof( ImDrawVert );
 			desc.stride = sizeof( ImDrawVert );
-			desc.bufferType = ldx12::BufferDesc::BufferType::VertexBuffer;
-			desc.heapType = D3D12_HEAP_TYPE_UPLOAD;
+			desc.type = ldx12::BufferType::Vertex;
+			desc.memory = ldx12::BufferMemory::CpuToGpu;
 			frame.vertexBuffer = data.device->CreateBuffer( desc );
 		}
 
@@ -231,8 +231,8 @@ float4 PSMain(PixelInput input) : SV_Target0
 			desc.debugName = "Dear ImGui index buffer";
 			desc.size = static_cast<uint64_t>( frame.indexCapacity ) * sizeof( ImDrawIdx );
 			desc.stride = sizeof( ImDrawIdx );
-			desc.bufferType = ldx12::BufferDesc::BufferType::IndexBuffer;
-			desc.heapType = D3D12_HEAP_TYPE_UPLOAD;
+			desc.type = ldx12::BufferType::Index;
+			desc.memory = ldx12::BufferMemory::CpuToGpu;
 			frame.indexBuffer = data.device->CreateBuffer( desc );
 		}
 

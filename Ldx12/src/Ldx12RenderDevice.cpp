@@ -681,56 +681,130 @@ namespace ldx12
 	{
 		if( !IsValidConstantBufferSlot( slot ) )
 		{
-			throw std::runtime_error( "Invalid constant buffer slot." );
+			throw std::invalid_argument( "Invalid constant buffer slot." );
 		}
-
-		BufferDesc fixedSlotDesc = desc;
-		fixedSlotDesc.createConstantBufferView = true;
-		return CreateBufferInternal( fixedSlotDesc, ToSlotIndex( slot ), UINT32_MAX );
+		if( desc.type != BufferType::Constant )
+		{
+			throw std::invalid_argument( "A fixed constant-buffer slot requires Constant buffer usage." );
+		}
+		return CreateBufferInternal( desc, ToSlotIndex( slot ), UINT32_MAX );
 	}
 
 	BufferHandle RenderDevice::CreateBuffer( const BufferDesc& desc, ShaderResourceSlot slot )
 	{
 		if( !IsValidShaderResourceSlot( slot ) )
 		{
-			throw std::runtime_error( "Invalid shader resource slot." );
+			throw std::invalid_argument( "Invalid shader resource slot." );
 		}
-
-		BufferDesc fixedSlotDesc = desc;
-		fixedSlotDesc.createShaderResourceView = true;
-		return CreateBufferInternal( fixedSlotDesc, UINT32_MAX, ToSlotIndex( slot ) );
+		if( desc.type != BufferType::Structured &&
+			desc.type != BufferType::Raw )
+		{
+			throw std::invalid_argument( "A fixed shader-resource slot requires Structured or Raw buffer usage." );
+		}
+		return CreateBufferInternal( desc, UINT32_MAX, ToSlotIndex( slot ) );
 	}
 
-	BufferHandle RenderDevice::CreateBufferInternal( const BufferDesc& desc, uint32_t constantBufferSlot, uint32_t shaderResourceSlot )
+	void RenderDevice::ValidateBufferDesc( const BufferDesc& desc ) const
 	{
+		constexpr uint64_t maximumConstantBufferSize = 64ull * 1024ull;
 		if( desc.size == 0 )
 		{
-			throw std::runtime_error( "BufferDesc.size must be greater than zero." );
+			throw std::invalid_argument( "BufferDesc.size must be greater than zero." );
 		}
 
-		constexpr uint64_t kMaxConstantBufferViewBytes = 64ull * 1024ull;
-		if( desc.createConstantBufferView && desc.size > kMaxConstantBufferViewBytes )
+		if( desc.type == BufferType::Constant && desc.size > maximumConstantBufferSize )
 		{
-			throw std::runtime_error(
+			throw std::length_error(
 				"Constant buffer views are limited to 64 KiB. Use an SRV/StructuredBuffer for larger data." );
 		}
+		if( (desc.type == BufferType::Vertex || desc.type == BufferType::Index) &&
+			desc.size > std::numeric_limits<uint32_t>::max() )
+		{
+			throw std::length_error( "Vertex and index buffers are limited to 4 GiB by their D3D12 views." );
+		}
+		if( desc.type == BufferType::Structured )
+		{
+			if( desc.stride == 0 )
+			{
+				throw std::invalid_argument( "Structured buffers require a non-zero stride." );
+			}
+			if( desc.stride % sizeof( uint32_t ) != 0 ||
+				desc.stride > D3D12_REQ_MULTI_ELEMENT_STRUCTURE_SIZE_IN_BYTES )
+			{
+				throw std::invalid_argument( "Structured buffer stride must be a multiple of 4 bytes and no greater than 2,048 bytes." );
+			}
+			if( desc.size % desc.stride != 0 )
+			{
+				throw std::invalid_argument( "Structured buffer size must be a multiple of its stride." );
+			}
+			if( desc.size / desc.stride > std::numeric_limits<uint32_t>::max() )
+			{
+				throw std::length_error( "Structured buffer element count exceeds the D3D12 SRV limit." );
+			}
+		}
+		if( desc.type == BufferType::Raw )
+		{
+			if( desc.stride != 0 )
+			{
+				throw std::invalid_argument( "Raw buffers do not use a structured stride." );
+			}
+			if( desc.size % sizeof( uint32_t ) != 0 )
+			{
+				throw std::invalid_argument( "Raw buffer size must be aligned to 32-bit values." );
+			}
+			if( desc.size / sizeof( uint32_t ) > std::numeric_limits<uint32_t>::max() )
+			{
+				throw std::length_error( "Raw buffer element count exceeds the D3D12 SRV limit." );
+			}
+		}
+	}
 
-		const uint64_t resourceSize = desc.createConstantBufferView
+	BufferResource RenderDevice::CreateBufferResource( const BufferDesc& desc )
+	{
+		const uint64_t resourceSize = desc.type == BufferType::Constant
 			? AlignUp( desc.size, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT )
 			: desc.size;
 
 		BufferResource resource;
-		resource.bufferSize_ = resourceSize;
+		resource.bufferSize_ = desc.size;
 		resource.bufferStride_ = desc.stride;
-		resource.bufferType_ = desc.bufferType;
-		resource.resourceFlags_ = desc.flags;
-		resource.heapType_ = desc.heapType;
-		resource.desc_ = BufferResource::BufferDesc( resourceSize, desc.flags );
-		resource.currentState_ = desc.heapType == D3D12_HEAP_TYPE_UPLOAD
-			? D3D12_RESOURCE_STATE_GENERIC_READ
-			: desc.initialState;
+		resource.type_ = desc.type;
+		resource.memory_ = desc.memory;
+		resource.desc_ = BufferResource::CreateNativeDesc( resourceSize );
 
-		const CD3DX12_HEAP_PROPERTIES heapProps( desc.heapType );
+		if( desc.memory == BufferMemory::CpuToGpu )
+		{
+			resource.currentState_ = D3D12_RESOURCE_STATE_GENERIC_READ;
+		}
+		else
+		{
+			switch( desc.type )
+			{
+				case BufferType::Vertex:
+				case BufferType::Constant:
+					resource.currentState_ = D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
+					break;
+				case BufferType::Index:
+					resource.currentState_ = D3D12_RESOURCE_STATE_INDEX_BUFFER;
+					break;
+				case BufferType::Structured:
+				case BufferType::Raw:
+					resource.currentState_ = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE |
+						D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+					break;
+				case BufferType::Indirect:
+					resource.currentState_ = D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT;
+					break;
+				case BufferType::Generic:
+					resource.currentState_ = D3D12_RESOURCE_STATE_COMMON;
+					break;
+			}
+		}
+
+		const D3D12_HEAP_TYPE heapType = desc.memory == BufferMemory::CpuToGpu
+			? D3D12_HEAP_TYPE_UPLOAD
+			: D3D12_HEAP_TYPE_DEFAULT;
+		const CD3DX12_HEAP_PROPERTIES heapProps( heapType );
 		C_RESULT( manager_->device_->CreateCommittedResource(
 			&heapProps, D3D12_HEAP_FLAG_NONE, &resource.desc_,
 			resource.currentState_, nullptr,
@@ -738,12 +812,16 @@ namespace ldx12
 			"Failed to create buffer resource." );
 
 		resource.gpuAddress_ = resource.resource_->GetGPUVirtualAddress();
-		if( desc.heapType == D3D12_HEAP_TYPE_UPLOAD )
+		if( desc.memory == BufferMemory::CpuToGpu )
 		{
 			resource.resource_->Map( 0, nullptr, &resource.mappedPtr_ );
 		}
+		return resource;
+	}
 
-		if( desc.createShaderResourceView )
+	void RenderDevice::CreateBufferDescriptors( BufferResource& resource, const BufferDesc& desc, uint32_t constantBufferSlot, uint32_t shaderResourceSlot )
+	{
+		if( desc.type == BufferType::Structured || desc.type == BufferType::Raw )
 		{
 			resource.srvIndex_ = shaderResourceSlot != UINT32_MAX
 				? manager_->AllocateFixedBindlessDescriptor( shaderResourceSlot )
@@ -753,25 +831,24 @@ namespace ldx12
 			D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
 			srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
 			srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-			if( desc.rawShaderResourceView )
+			if( desc.type == BufferType::Raw )
 			{
 				srvDesc.Format = DXGI_FORMAT_R32_TYPELESS;
-				srvDesc.Buffer.NumElements = static_cast< UINT >(desc.size / 4u);
+				srvDesc.Buffer.NumElements = static_cast<UINT>( desc.size / sizeof( uint32_t ) );
 				srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_RAW;
 			}
 			else
 			{
 				srvDesc.Format = DXGI_FORMAT_UNKNOWN;
 				srvDesc.Buffer.StructureByteStride = desc.stride;
-				srvDesc.Buffer.NumElements =
-					desc.stride ? static_cast< UINT >(desc.size / desc.stride) : 0u;
+				srvDesc.Buffer.NumElements = static_cast<UINT>( desc.size / desc.stride );
 			}
 
-			manager_->device_->CreateShaderResourceView( resource.resource_.Get(), &srvDesc,
-													resource.srvHandle_ );
+			manager_->device_->CreateShaderResourceView(
+				resource.resource_.Get(), &srvDesc, resource.srvHandle_ );
 		}
 
-		if( desc.createConstantBufferView )
+		if( desc.type == BufferType::Constant )
 		{
 			resource.cbvIndex_ = constantBufferSlot != UINT32_MAX
 				? manager_->AllocateFixedBindlessDescriptor( constantBufferSlot )
@@ -780,14 +857,21 @@ namespace ldx12
 
 			D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc{};
 			cbvDesc.BufferLocation = resource.gpuAddress_;
-			cbvDesc.SizeInBytes = static_cast< UINT >(resourceSize);
+			cbvDesc.SizeInBytes = static_cast<UINT>( resource.desc_.Width );
 			manager_->device_->CreateConstantBufferView( &cbvDesc, resource.cbvHandle_ );
 		}
+	}
 
-		if( desc.data != nullptr && desc.dataSize > 0 )
+	BufferHandle RenderDevice::CreateBufferInternal( const BufferDesc& desc, uint32_t constantBufferSlot, uint32_t shaderResourceSlot )
+	{
+		ValidateBufferDesc( desc );
+		BufferResource resource = CreateBufferResource( desc );
+		CreateBufferDescriptors( resource, desc, constantBufferSlot, shaderResourceSlot );
+
+		if( desc.initialData != nullptr )
 		{
 			manager_->stagingDevice_->BufferSubData(
-				resource, 0, static_cast< size_t >(desc.dataSize), desc.data );
+				resource, 0, static_cast<size_t>( desc.size ), desc.initialData );
 		}
 
 		return manager_->slotMapBuffers_.Create( std::move( resource ) );
@@ -990,6 +1074,7 @@ namespace ldx12
 		const bool wasMapped = resource->mappedPtr_ != nullptr;
 		const uint32_t srvIndex = resource->srvIndex_;
 		const uint32_t cbvIndex = resource->cbvIndex_;
+
 		resource->mappedPtr_ = nullptr;
 		resource->srvIndex_ = UINT32_MAX;
 		resource->cbvIndex_ = UINT32_MAX;

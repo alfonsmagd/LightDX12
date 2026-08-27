@@ -23,7 +23,7 @@ int main()
 		ldx12::BufferDesc bufferDesc{};
 		bufferDesc.debugName = "Installed Ldx12 example buffer";
 		bufferDesc.size = 256;
-		bufferDesc.heapType = D3D12_HEAP_TYPE_UPLOAD;
+		bufferDesc.memory = ldx12::BufferMemory::CpuToGpu;
 
 		const ldx12::BufferHandle buffer = device.CreateBuffer( bufferDesc );
 		if( native.GetResource( buffer ) == nullptr )

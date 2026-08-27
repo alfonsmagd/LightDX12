@@ -186,7 +186,8 @@ namespace ldx12::tests
 		BufferDesc fixedBufferDesc{};
 		fixedBufferDesc.debugName = "Ldx12Tests recycled fixed CBV";
 		fixedBufferDesc.size = 256;
-		fixedBufferDesc.heapType = D3D12_HEAP_TYPE_UPLOAD;
+		fixedBufferDesc.type = BufferType::Constant;
+		fixedBufferDesc.memory = BufferMemory::CpuToGpu;
 		const BufferHandle fixedBuffer =
 			device.CreateBuffer( fixedBufferDesc, ConstantBufferSlot::FreeCB1 );
 		RequireThrows<std::runtime_error>(

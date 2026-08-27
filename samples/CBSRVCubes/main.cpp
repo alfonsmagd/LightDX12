@@ -201,6 +201,7 @@ namespace
 			BufferDesc desc{};
 			desc.debugName = "CB SRV Cubes Scene CBV";
 			desc.size = sizeof( SceneConstants );
+			desc.type = BufferType::Constant;
 			app.sceneBuffer = device.CreateBuffer( desc, ConstantBufferSlot::FreeCB0 );
 		}
 
@@ -220,6 +221,7 @@ namespace
 			desc.debugName = "CB SRV Cubes Data SRV";
 			desc.size = sizeof( CubeData ) * kCubeCount;
 			desc.stride = sizeof( CubeData );
+			desc.type = BufferType::Structured;
 			app.cubeBuffer = device.CreateBuffer( desc, ShaderResourceSlot::FreeSRV0 );
 		}
 

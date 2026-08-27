@@ -21,7 +21,7 @@ namespace ldx12
 
 	D3D12_VERTEX_BUFFER_VIEW BufferResource::GetVertexBufferView( uint32_t stride ) const noexcept
 	{
-		assert( bufferType_ == BufferDesc::BufferType::VertexBuffer );
+		assert( type_ == BufferType::Vertex );
 		D3D12_VERTEX_BUFFER_VIEW view{};
 		view.BufferLocation = gpuAddress_;
 		view.SizeInBytes = static_cast<UINT>( bufferSize_ );
@@ -31,7 +31,7 @@ namespace ldx12
 
 	D3D12_INDEX_BUFFER_VIEW BufferResource::GetIndexBufferView( DXGI_FORMAT format ) const noexcept
 	{
-		assert( bufferType_ == BufferDesc::BufferType::IndexBuffer );
+		assert( type_ == BufferType::Index );
 		D3D12_INDEX_BUFFER_VIEW view{};
 		view.BufferLocation = gpuAddress_;
 		view.SizeInBytes = static_cast<UINT>( bufferSize_ );
@@ -39,7 +39,7 @@ namespace ldx12
 		return view;
 	}
 
-	D3D12_RESOURCE_DESC BufferResource::BufferDesc( uint64_t size, D3D12_RESOURCE_FLAGS flags ) noexcept
+	D3D12_RESOURCE_DESC BufferResource::CreateNativeDesc( uint64_t size ) noexcept
 	{
 		D3D12_RESOURCE_DESC desc{};
 		desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
@@ -52,7 +52,7 @@ namespace ldx12
 		desc.SampleDesc.Count = 1;
 		desc.SampleDesc.Quality = 0;
 		desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-		desc.Flags = flags;
+		desc.Flags = D3D12_RESOURCE_FLAG_NONE;
 		return desc;
 	}
 
