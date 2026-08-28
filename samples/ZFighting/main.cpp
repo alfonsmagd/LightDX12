@@ -430,7 +430,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 				commands.CmdDraw( 6 );
 			}
 
-			//commands.CmdEndRendering();
+			commands.CmdEndRendering();
 			if( enableMsaa )
 			{
 				commands.CmdResolveTexture( app.sceneTargets.multisampleColor, backbuffer );

@@ -118,11 +118,15 @@ namespace
 		ComPtr<ID3D12CommandQueue> queue{};
 		ComPtr<IDXGISwapChain3> swapchain{};
 		ComPtr<ID3D12DescriptorHeap> rtvHeap{};
+
 		NativeDescriptorHeap imguiDescriptors{};
+
 		std::array<ComPtr<ID3D12Resource>, ourFramesInFlight> backbuffers{};
 		std::array<NativeFrame, ourFramesInFlight> frames{};
+
 		ComPtr<ID3D12GraphicsCommandList> commandList{};
 		ComPtr<ID3D12Fence> fence{};
+
 		HANDLE fenceEvent = nullptr;
 		uint64_t nextFenceValue = 0;
 		uint32_t rtvDescriptorSize = 0;
@@ -328,6 +332,7 @@ namespace
 			uploadDesc.MipLevels = 1;
 			uploadDesc.SampleDesc.Count = 1;
 			uploadDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
 			D3D12_HEAP_PROPERTIES uploadHeap{};
 			uploadHeap.Type = D3D12_HEAP_TYPE_UPLOAD;
 			ComPtr<ID3D12Resource> upload{};
@@ -357,9 +362,11 @@ namespace
 			WaitForFrame( uploadFrame );
 			CheckResult( uploadFrame.allocator->Reset(), "Failed to reset the native upload allocator." );
 			CheckResult( commandList->Reset( uploadFrame.allocator.Get(), nullptr ), "Failed to reset the native upload command list." );
+
 			D3D12_TEXTURE_COPY_LOCATION destination{};
 			destination.pResource = texture.resource.Get();
 			destination.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+
 			D3D12_TEXTURE_COPY_LOCATION sourceLocation{};
 			sourceLocation.pResource = upload.Get();
 			sourceLocation.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
@@ -374,6 +381,7 @@ namespace
 			barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
 			commandList->ResourceBarrier( 1, &barrier );
 			CheckResult( commandList->Close(), "Failed to close the native upload command list." );
+
 			ID3D12CommandList* commandLists[] = { commandList.Get() };
 			queue->ExecuteCommandLists( 1, commandLists );
 			WaitIdle();
@@ -382,6 +390,7 @@ namespace
 			D3D12_CPU_DESCRIPTOR_HANDLE cpu{};
 			D3D12_GPU_DESCRIPTOR_HANDLE gpu{};
 			imguiDescriptors.GetHandles( texture.descriptorIndex, cpu, gpu );
+
 			D3D12_SHADER_RESOURCE_VIEW_DESC srv{};
 			srv.Format = ourRenderTargetFormat;
 			srv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
@@ -529,6 +538,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		IMGUI_CHECKVERSION();
 		ImGui::CreateContext();
 		ImGui::StyleColorsDark();
+
 		if( !ImGui_ImplWin32_Init( window ) )
 		{
 			throw std::runtime_error( "ImGui Win32 initialization failed." );
@@ -545,6 +555,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		imguiInfo.UserData = &renderer.imguiDescriptors;
 		imguiInfo.SrvDescriptorAllocFn = &AllocateImGuiDescriptor;
 		imguiInfo.SrvDescriptorFreeFn = &FreeImGuiDescriptor;
+
 		if( !ImGui_ImplDX12_Init( &imguiInfo ) )
 		{
 			throw std::runtime_error( "ImGui native DirectX 12 initialization failed." );
@@ -583,6 +594,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 
 			ImGui_ImplDX12_NewFrame();
 			ImGui_ImplWin32_NewFrame();
+
 			ImGui::NewFrame();
 			ImGui::Begin( "Native DirectX 12 + Dear ImGui" );
 			ImGui::TextUnformatted( "This sample does not use Ldx12." );
@@ -595,6 +607,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 			}
 			ImGui::SameLine();
 			ImGui::Text( "Pressed %d times", buttonPressCount );
+
 			ImGui::End();
 			ImGui::Render();
 
@@ -629,8 +642,10 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		ImGui_ImplWin32_Shutdown();
 		imguiWin32Initialized = false;
 		ImGui::DestroyContext();
+
 		checkerTexture.resource.Reset();
 		renderer.imguiDescriptors.Free( checkerTexture.descriptorIndex );
+
 		SetWindowLongPtr( window, GWLP_USERDATA, 0 );
 		renderer.Shutdown();
 		DestroyWindow( window );

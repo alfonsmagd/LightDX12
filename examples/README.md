@@ -31,3 +31,33 @@ Interactive ImGui node graph with typed links, texture processing and live textu
 ![4. ImGuiNodeEditor](images/04-imgui-node-editor.png)
 
 [View source](../samples/ImGuiNodeEditor)
+
+## 5. Z-buffer and MSAA x4
+
+![5. Z-buffer and MSAA x4](images/05-zbuffer-msaa4.png)
+
+[View source](../samples/ZFighting)
+
+## 6. Textured cube
+
+![6. Textured cube](images/06-textured-cube.png)
+
+[View source](../samples/TexturedCube)
+
+## 7. Texture samplers
+
+![7. Texture samplers](images/07-texture-samplers.png)
+
+[View source](../samples/TextureSamplers)
+
+## 8. Ldx12 + Dear ImGui
+
+![8. Ldx12 + Dear ImGui](images/08-imgui-demo.png)
+
+[View source](../samples/ImGuiDemo)
+
+## 9. World geometry
+
+![9. World geometry](images/09-world-geometry.png)
+
+[View source](../samples/WorldGeometry)
