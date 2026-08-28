@@ -228,6 +228,7 @@ namespace ldx12
 		D3D_PRIMITIVE_TOPOLOGY topology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 		DXGI_FORMAT colorFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
 		DXGI_FORMAT depthFormat = DXGI_FORMAT_UNKNOWN;
+		uint32_t sampleCount = 1;
 	};
 
 	struct ComputePipelineDesc
@@ -307,6 +308,7 @@ namespace ldx12
 		uint16_t depthOrArraySize = 1;
 		TextureDimension dimension = TextureDimension::Texture2D;
 		DXGI_FORMAT format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		uint32_t sampleCount = 1;
 		TextureUsage usage = TextureUsage::Sampled;
 		// Optional flags for interoperating with another D3D API. Only
 		// D3D12_RESOURCE_FLAG_ALLOW_SIMULTANEOUS_ACCESS is accepted by the
@@ -538,6 +540,7 @@ namespace ldx12
 		virtual void CmdSetViewport( float x, float y, float width, float height, float minDepth = 0.0f, float maxDepth = 1.0f ) = 0;
 		virtual void CmdSetScissor( int32_t left, int32_t top, int32_t right, int32_t bottom ) = 0;
 		virtual void CmdTransitionTexture( TextureHandle texture, D3D12_RESOURCE_STATES newState ) = 0;
+		virtual void CmdResolveTexture( TextureHandle source, TextureHandle destination ) = 0;
 		virtual void CmdBindRenderPipeline( const RenderPipelineState& pipeline ) = 0;
 		virtual void CmdBindComputePipeline( const ComputePipelineState& pipeline ) = 0;
 		virtual void CmdBindVertexBuffer( BufferHandle buffer, uint32_t stride = 0, uint32_t offset = 0, uint32_t slot = 0 ) = 0;
@@ -626,6 +629,7 @@ namespace ldx12
 		uint32_t GetBindlessIndex( TextureHandle texture ) const;
 		uint32_t GetUnorderedAccessIndex( TextureHandle texture ) const;
 		uint32_t GetSamplerIndex( SamplerHandle sampler ) const;
+		bool SupportsSampleCount( DXGI_FORMAT format, uint32_t sampleCount ) const noexcept;
 		[[nodiscard]] D3D12Native GetNative() noexcept;
 		bool BindlessSupported() const noexcept;
 		bool IsAlive( BufferHandle buffer ) const noexcept;

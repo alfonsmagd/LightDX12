@@ -12,8 +12,10 @@ This file lists the main user-visible changes in each Ldx12 version.
 - `SamplerHandle`, `SamplerDesc` and the API required to create, query and destroy custom samplers.
 - A native Ldx12 renderer for Dear ImGui that accepts `TextureHandle` directly in `ImGui::Image()`.
 - An optional `Ldx12::Utils` world renderer with predefined cube, sphere and arrow geometry, per-instance colors and multi-draw indirect batching.
-- New textured-cube, Cookbook cube, texture-sampler, Ldx12 ImGui and native D3D12 ImGui samples.
+- Configurable multisample rendering through `TextureDesc::sampleCount`, `RenderPipelineDesc::sampleCount`, capability queries and `CmdResolveTexture()`.
+- New textured-cube, Cookbook cube, texture-sampler, Z-fighting, Ldx12 ImGui and native D3D12 ImGui samples.
 - A full-capacity test covering the documented resource, attachment, command-buffer and push-constant limits.
+- A GPU multisample test covering MSAA color/depth creation, rendering, resolve and texture readback.
 - Optional PIX GPU capture loading and HUD settings through `PixSettings`.
 
 ### Changed
@@ -27,6 +29,8 @@ This file lists the main user-visible changes in each Ldx12 version.
 - Context initialization and the App ImGui integration were simplified.
 - Sampler selection is now bindless and available to graphics, compute, mip generation and ImGui shaders.
 - Utils geometry is uploaded once; object changes rebuild only instance and indirect buffers, while transform changes update only instances.
+- Utils arrows now render as continuous line geometry with an outline arrowhead.
+- The Z-fighting sample can switch between single-sample rendering and MSAA x4 at runtime through a fixed ImGui control panel.
 
 ### Fixed
 

@@ -87,13 +87,13 @@ int main()
 		renderWorldDesc.depthFormat = depthDesc.format;
 		{
 			RenderWorld renderWorld( device, renderWorldDesc );
-			assert( renderWorld.GetVertexCount() == 475 && renderWorld.GetIndexCount() == 2436 );
+			assert( renderWorld.GetVertexCount() == 453 && renderWorld.GetIndexCount() == 2346 );
 
 			Camera camera{};
 			camera.aspectRatio = 1.0f;
 			RenderFrame( device, renderWorld, world, camera, color, depth );
-			assert( renderWorld.GetVertexCount() == 475 );
-			assert( renderWorld.GetIndexCount() == 2436 );
+			assert( renderWorld.GetVertexCount() == 453 );
+			assert( renderWorld.GetIndexCount() == 2346 );
 			assert( renderWorld.GetDrawCount() == 3 );
 			assert( renderWorld.GetInstanceCount() == 7 );
 
@@ -101,7 +101,7 @@ int main()
 			secondWorld.AddSphere( SphereDesc{} );
 			secondWorld.AddSphere( SphereDesc{} );
 			RenderFrame( device, renderWorld, secondWorld, camera, color, depth );
-			assert( renderWorld.GetVertexCount() == 475 && renderWorld.GetIndexCount() == 2436 );
+			assert( renderWorld.GetVertexCount() == 453 && renderWorld.GetIndexCount() == 2346 );
 			assert( renderWorld.GetDrawCount() == 1 && renderWorld.GetInstanceCount() == 2 );
 			RenderFrame( device, renderWorld, world, camera, color, depth );
 
@@ -109,14 +109,14 @@ int main()
 			movedCube.position = { -2.0f, 0.5f, 0.0f };
 			world.SetTransform( cube, movedCube );
 			RenderFrame( device, renderWorld, world, camera, color, depth );
-			assert( renderWorld.GetVertexCount() == 475 );
+			assert( renderWorld.GetVertexCount() == 453 );
 			assert( renderWorld.GetDrawCount() == 3 );
 			assert( renderWorld.GetInstanceCount() == 7 );
 
 			world.Destroy( cube );
 			RenderFrame( device, renderWorld, world, camera, color, depth );
-			assert( renderWorld.GetVertexCount() == 475 );
-			assert( renderWorld.GetIndexCount() == 2436 );
+			assert( renderWorld.GetVertexCount() == 453 );
+			assert( renderWorld.GetIndexCount() == 2346 );
 			assert( renderWorld.GetDrawCount() == 3 );
 			assert( renderWorld.GetInstanceCount() == 6 );
 
@@ -124,8 +124,8 @@ int main()
 			assert( world.Contains( arrow ) );
 			world.Clear();
 			RenderFrame( device, renderWorld, world, camera, color, depth );
-			assert( renderWorld.GetVertexCount() == 475 );
-			assert( renderWorld.GetIndexCount() == 2436 );
+			assert( renderWorld.GetVertexCount() == 453 );
+			assert( renderWorld.GetIndexCount() == 2346 );
 			assert( renderWorld.GetDrawCount() == 0 );
 			assert( renderWorld.GetInstanceCount() == 0 );
 		}

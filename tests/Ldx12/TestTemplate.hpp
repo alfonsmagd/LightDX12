@@ -102,4 +102,5 @@ namespace ldx12::tests
 	void TestGpuInvalidHandleSafety();
 	void TestGpuSubmissionSynchronization();
 	void TestGpuDescriptorRecycling();
+	void TestGpuMultisampleRendering();
 }

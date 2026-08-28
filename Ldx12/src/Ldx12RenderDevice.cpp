@@ -93,6 +93,36 @@ namespace ldx12
 			return format == DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
 		}
 
+		[[nodiscard]] bool IsValidSampleCount( uint32_t sampleCount ) noexcept
+		{
+			return sampleCount != 0 && ( sampleCount & ( sampleCount - 1u ) ) == 0;
+		}
+
+		[[nodiscard]] bool SupportsTextureSampleCount(
+			ID3D12Device* device,
+			DXGI_FORMAT format,
+			uint32_t sampleCount ) noexcept
+		{
+			if( device == nullptr || format == DXGI_FORMAT_UNKNOWN || !IsValidSampleCount( sampleCount ) )
+			{
+				return false;
+			}
+
+			if( sampleCount == 1 )
+			{
+				return true;
+			}
+
+			D3D12_FEATURE_DATA_MULTISAMPLE_QUALITY_LEVELS qualityLevels{};
+			qualityLevels.Format = format;
+			qualityLevels.SampleCount = sampleCount;
+			qualityLevels.Flags = D3D12_MULTISAMPLE_QUALITY_LEVELS_FLAG_NONE;
+			return SUCCEEDED( device->CheckFeatureSupport(
+				D3D12_FEATURE_MULTISAMPLE_QUALITY_LEVELS,
+				&qualityLevels,
+				sizeof( qualityLevels ) ) ) && qualityLevels.NumQualityLevels > 0;
+		}
+
 		[[nodiscard]] bool SupportsComputeMipGeneration( const TextureDesc& desc,
 														 uint16_t mipCount ) noexcept
 		{
@@ -261,6 +291,39 @@ namespace ldx12
 				throw std::runtime_error( "DepthStencil textures cannot expose UAVs." );
 			}
 
+			if( !IsValidSampleCount( desc.sampleCount ) )
+			{
+				throw std::invalid_argument(
+					"TextureDesc::sampleCount must be a non-zero power of two." );
+			}
+
+			if( desc.sampleCount > 1 )
+			{
+				if( desc.dimension != TextureDimension::Texture2D || desc.depthOrArraySize != 1 )
+				{
+					throw std::runtime_error(
+						"Multisampled textures currently support only single-slice Texture2D resources." );
+				}
+				if( desc.countMipMap != 1 )
+				{
+					throw std::runtime_error( "Multisampled textures cannot contain mipmaps." );
+				}
+				if( desc.data != nullptr )
+				{
+					throw std::runtime_error( "Multisampled textures cannot be initialized from CPU data." );
+				}
+				if( HasTextureUsage( desc.usage, TextureUsage::UnorderedAccess ) )
+				{
+					throw std::runtime_error( "Multisampled textures cannot expose UAVs." );
+				}
+				if( !HasTextureUsage( desc.usage, TextureUsage::RenderTarget ) &&
+					!HasTextureUsage( desc.usage, TextureUsage::DepthStencil ) )
+				{
+					throw std::runtime_error(
+						"A multisampled texture must be a render target or depth-stencil target." );
+				}
+			}
+
 			if( desc.dimension != TextureDimension::Texture3D )
 			{
 				return;
@@ -301,7 +364,8 @@ namespace ldx12
 
 			return CD3DX12_RESOURCE_DESC::Tex2D(
 				resource.formats_.resource_, desc.width, desc.height,
-				desc.depthOrArraySize, resource.mipLevels_, 1, 0, resource.usageFlags_ );
+				desc.depthOrArraySize, resource.mipLevels_, desc.sampleCount, 0,
+				resource.usageFlags_ );
 		}
 
 		[[nodiscard]] TextureResource
@@ -370,8 +434,15 @@ namespace ldx12
 		}
 		else
 		{
-			srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-			srvDesc.Texture2D.MipLevels = resource.mipLevels_;
+			if( resource.desc_.SampleDesc.Count > 1 )
+			{
+				srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DMS;
+			}
+			else
+			{
+				srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+				srvDesc.Texture2D.MipLevels = resource.mipLevels_;
+			}
 		}
 		device_->CreateShaderResourceView( resource.resource_.Get(), &srvDesc, resource.srvHandle_ );
 	}
@@ -418,7 +489,9 @@ namespace ldx12
 
 		D3D12_RENDER_TARGET_VIEW_DESC rtvDesc{};
 		rtvDesc.Format = resource.formats_.rtv_;
-		rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+		rtvDesc.ViewDimension = resource.desc_.SampleDesc.Count > 1
+			? D3D12_RTV_DIMENSION_TEXTURE2DMS
+			: D3D12_RTV_DIMENSION_TEXTURE2D;
 		device_->CreateRenderTargetView( resource.resource_.Get(), &rtvDesc, resource.rtvHandle_ );
 	}
 
@@ -430,7 +503,9 @@ namespace ldx12
 
 		D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc{};
 		dsvDesc.Format = resource.formats_.dsv_;
-		dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+		dsvDesc.ViewDimension = resource.desc_.SampleDesc.Count > 1
+			? D3D12_DSV_DIMENSION_TEXTURE2DMS
+			: D3D12_DSV_DIMENSION_TEXTURE2D;
 		device_->CreateDepthStencilView( resource.resource_.Get(), &dsvDesc, resource.dsvHandle_ );
 	}
 
@@ -581,6 +656,11 @@ namespace ldx12
 			throw std::runtime_error(
 				"RenderPipelineDesc requires valid vertex and fragment shader source." );
 		}
+		if( !IsValidSampleCount( desc.sampleCount ) )
+		{
+			throw std::invalid_argument(
+				"RenderPipelineDesc::sampleCount must be a non-zero power of two." );
+		}
 
 		const CompiledShader vertexShader =
 			CompileShader( desc.vertexShader, "vs_6_6" );
@@ -637,9 +717,28 @@ namespace ldx12
 			numRenderTargets = 1;
 		}
 
+		for( uint32_t index = 0; index < numRenderTargets; ++index )
+		{
+			if( !SupportsSampleCount( psoDesc.RTVFormats[ index ], desc.sampleCount ) )
+			{
+				throw std::runtime_error(
+					"The selected color format does not support the requested pipeline sample count." );
+			}
+		}
+		if( desc.depthFormat != DXGI_FORMAT_UNKNOWN &&
+			!SupportsSampleCount( desc.depthFormat, desc.sampleCount ) )
+		{
+			throw std::runtime_error(
+				"The selected depth format does not support the requested pipeline sample count." );
+		}
+
 		psoDesc.NumRenderTargets = numRenderTargets;
 		psoDesc.DSVFormat = desc.depthFormat;
-		psoDesc.SampleDesc = { 1, 0 };
+		psoDesc.SampleDesc = { desc.sampleCount, 0 };
+		if( desc.sampleCount > 1 )
+		{
+			psoDesc.RasterizerState.MultisampleEnable = TRUE;
+		}
 
 		RenderPipelineState pipeline;
 		C_RESULT( manager_->device_->CreateGraphicsPipelineState(
@@ -901,6 +1000,11 @@ namespace ldx12
 	TextureHandle RenderDevice::CreateTexture( const TextureDesc& desc )
 	{
 		ValidateTextureDesc( desc );
+		if( !SupportsSampleCount( desc.format, desc.sampleCount ) )
+		{
+			throw std::runtime_error(
+				"The selected texture format does not support the requested sample count." );
+		}
 		const TextureCreationPlan creationPlan = BuildTextureCreationPlan( desc );
 		TextureResource resource = PrepareTextureResource( desc, creationPlan );
 		manager_->CreateCommittedTextureResource( desc, resource );
@@ -1031,6 +1135,14 @@ namespace ldx12
 			throw std::runtime_error( "Invalid sampler handle." );
 		}
 		return resource->descriptorIndex_;
+	}
+
+	bool RenderDevice::SupportsSampleCount(
+		DXGI_FORMAT format,
+		uint32_t sampleCount ) const noexcept
+	{
+		return SupportsTextureSampleCount(
+			manager_->device_.Get(), format, sampleCount );
 	}
 
 	bool RenderDevice::BindlessSupported() const noexcept

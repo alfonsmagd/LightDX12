@@ -438,6 +438,7 @@ namespace ldx12
 
 		std::array<D3D12_RENDER_PASS_RENDER_TARGET_DESC, ourMaxColorAttachments> renderTargetDescs{};
 		uint32_t numRenderTargets = 0;
+		uint32_t framebufferSampleCount = 0;
 
 		TextureResource* viewportTexture = nullptr;
 
@@ -452,6 +453,15 @@ namespace ldx12
 			if( colorTexture.rtvHandle_.ptr == 0 )
 			{
 				throw std::runtime_error( "Color attachment does not have an RTV." );
+			}
+			if( framebufferSampleCount == 0 )
+			{
+				framebufferSampleCount = colorTexture.desc_.SampleDesc.Count;
+			}
+			else if( framebufferSampleCount != colorTexture.desc_.SampleDesc.Count )
+			{
+				throw std::runtime_error(
+					"All framebuffer attachments must use the same sample count." );
 			}
 
 			TransitionTexture( framebuffer.color[ index ].texture, colorTexture, D3D12_RESOURCE_STATE_RENDER_TARGET );
@@ -479,6 +489,15 @@ namespace ldx12
 			if( depthTexture.dsvHandle_.ptr == 0 )
 			{
 				throw std::runtime_error( "Depth attachment does not have a DSV." );
+			}
+			if( framebufferSampleCount == 0 )
+			{
+				framebufferSampleCount = depthTexture.desc_.SampleDesc.Count;
+			}
+			else if( framebufferSampleCount != depthTexture.desc_.SampleDesc.Count )
+			{
+				throw std::runtime_error(
+					"All framebuffer attachments must use the same sample count." );
 			}
 
 			TransitionTexture( framebuffer.depthStencil.texture, depthTexture, D3D12_RESOURCE_STATE_DEPTH_WRITE );
@@ -558,6 +577,56 @@ namespace ldx12
 	{
 		TextureResource& resource = manager_->GetTextureResource( texture );
 		TransitionTexture( texture, resource, newState );
+	}
+
+	void CommandBufferImpl::CmdResolveTexture(
+		TextureHandle source,
+		TextureHandle destination )
+	{
+		if( isRendering_ )
+		{
+			throw std::runtime_error(
+				"CmdResolveTexture must be called outside a render pass." );
+		}
+		if( source == destination )
+		{
+			throw std::invalid_argument(
+				"CmdResolveTexture requires different source and destination textures." );
+		}
+
+		TextureResource& sourceResource = manager_->GetTextureResource( source );
+		TextureResource& destinationResource = manager_->GetTextureResource( destination );
+		if( sourceResource.desc_.SampleDesc.Count <= 1 ||
+			destinationResource.desc_.SampleDesc.Count != 1 )
+		{
+			throw std::runtime_error(
+				"CmdResolveTexture requires a multisampled source and a single-sampled destination." );
+		}
+		if( sourceResource.width_ != destinationResource.width_ ||
+			sourceResource.height_ != destinationResource.height_ )
+		{
+			throw std::runtime_error(
+				"CmdResolveTexture requires matching source and destination dimensions." );
+		}
+		if( sourceResource.format_ != destinationResource.format_ )
+		{
+			throw std::runtime_error(
+				"CmdResolveTexture requires matching source and destination formats." );
+		}
+		if( sourceResource.isDepthFormat_ || destinationResource.isDepthFormat_ )
+		{
+			throw std::runtime_error(
+				"CmdResolveTexture supports color textures only." );
+		}
+
+		TransitionTexture( source, sourceResource, D3D12_RESOURCE_STATE_RESOLVE_SOURCE );
+		TransitionTexture( destination, destinationResource, D3D12_RESOURCE_STATE_RESOLVE_DEST );
+		wrapper_->commandList_->ResolveSubresource(
+			destinationResource.resource_.Get(),
+			0,
+			sourceResource.resource_.Get(),
+			0,
+			sourceResource.format_ );
 	}
 
 	void CommandBufferImpl::CmdBindRenderPipeline( const RenderPipelineState& pipeline )

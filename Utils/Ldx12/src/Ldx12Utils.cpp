@@ -15,10 +15,8 @@ namespace ldx12::utils
 	{
 		constexpr uint32_t ourSphereLongitudeSegments = 24;
 		constexpr uint32_t ourSphereLatitudeSegments = 16;
-		constexpr uint32_t ourArrowSegments = 8;
-		constexpr float ourArrowShaftRadius = 0.025f;
-		constexpr float ourArrowHeadRadius = 0.09f;
-		constexpr float ourArrowHeadStart = 0.72f;
+		constexpr float ourArrowHeadWidth = 0.10f;
+		constexpr float ourArrowHeadStart = 0.80f;
 
 		constexpr char ourWorldVertexShader[] = R"(
 struct WorldInstance
@@ -78,7 +76,12 @@ float4 main(PSInput input) : SV_Target0
 }
 )";
 
-		RenderPipelineState CreateWorldPipeline( RenderDevice& device, const RenderWorldDesc& worldDesc, D3D12_FILL_MODE fillMode )
+		RenderPipelineState CreateWorldPipeline(
+			RenderDevice& device,
+			const RenderWorldDesc& worldDesc,
+			D3D12_FILL_MODE fillMode,
+			D3D12_PRIMITIVE_TOPOLOGY_TYPE primitiveType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
+			D3D_PRIMITIVE_TOPOLOGY topology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST )
 		{
 			RenderPipelineDesc desc{};
 			desc.vertexShader.source = ourWorldVertexShader;
@@ -92,6 +95,8 @@ float4 main(PSInput input) : SV_Target0
 			desc.color[ 0 ].format = worldDesc.colorFormat;
 			desc.colorFormat = worldDesc.colorFormat;
 			desc.depthFormat = worldDesc.depthFormat;
+			desc.primitiveType = primitiveType;
+			desc.topology = topology;
 			desc.rasterizerState.FillMode = fillMode;
 			desc.rasterizerState.CullMode = D3D12_CULL_MODE_NONE;
 			desc.depthStencilState.DepthEnable = worldDesc.depthFormat != DXGI_FORMAT_UNKNOWN;
@@ -281,7 +286,13 @@ float4 main(PSInput input) : SV_Target0
 	RenderWorld::RenderWorld( RenderDevice& device, const RenderWorldDesc& desc ):
 		device_( &device ),
 		solidPipeline_( CreateWorldPipeline( device, desc, D3D12_FILL_MODE_SOLID ) ),
-		wireframePipeline_( CreateWorldPipeline( device, desc, D3D12_FILL_MODE_WIREFRAME ) )
+		wireframePipeline_( CreateWorldPipeline( device, desc, D3D12_FILL_MODE_WIREFRAME ) ),
+		linePipeline_( CreateWorldPipeline(
+			device,
+			desc,
+			D3D12_FILL_MODE_SOLID,
+			D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE,
+			D3D_PRIMITIVE_TOPOLOGY_LINELIST ) )
 	{
 		BuildPrimitiveGeometry();
 		UploadStaticGeometry();
@@ -312,14 +323,24 @@ float4 main(PSInput input) : SV_Target0
 			commands.CmdDrawIndexedIndirect( indirectBuffer_, solidDrawCount_ );
 		}
 
-		const uint32_t wireframeDrawCount = static_cast<uint32_t>( indirectDraws_.size() ) - solidDrawCount_;
-		if( wireframeDrawCount > 0 )
+		if( wireframeDrawCount_ > 0 )
 		{
 			commands.CmdBindRenderPipeline( wireframePipeline_ );
 			commands.CmdDrawIndexedIndirect(
 				indirectBuffer_,
-				wireframeDrawCount,
+				wireframeDrawCount_,
 				static_cast<uint64_t>( solidDrawCount_ ) * sizeof( IndirectDraw ) );
+		}
+
+		const uint32_t lineDrawCount = static_cast<uint32_t>( indirectDraws_.size() ) -
+			solidDrawCount_ - wireframeDrawCount_;
+		if( lineDrawCount > 0 )
+		{
+			commands.CmdBindRenderPipeline( linePipeline_ );
+			commands.CmdDrawIndexedIndirect(
+				indirectBuffer_,
+				lineDrawCount,
+				static_cast<uint64_t>( solidDrawCount_ + wireframeDrawCount_ ) * sizeof( IndirectDraw ) );
 		}
 	}
 
@@ -353,6 +374,10 @@ float4 main(PSInput input) : SV_Target0
 
 		for( uint32_t primitiveIndex = 0; primitiveIndex < ourPrimitiveCount; ++primitiveIndex )
 		{
+			if( geometryTopologies_[ primitiveIndex ] != GeometryTopology::Triangle )
+			{
+				continue;
+			}
 			const World::PrimitiveType primitive = static_cast<World::PrimitiveType>( primitiveIndex );
 			BuildBatch( world, primitive, false );
 		}
@@ -360,8 +385,23 @@ float4 main(PSInput input) : SV_Target0
 
 		for( uint32_t primitiveIndex = 0; primitiveIndex < ourPrimitiveCount; ++primitiveIndex )
 		{
+			if( geometryTopologies_[ primitiveIndex ] != GeometryTopology::Triangle )
+			{
+				continue;
+			}
 			const World::PrimitiveType primitive = static_cast<World::PrimitiveType>( primitiveIndex );
 			BuildBatch( world, primitive, true );
+		}
+		wireframeDrawCount_ = static_cast<uint32_t>( indirectDraws_.size() ) - solidDrawCount_;
+
+		for( uint32_t primitiveIndex = 0; primitiveIndex < ourPrimitiveCount; ++primitiveIndex )
+		{
+			if( geometryTopologies_[ primitiveIndex ] != GeometryTopology::Line )
+			{
+				continue;
+			}
+			const World::PrimitiveType primitive = static_cast<World::PrimitiveType>( primitiveIndex );
+			BuildBatch( world, primitive, false );
 		}
 	}
 
@@ -426,6 +466,7 @@ float4 main(PSInput input) : SV_Target0
 		sphere.indexCount = static_cast<uint32_t>( indices_.size() ) - sphere.firstIndex;
 
 		GeometryRange& arrow = geometries_[ static_cast<uint32_t>( World::PrimitiveType::Arrow ) ];
+		geometryTopologies_[ static_cast<uint32_t>( World::PrimitiveType::Arrow ) ] = GeometryTopology::Line;
 		arrow.firstVertex = static_cast<int32_t>( vertices_.size() );
 		arrow.firstIndex = static_cast<uint32_t>( indices_.size() );
 		AppendArrowGeometry();
@@ -509,58 +550,17 @@ float4 main(PSInput input) : SV_Target0
 
 	void RenderWorld::AppendArrowGeometry()
 	{
-		const uint32_t firstVertex = static_cast<uint32_t>( vertices_.size() );
-		for( uint32_t segment = 0; segment < ourArrowSegments; ++segment )
-		{
-			const float angle = static_cast<float>( segment ) /
-				static_cast<float>( ourArrowSegments ) * std::numbers::pi_v<float> * 2.0f;
-			const float x = std::cos( angle ) * ourArrowShaftRadius;
-			const float y = std::sin( angle ) * ourArrowShaftRadius;
-			vertices_.push_back( { { x, y, 0.0f } } );
-			vertices_.push_back( { { x, y, ourArrowHeadStart } } );
-		}
-
-		for( uint32_t segment = 0; segment < ourArrowSegments; ++segment )
-		{
-			const uint32_t nextSegment = ( segment + 1u ) % ourArrowSegments;
-			const uint32_t bottom = segment * 2u;
-			const uint32_t top = bottom + 1u;
-			const uint32_t nextBottom = nextSegment * 2u;
-			const uint32_t nextTop = nextBottom + 1u;
-			indices_.push_back( bottom );
-			indices_.push_back( top );
-			indices_.push_back( nextTop );
-			indices_.push_back( bottom );
-			indices_.push_back( nextTop );
-			indices_.push_back( nextBottom );
-		}
-
-		const uint32_t headFirstVertex = ourArrowSegments * 2u;
-		for( uint32_t segment = 0; segment < ourArrowSegments; ++segment )
-		{
-			const float angle = static_cast<float>( segment ) /
-				static_cast<float>( ourArrowSegments ) * std::numbers::pi_v<float> * 2.0f;
-			const float x = std::cos( angle ) * ourArrowHeadRadius;
-			const float y = std::sin( angle ) * ourArrowHeadRadius;
-			vertices_.push_back( { { x, y, ourArrowHeadStart } } );
-		}
-
-		const uint32_t tipVertex = static_cast<uint32_t>( vertices_.size() ) - firstVertex;
+		vertices_.push_back( { { 0.0f, 0.0f, 0.0f } } );
 		vertices_.push_back( { { 0.0f, 0.0f, 1.0f } } );
-		const uint32_t headCenterVertex = static_cast<uint32_t>( vertices_.size() ) - firstVertex;
-		vertices_.push_back( { { 0.0f, 0.0f, ourArrowHeadStart } } );
+		vertices_.push_back( { { 0.0f, ourArrowHeadWidth, ourArrowHeadStart } } );
+		vertices_.push_back( { { 0.0f, -ourArrowHeadWidth, ourArrowHeadStart } } );
 
-		for( uint32_t segment = 0; segment < ourArrowSegments; ++segment )
-		{
-			const uint32_t current = headFirstVertex + segment;
-			const uint32_t next = headFirstVertex + ( segment + 1u ) % ourArrowSegments;
-			indices_.push_back( current );
-			indices_.push_back( tipVertex );
-			indices_.push_back( next );
-			indices_.push_back( current );
-			indices_.push_back( next );
-			indices_.push_back( headCenterVertex );
-		}
+		indices_.push_back( 0u );
+		indices_.push_back( 1u );
+		indices_.push_back( 1u );
+		indices_.push_back( 2u );
+		indices_.push_back( 1u );
+		indices_.push_back( 3u );
 	}
 
 	void RenderWorld::UploadStaticGeometry()

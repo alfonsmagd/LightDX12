@@ -247,6 +247,7 @@ if(LDX12_BUILD_EXAMPLES)
 
     set(TRIANGLE_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/samples/Triangle/main.cpp")
     set(TEXTURED_CUBE_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/samples/TexturedCube/main.cpp")
+    set(Z_FIGHTING_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/samples/ZFighting/main.cpp")
     set(VIEWPORT_SCISSOR_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/samples/ViewportScissor/main.cpp")
     set(TEXTURE_SAMPLERS_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/samples/TextureSamplers/main.cpp")
     set(CBSRVCUBES_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/samples/CBSRVCubes/main.cpp")
@@ -259,6 +260,8 @@ if(LDX12_BUILD_EXAMPLES)
     set_source_files_properties("${COOKBOOK_CHAPTER02_SHADER}" PROPERTIES HEADER_FILE_ONLY TRUE)
     add_ldx12_sample(Triangle "${TRIANGLE_SOURCE}")
     add_ldx12_sample(TexturedCube "${TEXTURED_CUBE_SOURCE}")
+    add_ldx12_sample(ZFighting "${Z_FIGHTING_SOURCE}")
+    target_link_libraries(ZFighting PRIVATE Ldx12::ImGui)
     add_ldx12_sample(ViewportScissor "${VIEWPORT_SCISSOR_SOURCE}")
     add_ldx12_sample(TextureSamplers "${TEXTURE_SAMPLERS_SOURCE}")
     add_ldx12_sample(CBSRVCubes "${CBSRVCUBES_SOURCE}" "${CBSRVCUBES_README}" "${CBSRVCUBES_SHADER}")
@@ -286,8 +289,8 @@ if(LDX12_BUILD_EXAMPLES)
         target_compile_options(ImGuiDemoNative PRIVATE /W4 /EHsc /permissive- /MP)
     endif()
 
-    set(LDX12_EXAMPLE_TARGETS Triangle TexturedCube ViewportScissor TextureSamplers CBSRVCubes CookbookChapter02 WorldGeometry ImGuiDemo ImGuiDemoNative)
-    set(LDX12_EXAMPLE_SOURCES "${TRIANGLE_SOURCE}" "${TEXTURED_CUBE_SOURCE}" "${VIEWPORT_SCISSOR_SOURCE}" "${TEXTURE_SAMPLERS_SOURCE}" "${CBSRVCUBES_SOURCE}" "${CBSRVCUBES_README}" "${CBSRVCUBES_SHADER}" "${COOKBOOK_CHAPTER02_SOURCE}" "${COOKBOOK_CHAPTER02_README}" "${COOKBOOK_CHAPTER02_SHADER}" "${WORLD_GEOMETRY_SOURCE}" "${IMGUI_DEMO_SOURCE}" "${IMGUI_DEMO_NATIVE_SOURCE}")
+    set(LDX12_EXAMPLE_TARGETS Triangle TexturedCube ZFighting ViewportScissor TextureSamplers CBSRVCubes CookbookChapter02 WorldGeometry ImGuiDemo ImGuiDemoNative)
+    set(LDX12_EXAMPLE_SOURCES "${TRIANGLE_SOURCE}" "${TEXTURED_CUBE_SOURCE}" "${Z_FIGHTING_SOURCE}" "${VIEWPORT_SCISSOR_SOURCE}" "${TEXTURE_SAMPLERS_SOURCE}" "${CBSRVCUBES_SOURCE}" "${CBSRVCUBES_README}" "${CBSRVCUBES_SHADER}" "${COOKBOOK_CHAPTER02_SOURCE}" "${COOKBOOK_CHAPTER02_README}" "${COOKBOOK_CHAPTER02_SHADER}" "${WORLD_GEOMETRY_SOURCE}" "${IMGUI_DEMO_SOURCE}" "${IMGUI_DEMO_NATIVE_SOURCE}")
 
     if(LDX12_BUILD_APP)
         set(IMGUI_NODE_EDITOR_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/samples/ImGuiNodeEditor/main.cpp")
@@ -321,6 +324,7 @@ if(LDX12_BUILD_TESTS)
         "${CMAKE_CURRENT_SOURCE_DIR}/tests/Ldx12/GpuInvalidHandleTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/tests/Ldx12/GpuSubmissionTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/tests/Ldx12/GpuDescriptorRecyclingTest.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/Ldx12/GpuMultisampleTest.cpp"
     )
     add_executable(Ldx12Tests ${LDX12_CORE_TEST_SOURCES})
     target_compile_features(Ldx12Tests PRIVATE cxx_std_20)

@@ -175,6 +175,12 @@ namespace ldx12::utils
 			uint32_t indexCount = 0;
 		};
 
+		enum class GeometryTopology : uint8_t
+		{
+			Triangle,
+			Line,
+		};
+
 		struct PushConstants
 		{
 			std::array<float, 16> viewProjection = {};
@@ -202,6 +208,7 @@ namespace ldx12::utils
 		RenderDevice* device_ = nullptr;
 		RenderPipelineState solidPipeline_;
 		RenderPipelineState wireframePipeline_;
+		RenderPipelineState linePipeline_;
 		BufferHandle vertexBuffer_ = {};
 		BufferHandle indexBuffer_ = {};
 		BufferHandle instanceBuffer_ = {};
@@ -214,11 +221,13 @@ namespace ldx12::utils
 		std::vector<uint32_t> objectIndices_;
 		static constexpr uint32_t ourPrimitiveCount = static_cast<uint32_t>( World::PrimitiveType::Count );
 		std::array<GeometryRange, ourPrimitiveCount> geometries_ = {};
+		std::array<GeometryTopology, ourPrimitiveCount> geometryTopologies_ = {};
 		const World* synchronizedWorld_ = nullptr;
 		uint64_t instanceBufferCapacity_ = 0;
 		uint64_t indirectBufferCapacity_ = 0;
 		uint64_t uploadedObjectRevision_ = std::numeric_limits<uint64_t>::max();
 		uint64_t uploadedTransformRevision_ = std::numeric_limits<uint64_t>::max();
 		uint32_t solidDrawCount_ = 0;
+		uint32_t wireframeDrawCount_ = 0;
 	};
 }
