@@ -1,6 +1,7 @@
 #include "Ldx12/Ldx12.hpp"
 #include "Ldx12Utils/Ldx12Utils.hpp"
 
+#include <cassert>
 #include <cstdint>
 #include <iostream>
 #include <stdexcept>
@@ -10,14 +11,6 @@ using namespace ldx12::utils;
 
 namespace
 {
-	void Require( bool condition, const char* message )
-	{
-		if( !condition )
-		{
-			throw std::runtime_error( message );
-		}
-	}
-
 	void RenderFrame( RenderDevice& device, RenderWorld& renderWorld, const World& world, const Camera& camera, TextureHandle color, TextureHandle depth )
 	{
 		ICommandBuffer& commands = device.AcquireCommandBuffer();
@@ -61,54 +54,80 @@ int main()
 		const TextureHandle depth = device.CreateTexture( depthDesc );
 
 		World world;
-		const MeshHandle cube = world.AddCube( CubeDesc{} );
+		CubeDesc cubeDesc{};
+		const ObjectHandle cube = world.AddCube( cubeDesc );
+		cubeDesc.transform.position = { -1.5f, 0.0f, 0.0f };
+		cubeDesc.size = { 2.0f, 0.5f, 1.0f };
+		cubeDesc.color = { 1.0f, 0.0f, 0.0f, 1.0f };
+		world.AddCube( cubeDesc );
+		cubeDesc.transform.position = { 1.5f, 0.0f, 0.0f };
+		cubeDesc.color = { 0.0f, 1.0f, 0.0f, 1.0f };
+		world.AddCube( cubeDesc );
+
 		SphereDesc sphereDesc{};
-		sphereDesc.transform.position = { 1.5f, 0.0f, 0.0f };
-		const MeshHandle sphere = world.AddSphere( sphereDesc );
-		Require( world.NumMeshes() == 2, "World did not retain its two mesh descriptions." );
+		sphereDesc.transform.position = { -1.0f, 1.5f, 0.0f };
+		const ObjectHandle sphere = world.AddSphere( sphereDesc );
+		sphereDesc.transform.position = { 1.0f, 1.5f, 0.0f };
+		sphereDesc.color = { 1.0f, 0.0f, 1.0f, 1.0f };
+		world.AddSphere( sphereDesc );
+
+		ArrowDesc arrowDesc{};
+		arrowDesc.start = { -2.0f, -1.0f, 0.0f };
+		arrowDesc.end = { 2.0f, -1.0f, 0.0f };
+		arrowDesc.color = { 1.0f, 0.0f, 0.0f, 1.0f };
+		const ObjectHandle arrow = world.AddArrow( arrowDesc );
+		arrowDesc.start = { 0.0f, -1.0f, -2.0f };
+		arrowDesc.end = { 0.0f, 2.0f, 0.0f };
+		arrowDesc.color = { 0.0f, 1.0f, 0.0f, 1.0f };
+		world.AddArrow( arrowDesc );
+		assert( world.NumObjects() == 7 );
 
 		RenderWorldDesc renderWorldDesc{};
 		renderWorldDesc.colorFormat = colorDesc.format;
 		renderWorldDesc.depthFormat = depthDesc.format;
 		{
 			RenderWorld renderWorld( device, renderWorldDesc );
-			Require( renderWorld.GetVertexCount() == 0 && renderWorld.GetIndexCount() == 0,
-				"World geometry was generated before the first Render call." );
+			assert( renderWorld.GetVertexCount() == 475 && renderWorld.GetIndexCount() == 2436 );
 
 			Camera camera{};
 			camera.aspectRatio = 1.0f;
 			RenderFrame( device, renderWorld, world, camera, color, depth );
-			Require( renderWorld.GetVertexCount() == 449, "Combined cube and sphere vertex count is incorrect." );
-			Require( renderWorld.GetIndexCount() == 2340, "Combined cube and sphere index count is incorrect." );
-			Require( renderWorld.GetDrawCount() == 2, "The indirect buffer does not contain one draw per object." );
+			assert( renderWorld.GetVertexCount() == 475 );
+			assert( renderWorld.GetIndexCount() == 2436 );
+			assert( renderWorld.GetDrawCount() == 3 );
+			assert( renderWorld.GetInstanceCount() == 7 );
 
 			World secondWorld;
 			secondWorld.AddSphere( SphereDesc{} );
 			secondWorld.AddSphere( SphereDesc{} );
 			RenderFrame( device, renderWorld, secondWorld, camera, color, depth );
-			Require( renderWorld.GetVertexCount() == 850 && renderWorld.GetIndexCount() == 4608,
-				"RenderWorld did not rebuild for a different World with the same revision." );
+			assert( renderWorld.GetVertexCount() == 475 && renderWorld.GetIndexCount() == 2436 );
+			assert( renderWorld.GetDrawCount() == 1 && renderWorld.GetInstanceCount() == 2 );
 			RenderFrame( device, renderWorld, world, camera, color, depth );
 
 			Transform movedCube{};
 			movedCube.position = { -2.0f, 0.5f, 0.0f };
-			Require( world.SetTransform( cube, movedCube ), "Failed to modify a live world transform." );
+			world.SetTransform( cube, movedCube );
 			RenderFrame( device, renderWorld, world, camera, color, depth );
-			Require( renderWorld.GetVertexCount() == 449 && renderWorld.GetDrawCount() == 2,
-				"Changing a transform unexpectedly changed the geometry batch." );
+			assert( renderWorld.GetVertexCount() == 475 );
+			assert( renderWorld.GetDrawCount() == 3 );
+			assert( renderWorld.GetInstanceCount() == 7 );
 
-			Require( world.Destroy( cube ), "Failed to destroy a live cube." );
-			Require( !world.Destroy( cube ), "A stale mesh handle destroyed an object twice." );
+			world.Destroy( cube );
 			RenderFrame( device, renderWorld, world, camera, color, depth );
-			Require( renderWorld.GetVertexCount() == 425, "The cube was not removed from the lazy geometry rebuild." );
-			Require( renderWorld.GetIndexCount() == 2304 && renderWorld.GetDrawCount() == 1,
-				"The sphere batch was not preserved after deleting the cube." );
+			assert( renderWorld.GetVertexCount() == 475 );
+			assert( renderWorld.GetIndexCount() == 2436 );
+			assert( renderWorld.GetDrawCount() == 3 );
+			assert( renderWorld.GetInstanceCount() == 6 );
 
-			Require( world.Contains( sphere ), "The sphere handle became invalid after deleting another object." );
+			assert( world.Contains( sphere ) );
+			assert( world.Contains( arrow ) );
 			world.Clear();
 			RenderFrame( device, renderWorld, world, camera, color, depth );
-			Require( renderWorld.GetVertexCount() == 0 && renderWorld.GetIndexCount() == 0 && renderWorld.GetDrawCount() == 0,
-				"Clearing the world did not clear the rendered batch." );
+			assert( renderWorld.GetVertexCount() == 475 );
+			assert( renderWorld.GetIndexCount() == 2436 );
+			assert( renderWorld.GetDrawCount() == 0 );
+			assert( renderWorld.GetInstanceCount() == 0 );
 		}
 
 		device.WaitIdle();

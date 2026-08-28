@@ -22,14 +22,23 @@ namespace ldx12::utils
 	{
 		Transform transform = {};
 		DirectX::XMFLOAT3 size = { 1.0f, 1.0f, 1.0f };
+		DirectX::XMFLOAT4 color = { 0.20f, 0.65f, 1.00f, 1.0f };
+		bool wireframe = false;
 	};
 
 	struct SphereDesc
 	{
 		Transform transform = {};
 		float radius = 0.5f;
-		uint32_t longitudeSegments = 24;
-		uint32_t latitudeSegments = 16;
+		DirectX::XMFLOAT4 color = { 1.00f, 0.75f, 0.20f, 1.0f };
+		bool wireframe = true;
+	};
+
+	struct ArrowDesc
+	{
+		DirectX::XMFLOAT3 start = {};
+		DirectX::XMFLOAT3 end = { 0.0f, 1.0f, 0.0f };
+		DirectX::XMFLOAT4 color = { 1.0f, 0.25f, 0.10f, 1.0f };
 	};
 
 	struct Camera
@@ -43,21 +52,21 @@ namespace ldx12::utils
 		float farPlane = 1000.0f;
 	};
 
-	class MeshHandle final
+	class ObjectHandle final
 	{
 	public:
-		MeshHandle() = default;
+		ObjectHandle() = default;
 
 		[[nodiscard]] bool Valid() const noexcept { return generation_ != 0; }
 		[[nodiscard]] uint32_t Index() const noexcept { return index_; }
 		[[nodiscard]] uint32_t Generation() const noexcept { return generation_; }
-		[[nodiscard]] bool operator==( const MeshHandle& other ) const noexcept { return index_ == other.index_ && generation_ == other.generation_; }
-		[[nodiscard]] bool operator!=( const MeshHandle& other ) const noexcept { return !(*this == other); }
+		[[nodiscard]] bool operator==( const ObjectHandle& other ) const noexcept { return index_ == other.index_ && generation_ == other.generation_; }
+		[[nodiscard]] bool operator!=( const ObjectHandle& other ) const noexcept { return !(*this == other); }
 
 	private:
 		friend class World;
 
-		MeshHandle( uint32_t index, uint32_t generation ) noexcept: index_( index ), generation_( generation ) {}
+		ObjectHandle( uint32_t index, uint32_t generation ) noexcept: index_( index ), generation_( generation ) {}
 
 		uint32_t index_ = 0;
 		uint32_t generation_ = 0;
@@ -66,32 +75,37 @@ namespace ldx12::utils
 	class World final
 	{
 	public:
-		MeshHandle AddCube( const CubeDesc& desc );
-		MeshHandle AddSphere( const SphereDesc& desc );
-		bool SetTransform( MeshHandle mesh, const Transform& transform );
-		bool Destroy( MeshHandle mesh );
+		ObjectHandle AddCube( const CubeDesc& desc );
+		ObjectHandle AddSphere( const SphereDesc& desc );
+		ObjectHandle AddArrow( const ArrowDesc& desc );
+		bool SetTransform( ObjectHandle object, const Transform& transform );
+		bool Destroy( ObjectHandle object );
 		void Clear();
 
-		[[nodiscard]] bool Contains( MeshHandle mesh ) const noexcept;
-		[[nodiscard]] uint32_t NumMeshes() const noexcept { return meshCount_; }
+		[[nodiscard]] bool Contains( ObjectHandle object ) const noexcept;
+		[[nodiscard]] uint32_t NumObjects() const noexcept { return objectCount_; }
 
 	private:
 		friend class RenderWorld;
 
-		enum class GeometryType : uint8_t
+		enum class PrimitiveType : uint8_t
 		{
 			Cube,
 			Sphere,
+			Arrow,
+			Count,
 		};
 
 		struct Object
 		{
-			GeometryType geometry = GeometryType::Cube;
+			PrimitiveType primitive = PrimitiveType::Cube;
 			Transform transform = {};
 			DirectX::XMFLOAT3 cubeSize = { 1.0f, 1.0f, 1.0f };
 			float sphereRadius = 0.5f;
-			uint32_t longitudeSegments = 24;
-			uint32_t latitudeSegments = 16;
+			DirectX::XMFLOAT3 arrowStart = {};
+			DirectX::XMFLOAT3 arrowEnd = { 0.0f, 1.0f, 0.0f };
+			DirectX::XMFLOAT4 color = { 1.0f, 1.0f, 1.0f, 1.0f };
+			bool wireframe = false;
 		};
 
 		struct Slot
@@ -101,15 +115,15 @@ namespace ldx12::utils
 			bool occupied = false;
 		};
 
-		MeshHandle AddObject( Object&& object );
-		Object* GetObject( MeshHandle mesh ) noexcept;
+		ObjectHandle AddObject( Object&& object );
+		Object* GetObject( ObjectHandle object ) noexcept;
 		static void IncrementGeneration( Slot& slot ) noexcept;
 
 		std::vector<Slot> objects_;
 		std::vector<uint32_t> freeSlots_;
-		uint64_t geometryRevision_ = 1;
+		uint64_t objectRevision_ = 1;
 		uint64_t transformRevision_ = 1;
-		uint32_t meshCount_ = 0;
+		uint32_t objectCount_ = 0;
 	};
 
 	struct RenderWorldDesc
@@ -132,8 +146,9 @@ namespace ldx12::utils
 		void Render( ICommandBuffer& commands, const World& world, const Camera& camera );
 
 		[[nodiscard]] uint32_t GetVertexCount() const noexcept { return static_cast<uint32_t>( vertices_.size() ); }
-		[[nodiscard]] uint32_t GetIndexCount() const noexcept { return indexCount_; }
-		[[nodiscard]] uint32_t GetDrawCount() const noexcept { return drawCount_; }
+		[[nodiscard]] uint32_t GetIndexCount() const noexcept { return static_cast<uint32_t>( indices_.size() ); }
+		[[nodiscard]] uint32_t GetDrawCount() const noexcept { return static_cast<uint32_t>( indirectDraws_.size() ); }
+		[[nodiscard]] uint32_t GetInstanceCount() const noexcept { return static_cast<uint32_t>( instances_.size() ); }
 
 	private:
 		struct Vertex
@@ -147,52 +162,63 @@ namespace ldx12::utils
 			D3D12_DRAW_INDEXED_ARGUMENTS arguments = {};
 		};
 
-		struct GpuTransform
+		struct GpuInstance
 		{
 			std::array<float, 16> model = {};
+			DirectX::XMFLOAT4 color = {};
+		};
+
+		struct GeometryRange
+		{
+			int32_t firstVertex = 0;
+			uint32_t firstIndex = 0;
+			uint32_t indexCount = 0;
 		};
 
 		struct PushConstants
 		{
 			std::array<float, 16> viewProjection = {};
-			uint32_t transformBufferIndex = 0;
+			uint32_t instanceBufferIndex = 0;
 		};
 
 		void Synchronize( const World& world );
-		void RebuildGeometry( const World& world );
-		void RebuildTransforms( const World& world );
-		void AppendCube( const World::Object& object );
-		void AppendSphere( const World::Object& object );
-		void UploadVertexBuffer();
-		void UploadIndexBuffer();
-		void UploadTransformBuffer();
+		void RebuildRenderData( const World& world );
+		void RebuildInstancesOnly( const World& world );
+		void BuildBatch( const World& world, World::PrimitiveType primitive, bool wireframe );
+		void BuildPrimitiveGeometry();
+		void AppendCubeGeometry();
+		void AppendSphereGeometry();
+		void AppendArrowGeometry();
+		void UploadStaticGeometry();
+		void UploadInstanceBuffer();
 		void UploadIndirectBuffer();
+		void UploadDynamicBuffer( BufferHandle& buffer, uint64_t& capacity, const void* data, uint64_t elementCount, uint32_t stride, BufferType type, const char* debugName );
 		void RetireBuffer( BufferHandle& buffer );
 		void ReleaseBuffers();
 		static uint64_t GrowCapacity( uint64_t requiredSize );
-		static GpuTransform BuildGpuTransform( const Transform& transform );
-		static PushConstants BuildPushConstants( RenderDevice& device, BufferHandle transformBuffer, const Camera& camera );
+		static GpuInstance BuildGpuInstance( const World::Object& object );
+		static PushConstants BuildPushConstants( RenderDevice& device, BufferHandle instanceBuffer, const Camera& camera );
 
 		RenderDevice* device_ = nullptr;
-		RenderPipelineState pipeline_;
+		RenderPipelineState solidPipeline_;
+		RenderPipelineState wireframePipeline_;
 		BufferHandle vertexBuffer_ = {};
 		BufferHandle indexBuffer_ = {};
-		BufferHandle transformBuffer_ = {};
+		BufferHandle instanceBuffer_ = {};
 		BufferHandle indirectBuffer_ = {};
 		std::vector<BufferHandle> retiredBuffers_;
 		std::vector<Vertex> vertices_;
 		std::vector<uint32_t> indices_;
-		std::vector<GpuTransform> transforms_;
+		std::vector<GpuInstance> instances_;
 		std::vector<IndirectDraw> indirectDraws_;
 		std::vector<uint32_t> objectIndices_;
+		static constexpr uint32_t ourPrimitiveCount = static_cast<uint32_t>( World::PrimitiveType::Count );
+		std::array<GeometryRange, ourPrimitiveCount> geometries_ = {};
 		const World* synchronizedWorld_ = nullptr;
-		uint64_t vertexBufferCapacity_ = 0;
-		uint64_t indexBufferCapacity_ = 0;
-		uint64_t transformBufferCapacity_ = 0;
+		uint64_t instanceBufferCapacity_ = 0;
 		uint64_t indirectBufferCapacity_ = 0;
-		uint64_t uploadedGeometryRevision_ = std::numeric_limits<uint64_t>::max();
+		uint64_t uploadedObjectRevision_ = std::numeric_limits<uint64_t>::max();
 		uint64_t uploadedTransformRevision_ = std::numeric_limits<uint64_t>::max();
-		uint32_t indexCount_ = 0;
-		uint32_t drawCount_ = 0;
+		uint32_t solidDrawCount_ = 0;
 	};
 }

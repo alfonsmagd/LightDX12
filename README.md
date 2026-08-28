@@ -44,6 +44,8 @@ Ldx12 manages the device, swapchain, descriptor heaps, root signature, command-l
 | --- | --- |
 | [![CBSRVCubes](examples/images/03-cbsrv-cubes.png)](samples/CBSRVCubes) | [![ImGuiNodeEditor](examples/images/04-imgui-node-editor.png)](samples/ImGuiNodeEditor) |
 
+[TexturedCube](samples/TexturedCube) · [TextureSamplers](samples/TextureSamplers) · [CookbookChapter02](samples/CookbookChapter02) · [WorldGeometry](samples/WorldGeometry) · [ImGuiDemo](samples/ImGuiDemo)
+
 ## Get started
 
 Requirements: Windows 10/11, Visual Studio 2022 with Desktop development with C++, the Windows SDK with DXC, and an x64 target.
@@ -92,6 +94,7 @@ When used as a subproject, Ldx12 builds only the core library by default. Instal
 | `LDX12_BUILD_APP` | `ON` | `OFF` |
 | `LDX12_BUILD_EXAMPLES` | `ON` | `OFF` |
 | `LDX12_BUILD_TESTS` | `ON` | `OFF` |
+| `LDX12_BUILD_UTILS` | `OFF` | `OFF` |
 | `LDX12_INSTALL` | `ON` | `OFF` |
 
 </details>
@@ -105,6 +108,7 @@ When used as a subproject, Ldx12 builds only the core library by default. Instal
 - Fixed or dynamic bindless descriptors and push constants.
 - Submission batches, fences, waits and deferred GPU-safe destruction.
 - Debug layer, GPU labels, optional PIX capture attachment and native D3D12 access.
+- Optional `Ldx12::Utils` renderer with indirectly batched cubes, spheres and colored arrows.
 
 Normal rendering only requires `Ldx12.hpp`. Advanced integrations can include `Ldx12Native.hpp` and call `GetNative()` to obtain borrowed D3D12 objects.
 

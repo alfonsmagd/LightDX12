@@ -120,7 +120,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		HWND hwnd = CreateWindowExW(
 			0,
 			windowClass.lpszClassName,
-			L"Ldx12 World - Space adds or removes the sphere",
+			L"Ldx12 World - Instanced geometry and debug wireframes",
 			WS_OVERLAPPEDWINDOW,
 			CW_USEDEFAULT,
 			CW_USEDEFAULT,
@@ -155,16 +155,57 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		RecreateDepthTarget( app );
 
 		World world;
-		const MeshHandle cube = world.AddCube( CubeDesc{} );
-		Transform cubeTransform{};
-		cubeTransform.position = { -1.1f, 0.0f, 0.0f };
-		cubeTransform.rotation = { 0.2f, 0.55f, 0.0f };
-		world.SetTransform( cube, cubeTransform );
+		CubeDesc cubeDesc{};
+		cubeDesc.transform.position = { -3.0f, -0.6f, 0.0f };
+		cubeDesc.transform.rotation = { 0.15f, 0.25f, 0.0f };
+		cubeDesc.color = { 1.0f, 0.20f, 0.15f, 1.0f };
+		world.AddCube( cubeDesc );
+
+		cubeDesc.transform.position = { -1.5f, -0.2f, 0.4f };
+		cubeDesc.transform.rotation = { 0.25f, 0.55f, 0.0f };
+		cubeDesc.size = { 0.8f, 1.6f, 0.8f };
+		cubeDesc.color = { 1.0f, 0.60f, 0.10f, 1.0f };
+		world.AddCube( cubeDesc );
+
+		cubeDesc.transform.position = { 0.0f, 0.1f, 0.0f };
+		cubeDesc.transform.rotation = { 0.35f, 0.80f, 0.1f };
+		cubeDesc.size = { 1.2f, 1.2f, 1.2f };
+		cubeDesc.color = { 0.20f, 0.90f, 0.35f, 1.0f };
+		world.AddCube( cubeDesc );
+
+		cubeDesc.transform.position = { 1.5f, -0.2f, 0.4f };
+		cubeDesc.transform.rotation = { 0.20f, 1.10f, 0.0f };
+		cubeDesc.size = { 0.8f, 1.6f, 0.8f };
+		cubeDesc.color = { 0.15f, 0.55f, 1.0f, 1.0f };
+		world.AddCube( cubeDesc );
+
+		cubeDesc.transform.position = { 3.0f, -0.6f, 0.0f };
+		cubeDesc.transform.rotation = { 0.15f, 1.35f, 0.0f };
+		cubeDesc.size = { 1.0f, 1.0f, 1.0f };
+		cubeDesc.color = { 0.75f, 0.25f, 1.0f, 1.0f };
+		world.AddCube( cubeDesc );
 
 		SphereDesc sphereDesc{};
-		sphereDesc.transform.position = { 1.1f, 0.0f, 0.0f };
-		sphereDesc.radius = 0.7f;
-		MeshHandle sphere = world.AddSphere( sphereDesc );
+		sphereDesc.transform.position = { -2.25f, 1.15f, 0.2f };
+		sphereDesc.radius = 0.8f;
+		sphereDesc.color = { 0.20f, 0.95f, 1.0f, 1.0f };
+		world.AddSphere( sphereDesc );
+
+		sphereDesc.transform.position = { 2.25f, 1.15f, 0.2f };
+		sphereDesc.color = { 1.0f, 0.25f, 0.75f, 1.0f };
+		world.AddSphere( sphereDesc );
+
+		SphereDesc debugSphereDesc{};
+		debugSphereDesc.transform.position = { 0.0f, 1.75f, 0.3f };
+		debugSphereDesc.radius = 1.0f;
+		debugSphereDesc.color = { 1.0f, 0.95f, 0.20f, 1.0f };
+		ObjectHandle debugSphere = world.AddSphere( debugSphereDesc );
+
+		ArrowDesc arrowDesc{};
+		arrowDesc.start = { -3.5f, -1.8f, 0.0f };
+		arrowDesc.end = { -3.5f, 1.8f, 0.0f };
+		arrowDesc.color = { 1.0f, 0.85f, 0.10f, 1.0f };
+		world.AddArrow( arrowDesc );
 
 		RenderWorldDesc renderWorldDesc{};
 		renderWorldDesc.colorFormat = contextDesc.swapchainFormat;
@@ -172,7 +213,8 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		{
 			RenderWorld renderWorld( device, renderWorldDesc );
 			Camera camera{};
-			camera.position = { 0.0f, 2.0f, -6.0f };
+			camera.position = { 0.0f, 3.0f, -10.0f };
+			camera.target = { 0.0f, 0.4f, 0.0f };
 
 			MSG message{};
 			while( app.running )
@@ -195,13 +237,13 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 
 				if( app.toggleSphere )
 				{
-					if( world.Contains( sphere ) )
+					if( world.Contains( debugSphere ) )
 					{
-						world.Destroy( sphere );
+						world.Destroy( debugSphere );
 					}
 					else
 					{
-						sphere = world.AddSphere( sphereDesc );
+						debugSphere = world.AddSphere( debugSphereDesc );
 					}
 					app.toggleSphere = false;
 				}

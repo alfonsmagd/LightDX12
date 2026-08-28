@@ -1,6 +1,5 @@
 #include "Ldx12Utils/Ldx12Utils.hpp"
 
-#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <cstring>
@@ -14,16 +13,24 @@ namespace ldx12::utils
 {
 	namespace
 	{
+		constexpr uint32_t ourSphereLongitudeSegments = 24;
+		constexpr uint32_t ourSphereLatitudeSegments = 16;
+		constexpr uint32_t ourArrowSegments = 8;
+		constexpr float ourArrowShaftRadius = 0.025f;
+		constexpr float ourArrowHeadRadius = 0.09f;
+		constexpr float ourArrowHeadStart = 0.72f;
+
 		constexpr char ourWorldVertexShader[] = R"(
-struct WorldTransform
+struct WorldInstance
 {
     row_major float4x4 model;
+    float4 color;
 };
 
 cbuffer PushConstants : register(b0)
 {
     row_major float4x4 viewProjection;
-    uint transformBufferIndex;
+    uint instanceBufferIndex;
 };
 
 struct BaseInstance
@@ -36,6 +43,7 @@ ConstantBuffer<BaseInstance> baseInstance : register(b1); // Written by ExecuteI
 struct VSInput
 {
     float3 position : POSITION;
+    uint instanceId : SV_InstanceID;
 };
 
 struct VSOutput
@@ -46,15 +54,13 @@ struct VSOutput
 
 VSOutput main(VSInput input)
 {
-    StructuredBuffer<WorldTransform> transforms = ResourceDescriptorHeap[transformBufferIndex];
-    const WorldTransform transform = transforms[baseInstance.index];
-    const float4 worldPosition = mul(float4(input.position, 1.0), transform.model);
+    StructuredBuffer<WorldInstance> instances = ResourceDescriptorHeap[instanceBufferIndex];
+    const WorldInstance instance = instances[baseInstance.index + input.instanceId];
+    const float4 worldPosition = mul(float4(input.position, 1.0), instance.model);
 
     VSOutput output;
     output.position = mul(worldPosition, viewProjection);
-    output.color = baseInstance.index % 2 == 0
-        ? float3(0.20, 0.65, 1.00)
-        : float3(1.00, 0.45, 0.20);
+    output.color = instance.color.rgb;
     return output;
 }
 )";
@@ -72,18 +78,7 @@ float4 main(PSInput input) : SV_Target0
 }
 )";
 
-		void ValidateTransform( const Transform& transform )
-		{
-			constexpr float minimumScale = 0.00001f;
-			if( std::abs( transform.scale.x ) < minimumScale ||
-				std::abs( transform.scale.y ) < minimumScale ||
-				std::abs( transform.scale.z ) < minimumScale )
-			{
-				throw std::invalid_argument( "World object scale components must be non-zero." );
-			}
-		}
-
-		RenderPipelineState CreateWorldPipeline( RenderDevice& device, const RenderWorldDesc& worldDesc )
+		RenderPipelineState CreateWorldPipeline( RenderDevice& device, const RenderWorldDesc& worldDesc, D3D12_FILL_MODE fillMode )
 		{
 			RenderPipelineDesc desc{};
 			desc.vertexShader.source = ourWorldVertexShader;
@@ -97,6 +92,7 @@ float4 main(PSInput input) : SV_Target0
 			desc.color[ 0 ].format = worldDesc.colorFormat;
 			desc.colorFormat = worldDesc.colorFormat;
 			desc.depthFormat = worldDesc.depthFormat;
+			desc.rasterizerState.FillMode = fillMode;
 			desc.rasterizerState.CullMode = D3D12_CULL_MODE_NONE;
 			desc.depthStencilState.DepthEnable = worldDesc.depthFormat != DXGI_FORMAT_UNKNOWN;
 			desc.depthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
@@ -115,9 +111,17 @@ float4 main(PSInput input) : SV_Target0
 			XMStoreFloat4x4( &storedMatrix, matrix );
 			std::memcpy( destination.data(), &storedMatrix, sizeof( storedMatrix ) );
 		}
+
+		void ValidateTransform( const Transform& transform )
+		{
+			if( transform.scale.x == 0.0f || transform.scale.y == 0.0f || transform.scale.z == 0.0f )
+			{
+				throw std::invalid_argument( "World transform scale components must not be zero." );
+			}
+		}
 	}
 
-	MeshHandle World::AddCube( const CubeDesc& desc )
+	ObjectHandle World::AddCube( const CubeDesc& desc )
 	{
 		if( desc.size.x <= 0.0f || desc.size.y <= 0.0f || desc.size.z <= 0.0f )
 		{
@@ -126,42 +130,53 @@ float4 main(PSInput input) : SV_Target0
 		ValidateTransform( desc.transform );
 
 		Object object{};
-		object.geometry = GeometryType::Cube;
+		object.primitive = PrimitiveType::Cube;
 		object.transform = desc.transform;
 		object.cubeSize = desc.size;
+		object.color = desc.color;
+		object.wireframe = desc.wireframe;
 		return AddObject( std::move( object ) );
 	}
 
-	MeshHandle World::AddSphere( const SphereDesc& desc )
+	ObjectHandle World::AddSphere( const SphereDesc& desc )
 	{
 		if( desc.radius <= 0.0f )
 		{
 			throw std::invalid_argument( "Sphere radius must be greater than zero." );
 		}
-		if( desc.longitudeSegments < 3 || desc.latitudeSegments < 2 )
-		{
-			throw std::invalid_argument( "Sphere requires at least 3 longitude and 2 latitude segments." );
-		}
 		ValidateTransform( desc.transform );
 
 		Object object{};
-		object.geometry = GeometryType::Sphere;
+		object.primitive = PrimitiveType::Sphere;
 		object.transform = desc.transform;
 		object.sphereRadius = desc.radius;
-		object.longitudeSegments = desc.longitudeSegments;
-		object.latitudeSegments = desc.latitudeSegments;
+		object.color = desc.color;
+		object.wireframe = desc.wireframe;
 		return AddObject( std::move( object ) );
 	}
 
-	MeshHandle World::AddObject( Object&& object )
+	ObjectHandle World::AddArrow( const ArrowDesc& desc )
+	{
+		const XMVECTOR start = XMLoadFloat3( &desc.start );
+		const XMVECTOR end = XMLoadFloat3( &desc.end );
+		if( XMVectorGetX( XMVector3LengthSq( end - start ) ) == 0.0f )
+		{
+			throw std::invalid_argument( "Arrow start and end points must be different." );
+		}
+
+		Object object{};
+		object.primitive = PrimitiveType::Arrow;
+		object.arrowStart = desc.start;
+		object.arrowEnd = desc.end;
+		object.color = desc.color;
+		return AddObject( std::move( object ) );
+	}
+
+	ObjectHandle World::AddObject( Object&& object )
 	{
 		uint32_t index = 0;
 		if( freeSlots_.empty() )
 		{
-			if( objects_.size() >= std::numeric_limits<uint32_t>::max() )
-			{
-				throw std::length_error( "World mesh capacity exhausted." );
-			}
 			index = static_cast<uint32_t>( objects_.size() );
 			objects_.push_back( {} );
 		}
@@ -174,15 +189,15 @@ float4 main(PSInput input) : SV_Target0
 		Slot& slot = objects_[ index ];
 		slot.object = std::move( object );
 		slot.occupied = true;
-		meshCount_++;
-		geometryRevision_++;
+		objectCount_++;
+		objectRevision_++;
 		transformRevision_++;
-		return MeshHandle( index, slot.generation );
+		return ObjectHandle( index, slot.generation );
 	}
 
-	bool World::SetTransform( MeshHandle mesh, const Transform& transform )
+	bool World::SetTransform( ObjectHandle objectHandle, const Transform& transform )
 	{
-		Object* object = GetObject( mesh );
+		Object* object = GetObject( objectHandle );
 		if( object == nullptr )
 		{
 			return false;
@@ -194,27 +209,27 @@ float4 main(PSInput input) : SV_Target0
 		return true;
 	}
 
-	bool World::Destroy( MeshHandle mesh )
+	bool World::Destroy( ObjectHandle object )
 	{
-		if( !Contains( mesh ) )
+		if( !Contains( object ) )
 		{
 			return false;
 		}
 
-		Slot& slot = objects_[ mesh.Index() ];
+		Slot& slot = objects_[ object.Index() ];
 		slot.object = {};
 		slot.occupied = false;
 		IncrementGeneration( slot );
-		freeSlots_.push_back( mesh.Index() );
-		meshCount_--;
-		geometryRevision_++;
+		freeSlots_.push_back( object.Index() );
+		objectCount_--;
+		objectRevision_++;
 		transformRevision_++;
 		return true;
 	}
 
 	void World::Clear()
 	{
-		if( meshCount_ == 0 )
+		if( objectCount_ == 0 )
 		{
 			return;
 		}
@@ -233,25 +248,25 @@ float4 main(PSInput input) : SV_Target0
 			freeSlots_.push_back( static_cast<uint32_t>( index ) );
 		}
 
-		meshCount_ = 0;
-		geometryRevision_++;
+		objectCount_ = 0;
+		objectRevision_++;
 		transformRevision_++;
 	}
 
-	bool World::Contains( MeshHandle mesh ) const noexcept
+	bool World::Contains( ObjectHandle object ) const noexcept
 	{
-		if( !mesh.Valid() || mesh.Index() >= objects_.size() )
+		if( !object.Valid() || object.Index() >= objects_.size() )
 		{
 			return false;
 		}
 
-		const Slot& slot = objects_[ mesh.Index() ];
-		return slot.occupied && slot.generation == mesh.Generation();
+		const Slot& slot = objects_[ object.Index() ];
+		return slot.occupied && slot.generation == object.Generation();
 	}
 
-	World::Object* World::GetObject( MeshHandle mesh ) noexcept
+	World::Object* World::GetObject( ObjectHandle object ) noexcept
 	{
-		return Contains( mesh ) ? &objects_[ mesh.Index() ].object : nullptr;
+		return Contains( object ) ? &objects_[ object.Index() ].object : nullptr;
 	}
 
 	void World::IncrementGeneration( Slot& slot ) noexcept
@@ -265,12 +280,11 @@ float4 main(PSInput input) : SV_Target0
 
 	RenderWorld::RenderWorld( RenderDevice& device, const RenderWorldDesc& desc ):
 		device_( &device ),
-		pipeline_( CreateWorldPipeline( device, desc ) )
+		solidPipeline_( CreateWorldPipeline( device, desc, D3D12_FILL_MODE_SOLID ) ),
+		wireframePipeline_( CreateWorldPipeline( device, desc, D3D12_FILL_MODE_WIREFRAME ) )
 	{
-		static_assert( sizeof( Vertex ) == 12 );
-		static_assert( sizeof( IndirectDraw ) == sizeof( uint32_t ) + sizeof( D3D12_DRAW_INDEXED_ARGUMENTS ) );
-		static_assert( sizeof( GpuTransform ) == 64 );
-		static_assert( sizeof( PushConstants ) == 68 );
+		BuildPrimitiveGeometry();
+		UploadStaticGeometry();
 	}
 
 	RenderWorld::~RenderWorld()
@@ -281,128 +295,153 @@ float4 main(PSInput input) : SV_Target0
 	void RenderWorld::Render( ICommandBuffer& commands, const World& world, const Camera& camera )
 	{
 		Synchronize( world );
-		if( indexCount_ == 0 )
+		if( indirectDraws_.empty() )
 		{
 			return;
 		}
 
-		const PushConstants constants = BuildPushConstants( *device_, transformBuffer_, camera );
+		const PushConstants constants = BuildPushConstants( *device_, instanceBuffer_, camera );
 		ScopedCommandDebugGroup debugGroup( commands, "Ldx12 Utils World", 0xff4cc9f0u );
-		commands.CmdBindRenderPipeline( pipeline_ );
 		commands.CmdBindVertexBuffer( vertexBuffer_ );
 		commands.CmdBindIndexBuffer( indexBuffer_ );
 		commands.CmdPushConstants( &constants, sizeof( constants ) );
-		commands.CmdDrawIndexedIndirect( indirectBuffer_, drawCount_ );
+
+		if( solidDrawCount_ > 0 )
+		{
+			commands.CmdBindRenderPipeline( solidPipeline_ );
+			commands.CmdDrawIndexedIndirect( indirectBuffer_, solidDrawCount_ );
+		}
+
+		const uint32_t wireframeDrawCount = static_cast<uint32_t>( indirectDraws_.size() ) - solidDrawCount_;
+		if( wireframeDrawCount > 0 )
+		{
+			commands.CmdBindRenderPipeline( wireframePipeline_ );
+			commands.CmdDrawIndexedIndirect(
+				indirectBuffer_,
+				wireframeDrawCount,
+				static_cast<uint64_t>( solidDrawCount_ ) * sizeof( IndirectDraw ) );
+		}
 	}
 
 	void RenderWorld::Synchronize( const World& world )
 	{
-		if( synchronizedWorld_ != &world || uploadedGeometryRevision_ != world.geometryRevision_ )
+		if( synchronizedWorld_ != &world || uploadedObjectRevision_ != world.objectRevision_ )
 		{
-			RebuildGeometry( world );
-			UploadVertexBuffer();
-			UploadIndexBuffer();
-			UploadTransformBuffer();
+			RebuildRenderData( world );
+			UploadInstanceBuffer();
 			UploadIndirectBuffer();
 			synchronizedWorld_ = &world;
-			uploadedGeometryRevision_ = world.geometryRevision_;
+			uploadedObjectRevision_ = world.objectRevision_;
 			uploadedTransformRevision_ = world.transformRevision_;
 			return;
 		}
 
 		if( uploadedTransformRevision_ != world.transformRevision_ )
 		{
-			RebuildTransforms( world );
-			UploadTransformBuffer();
+			RebuildInstancesOnly( world );
+			UploadInstanceBuffer();
 			uploadedTransformRevision_ = world.transformRevision_;
 		}
 	}
 
-	void RenderWorld::RebuildGeometry( const World& world )
+	void RenderWorld::RebuildRenderData( const World& world )
 	{
-		vertices_.clear();
-		indices_.clear();
-		transforms_.clear();
+		instances_.clear();
 		indirectDraws_.clear();
 		objectIndices_.assign( world.objects_.size(), std::numeric_limits<uint32_t>::max() );
-		transforms_.reserve( world.meshCount_ );
-		uint32_t baseInstance = 0;
+		instances_.reserve( world.objectCount_ );
 
-		for( size_t slotIndex = 0; slotIndex < world.objects_.size(); ++slotIndex )
+		for( uint32_t primitiveIndex = 0; primitiveIndex < ourPrimitiveCount; ++primitiveIndex )
 		{
-			const World::Slot& slot = world.objects_[ slotIndex ];
-			if( !slot.occupied )
-			{
-				continue;
-			}
-
-			const uint32_t objectIndex = baseInstance++;
-			objectIndices_[ slotIndex ] = objectIndex;
-			transforms_.push_back( BuildGpuTransform( slot.object.transform ) );
-			const uint32_t firstIndex = static_cast<uint32_t>( indices_.size() );
-			switch( slot.object.geometry )
-			{
-				case World::GeometryType::Cube:
-					AppendCube( slot.object );
-					break;
-				case World::GeometryType::Sphere:
-					AppendSphere( slot.object );
-					break;
-			}
-
-			const uint64_t objectIndexCount = indices_.size() - firstIndex;
-			if( objectIndexCount > std::numeric_limits<uint32_t>::max() )
-			{
-				throw std::length_error( "One world object exceeds the 32bit index count limit." );
-			}
-			IndirectDraw draw{};
-			draw.baseInstance = objectIndex;
-			draw.arguments.IndexCountPerInstance = static_cast<uint32_t>( objectIndexCount );
-			draw.arguments.InstanceCount = 1;
-			draw.arguments.StartIndexLocation = firstIndex;
-			draw.arguments.BaseVertexLocation = 0;
-			draw.arguments.StartInstanceLocation = 0;
-			indirectDraws_.push_back( draw );
+			const World::PrimitiveType primitive = static_cast<World::PrimitiveType>( primitiveIndex );
+			BuildBatch( world, primitive, false );
 		}
+		solidDrawCount_ = static_cast<uint32_t>( indirectDraws_.size() );
 
-		if( indices_.size() > std::numeric_limits<uint32_t>::max() )
+		for( uint32_t primitiveIndex = 0; primitiveIndex < ourPrimitiveCount; ++primitiveIndex )
 		{
-			throw std::length_error( "World index count exceeds the 32-bit draw limit." );
+			const World::PrimitiveType primitive = static_cast<World::PrimitiveType>( primitiveIndex );
+			BuildBatch( world, primitive, true );
 		}
-		indexCount_ = static_cast<uint32_t>( indices_.size() );
-		drawCount_ = static_cast<uint32_t>( indirectDraws_.size() );
 	}
 
-	void RenderWorld::RebuildTransforms( const World& world )
+	void RenderWorld::RebuildInstancesOnly( const World& world )
 	{
-		transforms_.assign( world.meshCount_, {} );
 		for( size_t slotIndex = 0; slotIndex < world.objects_.size(); ++slotIndex )
 		{
 			const World::Slot& slot = world.objects_[ slotIndex ];
-			if( !slot.occupied )
+			if( slot.occupied )
+			{
+				const uint32_t instanceIndex = objectIndices_[ slotIndex ];
+				instances_[ instanceIndex ] = BuildGpuInstance( slot.object );
+			}
+		}
+	}
+
+	void RenderWorld::BuildBatch( const World& world, World::PrimitiveType primitive, bool wireframe )
+	{
+		const uint32_t primitiveIndex = static_cast<uint32_t>( primitive );
+		const GeometryRange& geometry = geometries_[ primitiveIndex ];
+		const uint32_t firstInstance = static_cast<uint32_t>( instances_.size() );
+		for( size_t slotIndex = 0; slotIndex < world.objects_.size(); ++slotIndex )
+		{
+			const World::Slot& slot = world.objects_[ slotIndex ];
+			if( !slot.occupied || slot.object.primitive != primitive || slot.object.wireframe != wireframe )
 			{
 				continue;
 			}
 
-			const uint32_t objectIndex = objectIndices_[ slotIndex ];
-			if( objectIndex >= transforms_.size() )
-			{
-				throw std::runtime_error( "World transform mapping is out of date." );
-			}
-			transforms_[ objectIndex ] = BuildGpuTransform( slot.object.transform );
+			objectIndices_[ slotIndex ] = static_cast<uint32_t>( instances_.size() );
+			instances_.push_back( BuildGpuInstance( slot.object ) );
 		}
+
+		const uint32_t instanceCount = static_cast<uint32_t>( instances_.size() ) - firstInstance;
+		if( instanceCount == 0 )
+		{
+			return;
+		}
+
+		IndirectDraw draw{};
+		draw.baseInstance = firstInstance;
+		draw.arguments.IndexCountPerInstance = geometry.indexCount;
+		draw.arguments.InstanceCount = instanceCount;
+		draw.arguments.StartIndexLocation = geometry.firstIndex;
+		draw.arguments.BaseVertexLocation = geometry.firstVertex;
+		draw.arguments.StartInstanceLocation = 0;
+		indirectDraws_.push_back( draw );
 	}
 
-	void RenderWorld::AppendCube( const World::Object& object )
+	void RenderWorld::BuildPrimitiveGeometry()
+	{
+		GeometryRange& cube = geometries_[ static_cast<uint32_t>( World::PrimitiveType::Cube ) ];
+		cube.firstVertex = static_cast<int32_t>( vertices_.size() );
+		cube.firstIndex = static_cast<uint32_t>( indices_.size() );
+		AppendCubeGeometry();
+		cube.indexCount = static_cast<uint32_t>( indices_.size() ) - cube.firstIndex;
+
+		GeometryRange& sphere = geometries_[ static_cast<uint32_t>( World::PrimitiveType::Sphere ) ];
+		sphere.firstVertex = static_cast<int32_t>( vertices_.size() );
+		sphere.firstIndex = static_cast<uint32_t>( indices_.size() );
+		AppendSphereGeometry();
+		sphere.indexCount = static_cast<uint32_t>( indices_.size() ) - sphere.firstIndex;
+
+		GeometryRange& arrow = geometries_[ static_cast<uint32_t>( World::PrimitiveType::Arrow ) ];
+		arrow.firstVertex = static_cast<int32_t>( vertices_.size() );
+		arrow.firstIndex = static_cast<uint32_t>( indices_.size() );
+		AppendArrowGeometry();
+		arrow.indexCount = static_cast<uint32_t>( indices_.size() ) - arrow.firstIndex;
+	}
+
+	void RenderWorld::AppendCubeGeometry()
 	{
 		struct Face
 		{
 			std::array<XMFLOAT3, 4> corners;
 		};
 
-		const float halfX = object.cubeSize.x * 0.5f;
-		const float halfY = object.cubeSize.y * 0.5f;
-		const float halfZ = object.cubeSize.z * 0.5f;
+		constexpr float halfX = 0.5f;
+		constexpr float halfY = 0.5f;
+		constexpr float halfZ = 0.5f;
 		const std::array<Face, 6> faces = {
 			Face{ { XMFLOAT3{ -halfX, -halfY, -halfZ }, XMFLOAT3{ -halfX, halfY, -halfZ }, XMFLOAT3{ halfX, halfY, -halfZ }, XMFLOAT3{ halfX, -halfY, -halfZ } } },
 			Face{ { XMFLOAT3{ halfX, -halfY, halfZ }, XMFLOAT3{ halfX, halfY, halfZ }, XMFLOAT3{ -halfX, halfY, halfZ }, XMFLOAT3{ -halfX, -halfY, halfZ } } },
@@ -412,13 +451,10 @@ float4 main(PSInput input) : SV_Target0
 			Face{ { XMFLOAT3{ -halfX, -halfY, halfZ }, XMFLOAT3{ -halfX, -halfY, -halfZ }, XMFLOAT3{ halfX, -halfY, -halfZ }, XMFLOAT3{ halfX, -halfY, halfZ } } },
 		};
 
+		uint32_t faceIndex = 0;
 		for( const Face& face : faces )
 		{
-			if( vertices_.size() > std::numeric_limits<uint32_t>::max() - 4u )
-			{
-				throw std::length_error( "World vertex count exceeds the 32-bit index limit." );
-			}
-			const uint32_t firstVertex = static_cast<uint32_t>( vertices_.size() );
+			const uint32_t firstVertex = faceIndex * 4u;
 			for( const XMFLOAT3& corner : face.corners )
 			{
 				vertices_.push_back( { corner } );
@@ -429,45 +465,37 @@ float4 main(PSInput input) : SV_Target0
 			indices_.push_back( firstVertex );
 			indices_.push_back( firstVertex + 2u );
 			indices_.push_back( firstVertex + 3u );
+			faceIndex++;
 		}
 	}
 
-	void RenderWorld::AppendSphere( const World::Object& object )
+	void RenderWorld::AppendSphereGeometry()
 	{
-		const uint32_t columns = object.longitudeSegments + 1u;
-		const uint64_t addedVertexCount = static_cast<uint64_t>( columns ) * static_cast<uint64_t>( object.latitudeSegments + 1u );
-		const uint64_t currentVertexCount = static_cast<uint64_t>( vertices_.size() );
-		if( currentVertexCount > std::numeric_limits<uint32_t>::max() ||
-			addedVertexCount > std::numeric_limits<uint32_t>::max() - currentVertexCount )
+		const uint32_t columns = ourSphereLongitudeSegments + 1u;
+		for( uint32_t latitude = 0; latitude <= ourSphereLatitudeSegments; ++latitude )
 		{
-			throw std::length_error( "World vertex count exceeds the 32-bit index limit." );
-		}
-
-		const uint32_t firstVertex = static_cast<uint32_t>( vertices_.size() );
-		for( uint32_t latitude = 0; latitude <= object.latitudeSegments; ++latitude )
-		{
-			const float latitudeRatio = static_cast<float>( latitude ) / static_cast<float>( object.latitudeSegments );
+			const float latitudeRatio = static_cast<float>( latitude ) / static_cast<float>( ourSphereLatitudeSegments );
 			const float phi = latitudeRatio * std::numbers::pi_v<float>;
 			const float y = std::cos( phi );
 			const float ringRadius = std::sin( phi );
 
-			for( uint32_t longitude = 0; longitude <= object.longitudeSegments; ++longitude )
+			for( uint32_t longitude = 0; longitude <= ourSphereLongitudeSegments; ++longitude )
 			{
-				const float longitudeRatio = static_cast<float>( longitude ) / static_cast<float>( object.longitudeSegments );
+				const float longitudeRatio = static_cast<float>( longitude ) / static_cast<float>( ourSphereLongitudeSegments );
 				const float theta = longitudeRatio * std::numbers::pi_v<float> * 2.0f;
 				const XMFLOAT3 position = {
-					ringRadius * std::cos( theta ) * object.sphereRadius,
-					y * object.sphereRadius,
-					ringRadius * std::sin( theta ) * object.sphereRadius };
+					ringRadius * std::cos( theta ),
+					y,
+					ringRadius * std::sin( theta ) };
 				vertices_.push_back( { position } );
 			}
 		}
 
-		for( uint32_t latitude = 0; latitude < object.latitudeSegments; ++latitude )
+		for( uint32_t latitude = 0; latitude < ourSphereLatitudeSegments; ++latitude )
 		{
-			for( uint32_t longitude = 0; longitude < object.longitudeSegments; ++longitude )
+			for( uint32_t longitude = 0; longitude < ourSphereLongitudeSegments; ++longitude )
 			{
-				const uint32_t topLeft = firstVertex + latitude * columns + longitude;
+				const uint32_t topLeft = latitude * columns + longitude;
 				const uint32_t bottomLeft = topLeft + columns;
 				indices_.push_back( topLeft );
 				indices_.push_back( bottomLeft );
@@ -479,109 +507,136 @@ float4 main(PSInput input) : SV_Target0
 		}
 	}
 
-	void RenderWorld::UploadVertexBuffer()
+	void RenderWorld::AppendArrowGeometry()
 	{
-		const uint64_t requiredSize = static_cast<uint64_t>( vertices_.size() ) * sizeof( Vertex );
-		if( requiredSize == 0 )
+		const uint32_t firstVertex = static_cast<uint32_t>( vertices_.size() );
+		for( uint32_t segment = 0; segment < ourArrowSegments; ++segment )
 		{
-			return;
+			const float angle = static_cast<float>( segment ) /
+				static_cast<float>( ourArrowSegments ) * std::numbers::pi_v<float> * 2.0f;
+			const float x = std::cos( angle ) * ourArrowShaftRadius;
+			const float y = std::sin( angle ) * ourArrowShaftRadius;
+			vertices_.push_back( { { x, y, 0.0f } } );
+			vertices_.push_back( { { x, y, ourArrowHeadStart } } );
 		}
 
-		if( !vertexBuffer_.Valid() || requiredSize > vertexBufferCapacity_ )
+		for( uint32_t segment = 0; segment < ourArrowSegments; ++segment )
 		{
-			BufferDesc desc{};
-			desc.debugName = "Ldx12 Utils World Vertices";
-			desc.size = GrowCapacity( requiredSize );
-			desc.stride = sizeof( Vertex );
-			desc.type = BufferType::Vertex;
-			const BufferHandle newBuffer = device_->CreateBuffer( desc );
-			device_->WriteBuffer( newBuffer, 0, vertices_.data(), requiredSize );
-			RetireBuffer( vertexBuffer_ );
-			vertexBuffer_ = newBuffer;
-			vertexBufferCapacity_ = desc.size;
-			return;
+			const uint32_t nextSegment = ( segment + 1u ) % ourArrowSegments;
+			const uint32_t bottom = segment * 2u;
+			const uint32_t top = bottom + 1u;
+			const uint32_t nextBottom = nextSegment * 2u;
+			const uint32_t nextTop = nextBottom + 1u;
+			indices_.push_back( bottom );
+			indices_.push_back( top );
+			indices_.push_back( nextTop );
+			indices_.push_back( bottom );
+			indices_.push_back( nextTop );
+			indices_.push_back( nextBottom );
 		}
 
-		device_->WriteBuffer( vertexBuffer_, 0, vertices_.data(), requiredSize );
+		const uint32_t headFirstVertex = ourArrowSegments * 2u;
+		for( uint32_t segment = 0; segment < ourArrowSegments; ++segment )
+		{
+			const float angle = static_cast<float>( segment ) /
+				static_cast<float>( ourArrowSegments ) * std::numbers::pi_v<float> * 2.0f;
+			const float x = std::cos( angle ) * ourArrowHeadRadius;
+			const float y = std::sin( angle ) * ourArrowHeadRadius;
+			vertices_.push_back( { { x, y, ourArrowHeadStart } } );
+		}
+
+		const uint32_t tipVertex = static_cast<uint32_t>( vertices_.size() ) - firstVertex;
+		vertices_.push_back( { { 0.0f, 0.0f, 1.0f } } );
+		const uint32_t headCenterVertex = static_cast<uint32_t>( vertices_.size() ) - firstVertex;
+		vertices_.push_back( { { 0.0f, 0.0f, ourArrowHeadStart } } );
+
+		for( uint32_t segment = 0; segment < ourArrowSegments; ++segment )
+		{
+			const uint32_t current = headFirstVertex + segment;
+			const uint32_t next = headFirstVertex + ( segment + 1u ) % ourArrowSegments;
+			indices_.push_back( current );
+			indices_.push_back( tipVertex );
+			indices_.push_back( next );
+			indices_.push_back( current );
+			indices_.push_back( next );
+			indices_.push_back( headCenterVertex );
+		}
 	}
 
-	void RenderWorld::UploadIndexBuffer()
+	void RenderWorld::UploadStaticGeometry()
 	{
-		const uint64_t requiredSize = static_cast<uint64_t>( indices_.size() ) * sizeof( uint32_t );
-		if( requiredSize == 0 )
-		{
-			return;
-		}
+		BufferDesc vertexDesc{};
+		vertexDesc.debugName = "Ldx12 Utils World Vertices";
+		vertexDesc.size = static_cast<uint64_t>( vertices_.size() ) * sizeof( Vertex );
+		vertexDesc.stride = sizeof( Vertex );
+		vertexDesc.type = BufferType::Vertex;
+		vertexDesc.initialData = vertices_.data();
+		vertexBuffer_ = device_->CreateBuffer( vertexDesc );
 
-		if( !indexBuffer_.Valid() || requiredSize > indexBufferCapacity_ )
-		{
-			BufferDesc desc{};
-			desc.debugName = "Ldx12 Utils World Indices";
-			desc.size = GrowCapacity( requiredSize );
-			desc.stride = sizeof( uint32_t );
-			desc.type = BufferType::Index;
-			const BufferHandle newBuffer = device_->CreateBuffer( desc );
-			device_->WriteBuffer( newBuffer, 0, indices_.data(), requiredSize );
-			RetireBuffer( indexBuffer_ );
-			indexBuffer_ = newBuffer;
-			indexBufferCapacity_ = desc.size;
-			return;
-		}
-
-		device_->WriteBuffer( indexBuffer_, 0, indices_.data(), requiredSize );
+		BufferDesc indexDesc{};
+		indexDesc.debugName = "Ldx12 Utils World Indices";
+		indexDesc.size = static_cast<uint64_t>( indices_.size() ) * sizeof( uint32_t );
+		indexDesc.stride = sizeof( uint32_t );
+		indexDesc.type = BufferType::Index;
+		indexDesc.initialData = indices_.data();
+		indexBuffer_ = device_->CreateBuffer( indexDesc );
 	}
 
-	void RenderWorld::UploadTransformBuffer()
+	void RenderWorld::UploadInstanceBuffer()
 	{
-		const uint64_t requiredSize = static_cast<uint64_t>( transforms_.size() ) * sizeof( GpuTransform );
-		if( requiredSize == 0 )
-		{
-			return;
-		}
-
-		if( !transformBuffer_.Valid() || requiredSize > transformBufferCapacity_ )
-		{
-			BufferDesc desc{};
-			desc.debugName = "Ldx12 Utils World Transforms";
-			desc.size = GrowCapacity( requiredSize );
-			desc.stride = sizeof( GpuTransform );
-			desc.type = BufferType::Structured;
-			const BufferHandle newBuffer = device_->CreateBuffer( desc );
-			device_->WriteBuffer( newBuffer, 0, transforms_.data(), requiredSize );
-			RetireBuffer( transformBuffer_ );
-			transformBuffer_ = newBuffer;
-			transformBufferCapacity_ = desc.size;
-			return;
-		}
-
-		device_->WriteBuffer( transformBuffer_, 0, transforms_.data(), requiredSize );
+		UploadDynamicBuffer(
+			instanceBuffer_,
+			instanceBufferCapacity_,
+			instances_.data(),
+			static_cast<uint64_t>( instances_.size() ),
+			sizeof( GpuInstance ),
+			BufferType::Structured,
+			"Ldx12 Utils World Instances" );
 	}
 
 	void RenderWorld::UploadIndirectBuffer()
 	{
-		const uint64_t requiredSize = static_cast<uint64_t>( indirectDraws_.size() ) * sizeof( IndirectDraw );
-		if( requiredSize == 0 )
+		UploadDynamicBuffer(
+			indirectBuffer_,
+			indirectBufferCapacity_,
+			indirectDraws_.data(),
+			static_cast<uint64_t>( indirectDraws_.size() ),
+			sizeof( IndirectDraw ),
+			BufferType::Indirect,
+			"Ldx12 Utils World Indirect Draws" );
+	}
+
+	void RenderWorld::UploadDynamicBuffer(
+		BufferHandle& buffer,
+		uint64_t& capacity,
+		const void* data,
+		uint64_t elementCount,
+		uint32_t stride,
+		BufferType type,
+		const char* debugName )
+	{
+		if( elementCount == 0 )
 		{
 			return;
 		}
 
-		if( !indirectBuffer_.Valid() || requiredSize > indirectBufferCapacity_ )
+		const uint64_t requiredSize = elementCount * stride;
+		if( !buffer.Valid() || requiredSize > capacity )
 		{
 			BufferDesc desc{};
-			desc.debugName = "Ldx12 Utils World Indirect Draws";
-			desc.size = GrowCapacity( requiredSize );
-			desc.stride = sizeof( IndirectDraw );
-			desc.type = BufferType::Indirect;
-
+			desc.debugName = debugName;
+			desc.size = GrowCapacity( elementCount ) * stride;
+			desc.stride = stride;
+			desc.type = type;
 			const BufferHandle newBuffer = device_->CreateBuffer( desc );
-			device_->WriteBuffer( newBuffer, 0, indirectDraws_.data(), requiredSize );
-			RetireBuffer( indirectBuffer_ );
-			indirectBuffer_ = newBuffer;
-			indirectBufferCapacity_ = desc.size;
+			device_->WriteBuffer( newBuffer, 0, data, requiredSize );
+			RetireBuffer( buffer );
+			buffer = newBuffer;
+			capacity = desc.size;
 			return;
 		}
 
-		device_->WriteBuffer( indirectBuffer_, 0, indirectDraws_.data(), requiredSize );
+		device_->WriteBuffer( buffer, 0, data, requiredSize );
 	}
 
 	void RenderWorld::RetireBuffer( BufferHandle& buffer )
@@ -600,7 +655,7 @@ float4 main(PSInput input) : SV_Target0
 			return;
 		}
 
-		if( vertexBuffer_.Valid() || indexBuffer_.Valid() || transformBuffer_.Valid() || indirectBuffer_.Valid() || !retiredBuffers_.empty() )
+		if( vertexBuffer_.Valid() || indexBuffer_.Valid() || instanceBuffer_.Valid() || indirectBuffer_.Valid() || !retiredBuffers_.empty() )
 		{
 			device_->WaitIdle();
 		}
@@ -614,10 +669,10 @@ float4 main(PSInput input) : SV_Target0
 			device_->Destroy( indexBuffer_ );
 			indexBuffer_ = {};
 		}
-		if( transformBuffer_.Valid() )
+		if( instanceBuffer_.Valid() )
 		{
-			device_->Destroy( transformBuffer_ );
-			transformBuffer_ = {};
+			device_->Destroy( instanceBuffer_ );
+			instanceBuffer_ = {};
 		}
 		if( indirectBuffer_.Valid() )
 		{
@@ -645,25 +700,80 @@ float4 main(PSInput input) : SV_Target0
 		return capacity;
 	}
 
-	RenderWorld::GpuTransform RenderWorld::BuildGpuTransform( const Transform& transform )
+	RenderWorld::GpuInstance RenderWorld::BuildGpuInstance( const World::Object& object )
 	{
-		ValidateTransform( transform );
-		const XMMATRIX scale = XMMatrixScaling( transform.scale.x, transform.scale.y, transform.scale.z );
-		const XMMATRIX rotation = XMMatrixRotationRollPitchYaw( transform.rotation.x, transform.rotation.y, transform.rotation.z );
-		const XMMATRIX translation = XMMatrixTranslation( transform.position.x, transform.position.y, transform.position.z );
+		if( object.primitive == World::PrimitiveType::Arrow )
+		{
+			const XMVECTOR start = XMLoadFloat3( &object.arrowStart );
+			const XMVECTOR end = XMLoadFloat3( &object.arrowEnd );
+			const XMVECTOR direction = end - start;
+			const float length = XMVectorGetX( XMVector3Length( direction ) );
+			const XMVECTOR forward = XMVectorScale( direction, 1.0f / length );
+			const XMVECTOR referenceUp = std::abs( XMVectorGetY( forward ) ) > 0.999f
+				? XMVectorSet( 1.0f, 0.0f, 0.0f, 0.0f )
+				: XMVectorSet( 0.0f, 1.0f, 0.0f, 0.0f );
+			const XMVECTOR unitRight = XMVector3Normalize( XMVector3Cross( referenceUp, forward ) );
+			const XMVECTOR unitUp = XMVector3Cross( forward, unitRight );
+			const XMMATRIX arrowModel(
+				XMVectorScale( unitRight, length ),
+				XMVectorScale( unitUp, length ),
+				XMVectorScale( forward, length ),
+				XMVectorSet( object.arrowStart.x, object.arrowStart.y, object.arrowStart.z, 1.0f ) );
+
+			const XMMATRIX scale = XMMatrixScaling(
+				object.transform.scale.x,
+				object.transform.scale.y,
+				object.transform.scale.z );
+			const XMMATRIX rotation = XMMatrixRotationRollPitchYaw(
+				object.transform.rotation.x,
+				object.transform.rotation.y,
+				object.transform.rotation.z );
+			const XMMATRIX translation = XMMatrixTranslation(
+				object.transform.position.x,
+				object.transform.position.y,
+				object.transform.position.z );
+
+			GpuInstance result{};
+			StoreMatrix( result.model, arrowModel * scale * rotation * translation );
+			result.color = object.color;
+			return result;
+		}
+
+		XMFLOAT3 geometryScale = object.cubeSize;
+		if( object.primitive == World::PrimitiveType::Sphere )
+		{
+			geometryScale = { object.sphereRadius, object.sphereRadius, object.sphereRadius };
+		}
+
+		const XMMATRIX scale = XMMatrixScaling(
+			object.transform.scale.x * geometryScale.x,
+			object.transform.scale.y * geometryScale.y,
+			object.transform.scale.z * geometryScale.z );
+		const XMMATRIX rotation = XMMatrixRotationRollPitchYaw(
+			object.transform.rotation.x,
+			object.transform.rotation.y,
+			object.transform.rotation.z );
+		const XMMATRIX translation = XMMatrixTranslation(
+			object.transform.position.x,
+			object.transform.position.y,
+			object.transform.position.z );
 		const XMMATRIX model = scale * rotation * translation;
 
-		GpuTransform result{};
+		GpuInstance result{};
 		StoreMatrix( result.model, model );
+		result.color = object.color;
 		return result;
 	}
 
-	RenderWorld::PushConstants RenderWorld::BuildPushConstants( RenderDevice& device, BufferHandle transformBuffer, const Camera& camera )
+	RenderWorld::PushConstants RenderWorld::BuildPushConstants( RenderDevice& device, BufferHandle instanceBuffer, const Camera& camera )
 	{
-		if( camera.aspectRatio <= 0.0f || camera.nearPlane <= 0.0f || camera.farPlane <= camera.nearPlane ||
-			camera.verticalFieldOfViewRadians <= 0.0f || camera.verticalFieldOfViewRadians >= std::numbers::pi_v<float> )
+		if( camera.aspectRatio <= 0.0f ||
+			camera.nearPlane <= 0.0f ||
+			camera.farPlane <= camera.nearPlane ||
+			camera.verticalFieldOfViewRadians <= 0.0f ||
+			camera.verticalFieldOfViewRadians >= std::numbers::pi_v<float> )
 		{
-			throw std::invalid_argument( "World camera projection values are invalid." );
+			throw std::invalid_argument( "Camera projection values are invalid." );
 		}
 
 		const XMVECTOR eye = XMVectorSet( camera.position.x, camera.position.y, camera.position.z, 1.0f );
@@ -675,7 +785,7 @@ float4 main(PSInput input) : SV_Target0
 
 		PushConstants constants{};
 		StoreMatrix( constants.viewProjection, view * projection );
-		constants.transformBufferIndex = device.GetBindlessIndex( transformBuffer );
+		constants.instanceBufferIndex = device.GetBindlessIndex( instanceBuffer );
 		return constants;
 	}
 }
