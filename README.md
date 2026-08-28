@@ -1,6 +1,6 @@
 # Ldx12
 
-**Prototype Direct3D 12 renderers quickly with a modern, lightweight API and low overhead.**
+**Prototype Direct3D 12  Bindless renderers quickly with a modern, lightweight API and low overhead.**
 
 Ldx12 is a C++20 static library that removes repetitive Direct3D 12 setup while keeping rendering explicit. It follows modern design patterns through bindless resources, typed generational handles, reusable command buffers and GPU-safe deferred destruction.
 
