@@ -76,38 +76,57 @@ namespace ldx12
 			} );
 	}
 
-	void StagingDevice::TextureSubData2D( TextureResource& texture, const void* data, uint32_t rowPitch, uint32_t slicePitch )
+	void StagingDevice::TextureSubData( TextureResource& texture, const void* data, uint32_t rowPitch, uint32_t slicePitch )
 	{
 		if( data == nullptr || rowPitch == 0 || slicePitch == 0 )
 		{
 			return;
 		}
 
-		if( texture.dimension_ != TextureDimension::Texture2D || texture.depthOrArraySize_ != 1 )
+		uint32_t subresourceCount = 1;
+		if( texture.dimension_ == TextureDimension::TextureCube )
 		{
-			throw std::runtime_error( "TextureSubData2D only supports single-slice Texture2D uploads." );
+			subresourceCount = ourCubeMapFaceCount;
+		}
+		else if( texture.dimension_ == TextureDimension::Texture2DArray )
+		{
+			subresourceCount = texture.depthOrArraySize_;
+		}
+		else if( texture.dimension_ != TextureDimension::Texture2D || texture.depthOrArraySize_ != 1 )
+		{
+			throw std::runtime_error(
+				"TextureSubData supports only Texture2D, Texture2DArray and TextureCube uploads." );
 		}
 
 		UINT64 uploadBufferSize = 0;
-		D3D12_PLACED_SUBRESOURCE_FOOTPRINT layout{};
-		UINT numRows = 0;
-		UINT64 rowSizeInBytes = 0;
-		manager_.device_->GetCopyableFootprints( &texture.desc_, 0, 1, 0, &layout, &numRows, &rowSizeInBytes, &uploadBufferSize );
+		std::unique_ptr<D3D12_PLACED_SUBRESOURCE_FOOTPRINT[]> layouts =
+			std::make_unique<D3D12_PLACED_SUBRESOURCE_FOOTPRINT[]>( subresourceCount );
+		std::unique_ptr<UINT[]> rowCounts = std::make_unique<UINT[]>( subresourceCount );
+		std::unique_ptr<UINT64[]> rowSizes = std::make_unique<UINT64[]>( subresourceCount );
+		manager_.device_->GetCopyableFootprints(
+			&texture.desc_, 0, subresourceCount, 0, layouts.get(), rowCounts.get(),
+			rowSizes.get(), &uploadBufferSize );
 
-		if( rowPitch < rowSizeInBytes )
+		for( uint32_t subresource = 0; subresource < subresourceCount; ++subresource )
 		{
-			throw std::runtime_error( "TextureSubData2D rowPitch is smaller than the required source row size." );
-		}
+			if( rowPitch < rowSizes[ subresource ] )
+			{
+				throw std::runtime_error(
+					"TextureSubData rowPitch is smaller than the required source row size." );
+			}
 
-		UINT64 requiredSlicePitch = rowSizeInBytes;
-		if( numRows > 1u )
-		{
-			requiredSlicePitch += static_cast<UINT64>( numRows - 1u ) * static_cast<UINT64>( rowPitch );
-		}
+			UINT64 requiredSlicePitch = rowSizes[ subresource ];
+			if( rowCounts[ subresource ] > 1u )
+			{
+				requiredSlicePitch += static_cast<UINT64>( rowCounts[ subresource ] - 1u ) *
+					static_cast<UINT64>( rowPitch );
+			}
 
-		if( slicePitch < requiredSlicePitch )
-		{
-			throw std::runtime_error( "TextureSubData2D slicePitch is smaller than the required source data size." );
+			if( slicePitch < requiredSlicePitch )
+			{
+				throw std::runtime_error(
+					"TextureSubData slicePitch is smaller than the required source data size." );
+			}
 		}
 
 		ComPtr<ID3D12Resource> stagingBuffer;
@@ -128,12 +147,19 @@ namespace ldx12
 
 		uint8_t* dstBytes = static_cast<uint8_t*>( mapped );
 		const uint8_t* srcBytes = static_cast<const uint8_t*>( data );
-		for( UINT row = 0; row < numRows; ++row )
+		for( uint32_t subresource = 0; subresource < subresourceCount; ++subresource )
 		{
-			std::memcpy(
-				dstBytes + layout.Offset + static_cast<size_t>( row ) * layout.Footprint.RowPitch,
-				srcBytes + static_cast<size_t>( row ) * rowPitch,
-				static_cast<size_t>( rowSizeInBytes ) );
+			const uint8_t* sourceSlice =
+				srcBytes + static_cast<size_t>( subresource ) * slicePitch;
+			const D3D12_PLACED_SUBRESOURCE_FOOTPRINT& layout = layouts[ subresource ];
+			for( UINT row = 0; row < rowCounts[ subresource ]; ++row )
+			{
+				std::memcpy(
+					dstBytes + layout.Offset +
+						static_cast<size_t>( row ) * layout.Footprint.RowPitch,
+					sourceSlice + static_cast<size_t>( row ) * rowPitch,
+					static_cast<size_t>( rowSizes[ subresource ] ) );
+			}
 		}
 
 		stagingBuffer->Unmap( 0, nullptr );
@@ -151,17 +177,21 @@ namespace ldx12
 			texture.currentState_ = D3D12_RESOURCE_STATE_COPY_DEST;
 		}
 
-		D3D12_TEXTURE_COPY_LOCATION dstLocation{};
-		dstLocation.pResource = texture.resource_.Get();
-		dstLocation.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-		dstLocation.SubresourceIndex = 0;
+		for( uint32_t subresource = 0; subresource < subresourceCount; ++subresource )
+		{
+			D3D12_TEXTURE_COPY_LOCATION dstLocation{};
+			dstLocation.pResource = texture.resource_.Get();
+			dstLocation.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+			dstLocation.SubresourceIndex = subresource;
 
-		D3D12_TEXTURE_COPY_LOCATION srcLocation{};
-		srcLocation.pResource = stagingBuffer.Get();
-		srcLocation.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-		srcLocation.PlacedFootprint = layout;
+			D3D12_TEXTURE_COPY_LOCATION srcLocation{};
+			srcLocation.pResource = stagingBuffer.Get();
+			srcLocation.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+			srcLocation.PlacedFootprint = layouts[ subresource ];
 
-		cmd.commandList_->CopyTextureRegion( &dstLocation, 0, 0, 0, &srcLocation, nullptr );
+			cmd.commandList_->CopyTextureRegion(
+				&dstLocation, 0, 0, 0, &srcLocation, nullptr );
+		}
 
 		if( previousState != D3D12_RESOURCE_STATE_COPY_DEST )
 		{

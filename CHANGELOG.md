@@ -17,6 +17,8 @@ This file lists the main user-visible changes in each Ldx12 version.
 - A full-capacity test covering the documented resource, attachment, command-buffer and push-constant limits.
 - A GPU multisample test covering MSAA color/depth creation, rendering, resolve and texture readback.
 - Optional PIX GPU capture loading and HUD settings through `PixSettings`.
+- Sampled `Texture2DArray` and `TextureCube` resources with packed slice uploads and bindless SRVs.
+- A cubemap sample with a reflective cube, skybox and separate HLSL shader files.
 
 ### Changed
 

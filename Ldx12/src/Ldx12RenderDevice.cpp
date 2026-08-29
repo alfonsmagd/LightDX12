@@ -324,6 +324,44 @@ namespace ldx12
 				}
 			}
 
+			if( desc.dimension == TextureDimension::Texture2D )
+			{
+				if( desc.depthOrArraySize != 1 )
+				{
+					throw std::runtime_error(
+						"Texture2D resources require depthOrArraySize == 1. Use Texture2DArray for multiple slices." );
+				}
+			}
+			else if( desc.dimension == TextureDimension::TextureCube )
+			{
+				if( desc.width != desc.height )
+				{
+					throw std::runtime_error( "TextureCube faces must be square." );
+				}
+				if( desc.depthOrArraySize != ourCubeMapFaceCount )
+				{
+					throw std::runtime_error( "TextureCube resources require exactly six faces." );
+				}
+				if( desc.usage != TextureUsage::Sampled )
+				{
+					throw std::runtime_error(
+						"TextureCube resources currently support sampled usage only." );
+				}
+			}
+			else if( desc.dimension == TextureDimension::Texture2DArray )
+			{
+				if( desc.depthOrArraySize == 0 )
+				{
+					throw std::runtime_error(
+						"Texture2DArray resources require at least one array slice." );
+				}
+				if( desc.usage != TextureUsage::Sampled )
+				{
+					throw std::runtime_error(
+						"Texture2DArray resources currently support sampled usage only." );
+				}
+			}
+
 			if( desc.dimension != TextureDimension::Texture3D )
 			{
 				return;
@@ -431,6 +469,17 @@ namespace ldx12
 		{
 			srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE3D;
 			srvDesc.Texture3D.MipLevels = resource.mipLevels_;
+		}
+		else if( resource.dimension_ == TextureDimension::TextureCube )
+		{
+			srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
+			srvDesc.TextureCube.MipLevels = resource.mipLevels_;
+		}
+		else if( resource.dimension_ == TextureDimension::Texture2DArray )
+		{
+			srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
+			srvDesc.Texture2DArray.MipLevels = resource.mipLevels_;
+			srvDesc.Texture2DArray.ArraySize = resource.depthOrArraySize_;
 		}
 		else
 		{
@@ -1038,8 +1087,8 @@ namespace ldx12
 		if( desc.data != nullptr && desc.rowPitch > 0 && desc.slicePitch > 0 )
 		{
 			TextureResource& textureResource = manager_->GetTextureResource( handle );
-			manager_->stagingDevice_->TextureSubData2D( textureResource, desc.data,
-												   desc.rowPitch, desc.slicePitch );
+			manager_->stagingDevice_->TextureSubData( textureResource, desc.data,
+											   desc.rowPitch, desc.slicePitch );
 			if( creationPlan.generateInitialMipChain_ )
 			{
 				manager_->baseMips_->Generate( textureResource, desc.initialState );

@@ -103,4 +103,5 @@ namespace ldx12::tests
 	void TestGpuSubmissionSynchronization();
 	void TestGpuDescriptorRecycling();
 	void TestGpuMultisampleRendering();
+	void TestGpuTextureArrayAndCubeViews();
 }

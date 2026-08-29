@@ -151,6 +151,52 @@ namespace ldx12::tests
 		Require( ( nativeTextureDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS ) != 0,
 			"Native UAV texture is missing its D3D12 resource flag." );
 
+		const std::array<uint32_t, 8> arrayPixels = {
+			0xffff0000u, 0xffff0000u, 0xffff0000u, 0xffff0000u,
+			0xff00ff00u, 0xff00ff00u, 0xff00ff00u, 0xff00ff00u
+		};
+		TextureDesc arrayTextureDesc{};
+		arrayTextureDesc.debugName = "Ldx12Tests Texture2DArray";
+		arrayTextureDesc.width = 2;
+		arrayTextureDesc.height = 2;
+		arrayTextureDesc.depthOrArraySize = 2;
+		arrayTextureDesc.dimension = TextureDimension::Texture2DArray;
+		arrayTextureDesc.data = arrayPixels.data();
+		arrayTextureDesc.rowPitch = 2 * sizeof( uint32_t );
+		arrayTextureDesc.slicePitch = arrayTextureDesc.rowPitch * 2;
+		const TextureHandle arrayTexture = device.CreateTexture( arrayTextureDesc );
+		const D3D12_RESOURCE_DESC nativeArrayDesc = native.GetResource( arrayTexture )->GetDesc();
+		Require( nativeArrayDesc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE2D &&
+			nativeArrayDesc.DepthOrArraySize == arrayTextureDesc.depthOrArraySize,
+			"Texture2DArray did not create the requested native array slices." );
+		Require( device.GetBindlessIndex( arrayTexture ) != LDX12_DESCRIPTOR_SLOT_INVALID,
+			"Texture2DArray did not receive a bindless SRV." );
+
+		std::array<uint32_t, ourCubeMapFaceCount * 4> cubePixels{};
+		for( uint32_t face = 0; face < ourCubeMapFaceCount; ++face )
+		{
+			for( uint32_t pixel = 0; pixel < 4; ++pixel )
+			{
+				cubePixels[ face * 4 + pixel ] = 0xff000000u | ( face + 1u ) * 0x00202020u;
+			}
+		}
+		TextureDesc cubeTextureDesc{};
+		cubeTextureDesc.debugName = "Ldx12Tests TextureCube";
+		cubeTextureDesc.width = 2;
+		cubeTextureDesc.height = 2;
+		cubeTextureDesc.depthOrArraySize = ourCubeMapFaceCount;
+		cubeTextureDesc.dimension = TextureDimension::TextureCube;
+		cubeTextureDesc.data = cubePixels.data();
+		cubeTextureDesc.rowPitch = 2 * sizeof( uint32_t );
+		cubeTextureDesc.slicePitch = cubeTextureDesc.rowPitch * 2;
+		const TextureHandle cubeTexture = device.CreateTexture( cubeTextureDesc );
+		const D3D12_RESOURCE_DESC nativeCubeDesc = native.GetResource( cubeTexture )->GetDesc();
+		Require( nativeCubeDesc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE2D &&
+			nativeCubeDesc.DepthOrArraySize == ourCubeMapFaceCount,
+			"TextureCube did not create its six native array slices." );
+		Require( device.GetBindlessIndex( cubeTexture ) != LDX12_DESCRIPTOR_SLOT_INVALID,
+			"TextureCube did not receive a bindless SRV." );
+
 		TextureDesc invalidTextureDesc{};
 		invalidTextureDesc.usage = TextureUsage::RenderTarget | TextureUsage::DepthStencil;
 		RequireThrows<std::runtime_error>(
@@ -182,6 +228,8 @@ namespace ldx12::tests
 
 		device.Destroy( replacementBuffer );
 		device.Destroy( replacementTexture );
+		device.Destroy( cubeTexture );
+		device.Destroy( arrayTexture );
 		device.Destroy( rawBuffer );
 		device.Destroy( constantBuffer );
 		const BufferHandle reusedConstantBuffer =

@@ -12,7 +12,7 @@ namespace ldx12
 		StagingDevice& operator=( const StagingDevice& ) = delete;
 
 		void BufferSubData( BufferResource& buffer, size_t dstOffset, size_t size, const void* data );
-		void TextureSubData2D( TextureResource& texture, const void* data, uint32_t rowPitch, uint32_t slicePitch );
+		void TextureSubData( TextureResource& texture, const void* data, uint32_t rowPitch, uint32_t slicePitch );
 		void TextureData2D( TextureResource& texture, void* outData, uint32_t rowPitch, uint32_t slicePitch );
 
 	private:

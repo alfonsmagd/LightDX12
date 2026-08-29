@@ -39,6 +39,7 @@ namespace ldx12
 	static constexpr uint32_t ourMaxImmediateCommandBuffers = ourMaxActiveCommandBuffers + ourMaxCommandBufferBatch;
 	static constexpr uint32_t ourMaxTrackedTexturesPerCommandBuffer = 256;
 	static constexpr uint32_t ourMaxPushConstant32BitValues = 63;
+	static constexpr uint32_t ourCubeMapFaceCount = 6;
 	static constexpr uint32_t ourBuiltInSamplerCount = LDX12_BUILT_IN_SAMPLER_COUNT;
 	static constexpr uint32_t ourCustomSamplerCount = LDX12_CUSTOM_SAMPLER_COUNT;
 	static constexpr uint32_t ourMaxSamplers = LDX12_SAMPLER_COUNT;
@@ -296,6 +297,8 @@ namespace ldx12
 	enum class TextureDimension : uint8_t
 	{
 		Texture2D,
+		Texture2DArray,
+		TextureCube,
 		Texture3D,
 	};
 
@@ -316,6 +319,9 @@ namespace ldx12
 		// be inferred from usage above.
 		D3D12_RESOURCE_FLAGS additionalResourceFlags = D3D12_RESOURCE_FLAG_NONE;
 		D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_COMMON;
+		// Texture2DArray data contains tightly packed base-mip slices and
+		// slicePitch advances one slice. TextureCube uses six slices in D3D12
+		// order: +X, -X, +Y, -Y, +Z, -Z.
 		const void* data = nullptr;
 		uint32_t rowPitch = 0;
 		uint32_t slicePitch = 0;
