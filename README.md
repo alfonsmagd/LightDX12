@@ -44,7 +44,19 @@ Ldx12 manages the device, swapchain, descriptor heaps, root signature, command-l
 | --- | --- |
 | [![CBSRVCubes](examples/images/03-cbsrv-cubes.png)](samples/CBSRVCubes) | [![ImGuiNodeEditor](examples/images/04-imgui-node-editor.png)](samples/ImGuiNodeEditor) |
 
-[TexturedCube](samples/TexturedCube) · [TextureSamplers](samples/TextureSamplers) · [CookbookChapter02](samples/CookbookChapter02) · [WorldGeometry](samples/WorldGeometry) · [ImGuiDemo](samples/ImGuiDemo)
+| 5. Z-buffer + MSAA x4 | 6. TexturedCube |
+| --- | --- |
+| [![Z-buffer and MSAA x4](examples/images/05-zbuffer-msaa4.png)](samples/ZFighting) | [![TexturedCube](examples/images/06-textured-cube.png)](samples/TexturedCube) |
+
+| 7. TextureSamplers | 8. Ldx12 + Dear ImGui |
+| --- | --- |
+| [![TextureSamplers](examples/images/07-texture-samplers.png)](samples/TextureSamplers) | [![Ldx12 + Dear ImGui](examples/images/08-imgui-demo.png)](samples/ImGuiDemo) |
+
+| 9. WorldGeometry |
+| --- |
+| [![WorldGeometry](examples/images/09-world-geometry.png)](samples/WorldGeometry) |
+
+[CookbookChapter02](samples/CookbookChapter02) · [ImGuiDemoNative](samples/ImGuiDemoNative)
 
 ## Get started
 
