@@ -61,3 +61,11 @@ Interactive ImGui node graph with typed links, texture processing and live textu
 ![9. World geometry](images/09-world-geometry.png)
 
 [View source](../samples/WorldGeometry)
+
+## 10. Cube map
+
+Reflective cube or sphere rendered inside a six-face cubemap skybox.
+
+![10. Cube map](images/10-cubemap.png)
+
+[View source](../samples/CubeMap)

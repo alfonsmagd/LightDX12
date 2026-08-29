@@ -133,8 +133,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		RenderPipelineState objectPipeline = CreateObjectPipeline( device, context.swapchainFormat );
 		RenderPipelineState skyboxPipeline = CreateSkyboxPipeline( device, context.swapchainFormat );
 		const std::filesystem::path cubeMapDirectory =
-			std::filesystem::path( __FILE__ ).parent_path().parent_path().parent_path() /
-			"media" / "sky_129_cubemap_2k";
+			std::filesystem::path( LDX12_MEDIA_DIRECTORY ) / "sky_129_cubemap_2k";
 		const TextureHandle cubeMap = utils::LoadCubeMap( device, cubeMapDirectory );
 		utils::GeometryBuffers cube = utils::CreateCube( device );
 		utils::GeometryBuffers sphere = utils::CreateSphere( device );

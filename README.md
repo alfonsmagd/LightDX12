@@ -161,5 +161,6 @@ Ldx12 is available under the [MIT License](LICENSE). Third-party attribution is 
 | **7. [TextureSamplers](samples/TextureSamplers)**<br>[![TextureSamplers](examples/images/07-texture-samplers.png)](samples/TextureSamplers) |
 | **8. [Ldx12 + Dear ImGui](samples/ImGuiDemo)**<br>[![Ldx12 + Dear ImGui](examples/images/08-imgui-demo.png)](samples/ImGuiDemo) |
 | **9. [WorldGeometry](samples/WorldGeometry)**<br>[![WorldGeometry](examples/images/09-world-geometry.png)](samples/WorldGeometry) |
+| **10. [CubeMap](samples/CubeMap)**<br>[![CubeMap](examples/images/10-cubemap.png)](samples/CubeMap) |
 
 Additional samples: [CookbookChapter02](samples/CookbookChapter02) · [ImGuiDemoNative](samples/ImGuiDemoNative)
