@@ -245,6 +245,11 @@ if(LDX12_BUILD_EXAMPLES)
         endif()
     endfunction()
 
+    function(add_ldx12_utils_sample target_name)
+        add_ldx12_sample(${target_name} ${ARGN})
+        target_link_libraries(${target_name} PRIVATE Ldx12::Utils)
+    endfunction()
+
     set(TRIANGLE_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/samples/Triangle/main.cpp")
     set(TEXTURED_CUBE_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/samples/TexturedCube/main.cpp")
     set(Z_FIGHTING_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/samples/ZFighting/main.cpp")
@@ -278,22 +283,21 @@ if(LDX12_BUILD_EXAMPLES)
         ${CUBE_MAP_MEDIA}
         PROPERTIES HEADER_FILE_ONLY TRUE
     )
-    add_ldx12_sample(Triangle "${TRIANGLE_SOURCE}")
-    add_ldx12_sample(TexturedCube "${TEXTURED_CUBE_SOURCE}")
+    add_ldx12_utils_sample(Triangle "${TRIANGLE_SOURCE}")
+    add_ldx12_utils_sample(TexturedCube "${TEXTURED_CUBE_SOURCE}")
     add_ldx12_sample(ZFighting "${Z_FIGHTING_SOURCE}")
-    target_link_libraries(ZFighting PRIVATE Ldx12::ImGui)
-    add_ldx12_sample(ViewportScissor "${VIEWPORT_SCISSOR_SOURCE}")
-    add_ldx12_sample(TextureSamplers "${TEXTURE_SAMPLERS_SOURCE}")
-    add_ldx12_sample(CubeMap
+    target_link_libraries(ZFighting PRIVATE Ldx12::ImGui Ldx12::Utils)
+    add_ldx12_utils_sample(ViewportScissor "${VIEWPORT_SCISSOR_SOURCE}")
+    add_ldx12_utils_sample(TextureSamplers "${TEXTURE_SAMPLERS_SOURCE}")
+    add_ldx12_utils_sample(CubeMap
         "${CUBE_MAP_SOURCE}"
         "${CUBE_MAP_COMMON_SHADER}"
         "${CUBE_MAP_OBJECT_SHADER}"
         "${CUBE_MAP_SKYBOX_SHADER}"
         ${CUBE_MAP_MEDIA}
     )
-    target_link_libraries(CubeMap PRIVATE windowscodecs ole32)
-    add_ldx12_sample(CBSRVCubes "${CBSRVCUBES_SOURCE}" "${CBSRVCUBES_README}" "${CBSRVCUBES_SHADER}")
-    add_ldx12_sample(CookbookChapter02 "${COOKBOOK_CHAPTER02_SOURCE}" "${COOKBOOK_CHAPTER02_README}" "${COOKBOOK_CHAPTER02_SHADER}")
+    add_ldx12_utils_sample(CBSRVCubes "${CBSRVCUBES_SOURCE}" "${CBSRVCUBES_README}" "${CBSRVCUBES_SHADER}")
+    add_ldx12_utils_sample(CookbookChapter02 "${COOKBOOK_CHAPTER02_SOURCE}" "${COOKBOOK_CHAPTER02_README}" "${COOKBOOK_CHAPTER02_SHADER}")
 
     if(LDX12_UTILS_AVAILABLE)
         set(WORLD_GEOMETRY_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/samples/WorldGeometry/main.cpp")
@@ -304,7 +308,7 @@ if(LDX12_BUILD_EXAMPLES)
     set(IMGUI_DEMO_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/samples/ImGuiDemo/main.cpp")
     add_executable(ImGuiDemo WIN32 "${IMGUI_DEMO_SOURCE}")
     target_compile_features(ImGuiDemo PRIVATE cxx_std_20)
-    target_link_libraries(ImGuiDemo PRIVATE Ldx12::ImGui)
+    target_link_libraries(ImGuiDemo PRIVATE Ldx12::ImGui Ldx12::Utils)
     if(MSVC)
         target_compile_options(ImGuiDemo PRIVATE /W4 /EHsc /permissive- /MP)
     endif()
@@ -318,14 +322,34 @@ if(LDX12_BUILD_EXAMPLES)
     endif()
 
     set(LDX12_EXAMPLE_TARGETS Triangle TexturedCube ZFighting ViewportScissor TextureSamplers CubeMap CBSRVCubes CookbookChapter02 WorldGeometry ImGuiDemo ImGuiDemoNative)
-    set(LDX12_EXAMPLE_SOURCES "${TRIANGLE_SOURCE}" "${TEXTURED_CUBE_SOURCE}" "${Z_FIGHTING_SOURCE}" "${VIEWPORT_SCISSOR_SOURCE}" "${TEXTURE_SAMPLERS_SOURCE}" "${CUBE_MAP_SOURCE}" "${CUBE_MAP_COMMON_SHADER}" "${CUBE_MAP_OBJECT_SHADER}" "${CUBE_MAP_SKYBOX_SHADER}" ${CUBE_MAP_MEDIA} "${CBSRVCUBES_SOURCE}" "${CBSRVCUBES_README}" "${CBSRVCUBES_SHADER}" "${COOKBOOK_CHAPTER02_SOURCE}" "${COOKBOOK_CHAPTER02_README}" "${COOKBOOK_CHAPTER02_SHADER}" "${WORLD_GEOMETRY_SOURCE}" "${IMGUI_DEMO_SOURCE}" "${IMGUI_DEMO_NATIVE_SOURCE}")
+    set(LDX12_EXAMPLE_SOURCES
+        "${TRIANGLE_SOURCE}"
+        "${TEXTURED_CUBE_SOURCE}"
+        "${Z_FIGHTING_SOURCE}"
+        "${VIEWPORT_SCISSOR_SOURCE}"
+        "${TEXTURE_SAMPLERS_SOURCE}"
+        "${CUBE_MAP_SOURCE}"
+        "${CUBE_MAP_COMMON_SHADER}"
+        "${CUBE_MAP_OBJECT_SHADER}"
+        "${CUBE_MAP_SKYBOX_SHADER}"
+        ${CUBE_MAP_MEDIA}
+        "${CBSRVCUBES_SOURCE}"
+        "${CBSRVCUBES_README}"
+        "${CBSRVCUBES_SHADER}"
+        "${COOKBOOK_CHAPTER02_SOURCE}"
+        "${COOKBOOK_CHAPTER02_README}"
+        "${COOKBOOK_CHAPTER02_SHADER}"
+        "${WORLD_GEOMETRY_SOURCE}"
+        "${IMGUI_DEMO_SOURCE}"
+        "${IMGUI_DEMO_NATIVE_SOURCE}"
+    )
 
     if(LDX12_BUILD_APP)
         set(IMGUI_NODE_EDITOR_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/samples/ImGuiNodeEditor/main.cpp")
         set(IMGUI_NODE_EDITOR_README "${CMAKE_CURRENT_SOURCE_DIR}/samples/ImGuiNodeEditor/README.md")
         add_executable(ImGuiNodeEditor WIN32 "${IMGUI_NODE_EDITOR_SOURCE}" "${IMGUI_NODE_EDITOR_README}")
         target_compile_features(ImGuiNodeEditor PRIVATE cxx_std_20)
-        target_link_libraries(ImGuiNodeEditor PRIVATE Ldx12::Ldx12 Ldx12::App DearImGui)
+        target_link_libraries(ImGuiNodeEditor PRIVATE Ldx12::Ldx12 Ldx12::Utils Ldx12::App DearImGui)
         if(MSVC)
             target_compile_options(ImGuiNodeEditor PRIVATE /W4 /EHsc /permissive- /MP)
         endif()

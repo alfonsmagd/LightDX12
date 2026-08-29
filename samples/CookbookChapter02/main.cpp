@@ -1,12 +1,13 @@
 #include "Ldx12/HLSLLoader.hpp"
 #include "Ldx12/Ldx12.hpp"
+#include "Ldx12Utils/AppLdx.hpp"
 
 #include <DirectXMath.h>
 
 #include <chrono>
 #include <cstdint>
+#include <exception>
 #include <filesystem>
-#include <stdexcept>
 
 using namespace DirectX;
 using namespace ldx12;
@@ -20,49 +21,12 @@ namespace
 
 	static_assert( sizeof( PushConstants ) == 64 );
 
-	struct AppState
+	struct GraphicsState
 	{
 		DeviceManager* deviceManager = nullptr;
 		RenderPipelineState solidPipeline;
 		RenderPipelineState wireframePipeline;
-		bool running = true;
-		bool minimized = false;
 	};
-
-	LRESULT CALLBACK WindowProc( HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam )
-	{
-		auto* app = reinterpret_cast<AppState*>( GetWindowLongPtr( hwnd, GWLP_USERDATA ) );
-
-		switch( message )
-		{
-			case WM_SIZE:
-				if( app != nullptr && app->deviceManager != nullptr )
-				{
-					const uint32_t width = LOWORD( lParam );
-					const uint32_t height = HIWORD( lParam );
-					app->minimized = width == 0 || height == 0;
-					if( !app->minimized )
-					{
-						app->deviceManager->Resize( width, height );
-					}
-				}
-				return 0;
-
-			case WM_CLOSE:
-				if( app != nullptr )
-				{
-					app->running = false;
-				}
-				return 0;
-
-			case WM_DESTROY:
-				PostQuitMessage( 0 );
-				return 0;
-
-			default:
-				return DefWindowProc( hwnd, message, wParam, lParam );
-		}
-	}
 
 	RenderPipelineState CreatePipeline( RenderDevice& device, DXGI_FORMAT colorFormat, const char* vertexEntryPoint, D3D12_FILL_MODE fillMode )
 	{
@@ -98,40 +62,18 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 {
 	try
 	{
-		WNDCLASSEXW windowClass{};
-		windowClass.cbSize = sizeof( WNDCLASSEX );
-		windowClass.lpfnWndProc = WindowProc;
-		windowClass.hInstance = instance;
-		windowClass.lpszClassName = L"Ldx12CookbookChapter02Window";
-		windowClass.hCursor = LoadCursor( nullptr, IDC_ARROW );
-		RegisterClassExW( &windowClass );
-
 		constexpr uint32_t kInitialWidth = 1280;
 		constexpr uint32_t kInitialHeight = 720;
-		HWND hwnd = CreateWindowExW(
-			0,
-			windowClass.lpszClassName,
-			L"Ldx12 - 3D Graphics Rendering Cookbook Chapter 02",
-			WS_OVERLAPPEDWINDOW,
-			CW_USEDEFAULT,
-			CW_USEDEFAULT,
-			static_cast<int>( kInitialWidth ),
-			static_cast<int>( kInitialHeight ),
-			nullptr,
-			nullptr,
-			instance,
-			nullptr );
+		utils::AppLdxDesc appDesc{};
+		appDesc.instance = instance;
+		appDesc.showCommand = showCommand;
+		appDesc.className = L"Ldx12CookbookChapter02Window";
+		appDesc.title = L"Ldx12 - 3D Graphics Rendering Cookbook Chapter 02";
+		appDesc.width = kInitialWidth;
+		appDesc.height = kInitialHeight;
+		utils::AppLdx app( appDesc );
 
-		if( hwnd == nullptr )
-		{
-			throw std::runtime_error( "Failed to create Win32 window." );
-		}
-
-		ShowWindow( hwnd, showCommand );
-		UpdateWindow( hwnd );
-
-		AppState app{};
-		SetWindowLongPtr( hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>( &app ) );
+		GraphicsState gfx{};
 		HLSLLoader::SetRootDirectory( std::filesystem::path( __FILE__ ).parent_path() );
 
 		ContextDesc contextDesc{};
@@ -139,41 +81,31 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		contextDesc.pixSettings.enableGpuCapture = true;
 
 		SwapchainDesc swapchainDesc{};
-		swapchainDesc.window = MakeWin32WindowHandle( hwnd );
+		swapchainDesc.window = MakeWin32WindowHandle( app.GetWindow() );
 		swapchainDesc.width = kInitialWidth;
 		swapchainDesc.height = kInitialHeight;
 		swapchainDesc.vsync = true;
 
-		app.deviceManager = &DeviceManager::Initialize( contextDesc, swapchainDesc );
-		RenderDevice& device = *app.deviceManager->GetRenderDevice();
-		app.solidPipeline = CreatePipeline( device, contextDesc.swapchainFormat, "VSMainSolid", D3D12_FILL_MODE_SOLID );
-		app.wireframePipeline = CreatePipeline( device, contextDesc.swapchainFormat, "VSMainWireframe", D3D12_FILL_MODE_WIREFRAME );
+		gfx.deviceManager = &DeviceManager::Initialize( contextDesc, swapchainDesc );
+		app.SetDeviceManager( *gfx.deviceManager );
+		RenderDevice& device = *gfx.deviceManager->GetRenderDevice();
+		gfx.solidPipeline = CreatePipeline( device, contextDesc.swapchainFormat, "VSMainSolid", D3D12_FILL_MODE_SOLID );
+		gfx.wireframePipeline = CreatePipeline( device, contextDesc.swapchainFormat, "VSMainWireframe", D3D12_FILL_MODE_WIREFRAME );
 
-		const auto animationStart = std::chrono::steady_clock::now();
-		MSG message{};
-		while( app.running )
+		const std::chrono::steady_clock::time_point animationStart = std::chrono::steady_clock::now();
+		while( app.PumpMessages() )
 		{
-			while( PeekMessage( &message, nullptr, 0, 0, PM_REMOVE ) )
+			if( app.IsWindowMinimized() )
 			{
-				if( message.message == WM_QUIT )
-				{
-					app.running = false;
-					break;
-				}
-				TranslateMessage( &message );
-				DispatchMessage( &message );
-			}
-
-			if( !app.running || app.minimized )
-			{
+				WaitMessage();
 				continue;
 			}
 
 			const float animationTime =
 				std::chrono::duration<float>( std::chrono::steady_clock::now() - animationStart ).count();
 			const float aspectRatio =
-				static_cast<float>( app.deviceManager->GetWidth() ) /
-				static_cast<float>( app.deviceManager->GetHeight() );
+				static_cast<float>( gfx.deviceManager->GetWidth() ) /
+				static_cast<float>( gfx.deviceManager->GetHeight() );
 			const PushConstants constants = BuildPushConstants( animationTime, aspectRatio );
 
 			ICommandBuffer& commands = device.AcquireCommandBuffer();
@@ -188,31 +120,24 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 
 			commands.CmdBeginRendering( renderPass, framebuffer );
 			commands.CmdPushDebugGroupLabel( "Solid cube", 0xff0000ff );
-			commands.CmdBindRenderPipeline( app.solidPipeline );
+			commands.CmdBindRenderPipeline( gfx.solidPipeline );
 			commands.CmdPushConstants( &constants, sizeof( constants ) );
 			commands.CmdDraw( 36 );
 			commands.CmdPopDebugGroupLabel();
 
 			commands.CmdPushDebugGroupLabel( "Wireframe cube", 0xff0000ff );
-			commands.CmdBindRenderPipeline( app.wireframePipeline );
+			commands.CmdBindRenderPipeline( gfx.wireframePipeline );
 			commands.CmdDraw( 36 );
 			commands.CmdPopDebugGroupLabel();
 			commands.CmdEndRendering();
 			device.Submit( commands, backbuffer );
 		}
 
-		SetWindowLongPtr( hwnd, GWLP_USERDATA, 0 );
-		app.deviceManager->WaitIdle();
-		app.solidPipeline = {};
-		app.wireframePipeline = {};
+		gfx.deviceManager->WaitIdle();
+		gfx.solidPipeline = {};
+		gfx.wireframePipeline = {};
 		DeviceManager::ShutdownSingleton();
-		app.deviceManager = nullptr;
-
-		if( IsWindow( hwnd ) != FALSE )
-		{
-			DestroyWindow( hwnd );
-		}
-		UnregisterClassW( windowClass.lpszClassName, instance );
+		gfx.deviceManager = nullptr;
 		return 0;
 	}
 	catch( const std::exception& error )

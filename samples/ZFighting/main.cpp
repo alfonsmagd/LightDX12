@@ -1,5 +1,6 @@
 #include "App/imgui_impl_ldx12.h"
 #include "Ldx12/Ldx12.hpp"
+#include "Ldx12Utils/AppLdx.hpp"
 
 #include "imgui.h"
 #include "backends/imgui_impl_win32.h"
@@ -45,53 +46,18 @@ namespace
 		uint32_t height = 0;
 	};
 
-	struct AppState
+	struct GraphicsState
 	{
 		DeviceManager* deviceManager = nullptr;
 		RenderPipelineState singleSamplePipeline;
 		RenderPipelineState multisamplePipeline;
 		SceneTargets sceneTargets;
-		bool running = true;
-		bool minimized = false;
 	};
 
-	LRESULT CALLBACK WindowProc( HWND window, UINT message, WPARAM wParam, LPARAM lParam )
+	bool HandleImGuiMessage( HWND window, UINT message, WPARAM wParam, LPARAM lParam, void* )
 	{
-		if( ImGui::GetCurrentContext() != nullptr && ImGui_ImplWin32_WndProcHandler( window, message, wParam, lParam ) )
-		{
-			return 1;
-		}
-
-		AppState* app = reinterpret_cast<AppState*>( GetWindowLongPtr( window, GWLP_USERDATA ) );
-		switch( message )
-		{
-			case WM_SIZE:
-				if( app != nullptr && app->deviceManager != nullptr )
-				{
-					const uint32_t width = LOWORD( lParam );
-					const uint32_t height = HIWORD( lParam );
-					app->minimized = width == 0 || height == 0;
-					if( !app->minimized )
-					{
-						app->deviceManager->Resize( width, height );
-					}
-				}
-				return 0;
-
-			case WM_CLOSE:
-				if( app != nullptr )
-				{
-					app->running = false;
-				}
-				return 0;
-
-			case WM_DESTROY:
-				PostQuitMessage( 0 );
-				return 0;
-
-			default:
-				return DefWindowProc( window, message, wParam, lParam );
-		}
+		return ImGui::GetCurrentContext() != nullptr &&
+			ImGui_ImplWin32_WndProcHandler( window, message, wParam, lParam ) != 0;
 	}
 
 	RenderPipelineState CreatePipeline( RenderDevice& device, uint32_t sampleCount )
@@ -175,21 +141,21 @@ float4 PSMain(float4 position : SV_Position, float4 color : COLOR0) : SV_Target0
 		targets.height = 0;
 	}
 
-	void RecreateSceneTargets( AppState& app )
+	void RecreateSceneTargets( GraphicsState& gfx )
 	{
-		RenderDevice& device = *app.deviceManager->GetRenderDevice();
-		const uint32_t width = app.deviceManager->GetWidth();
-		const uint32_t height = app.deviceManager->GetHeight();
-		if( app.sceneTargets.multisampleColor.Valid() &&
-			app.sceneTargets.multisampleDepth.Valid() &&
-			app.sceneTargets.singleSampleDepth.Valid() &&
-			app.sceneTargets.width == width &&
-			app.sceneTargets.height == height )
+		RenderDevice& device = *gfx.deviceManager->GetRenderDevice();
+		const uint32_t width = gfx.deviceManager->GetWidth();
+		const uint32_t height = gfx.deviceManager->GetHeight();
+		if( gfx.sceneTargets.multisampleColor.Valid() &&
+			gfx.sceneTargets.multisampleDepth.Valid() &&
+			gfx.sceneTargets.singleSampleDepth.Valid() &&
+			gfx.sceneTargets.width == width &&
+			gfx.sceneTargets.height == height )
 		{
 			return;
 		}
 
-		DestroySceneTargets( device, app.sceneTargets );
+		DestroySceneTargets( device, gfx.sceneTargets );
 
 		TextureDesc colorDesc{};
 		colorDesc.debugName = "Z-fighting MSAA color";
@@ -204,7 +170,7 @@ float4 PSMain(float4 position : SV_Position, float4 color : COLOR0) : SV_Target0
 		colorDesc.clearValue.Color[ 1 ] = 0.03f;
 		colorDesc.clearValue.Color[ 2 ] = 0.04f;
 		colorDesc.clearValue.Color[ 3 ] = 1.0f;
-		app.sceneTargets.multisampleColor = device.CreateTexture( colorDesc );
+		gfx.sceneTargets.multisampleColor = device.CreateTexture( colorDesc );
 
 		TextureDesc depthDesc{};
 		depthDesc.debugName = "Z-fighting MSAA depth";
@@ -216,13 +182,13 @@ float4 PSMain(float4 position : SV_Position, float4 color : COLOR0) : SV_Target0
 		depthDesc.useClearValue = true;
 		depthDesc.clearValue.Format = depthDesc.format;
 		depthDesc.clearValue.DepthStencil.Depth = 1.0f;
-		app.sceneTargets.multisampleDepth = device.CreateTexture( depthDesc );
+		gfx.sceneTargets.multisampleDepth = device.CreateTexture( depthDesc );
 
 		depthDesc.debugName = "Z-fighting single-sample depth";
 		depthDesc.sampleCount = 1;
-		app.sceneTargets.singleSampleDepth = device.CreateTexture( depthDesc );
-		app.sceneTargets.width = width;
-		app.sceneTargets.height = height;
+		gfx.sceneTargets.singleSampleDepth = device.CreateTexture( depthDesc );
+		gfx.sceneTargets.width = width;
+		gfx.sceneTargets.height = height;
 	}
 
 	PushConstants BuildConstants( float cameraTime, float aspectRatio, float nearPlane, float farPlane )
@@ -249,70 +215,49 @@ float4 PSMain(float4 position : SV_Position, float4 color : COLOR0) : SV_Target0
 
 int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 {
-	HWND window = nullptr;
 	bool imguiWin32Initialized = false;
 	bool imguiLdx12Initialized = false;
 
 	try
 	{
-		WNDCLASSEXW windowClass{};
-		windowClass.cbSize = sizeof( WNDCLASSEXW );
-		windowClass.lpfnWndProc = WindowProc;
-		windowClass.hInstance = instance;
-		windowClass.lpszClassName = L"Ldx12ZFightingWindow";
-		windowClass.hCursor = LoadCursor( nullptr, IDC_ARROW );
-		RegisterClassExW( &windowClass );
-
 		constexpr uint32_t initialWidth = 1280;
 		constexpr uint32_t initialHeight = 720;
-		window = CreateWindowExW(
-			0,
-			windowClass.lpszClassName,
-			L"Ldx12 - Z-fighting depth offsets: 0, 1e-6, 1e-5, 1e-4, 1e-3",
-			WS_OVERLAPPEDWINDOW,
-			CW_USEDEFAULT,
-			CW_USEDEFAULT,
-			static_cast<int>( initialWidth ),
-			static_cast<int>( initialHeight ),
-			nullptr,
-			nullptr,
-			instance,
-			nullptr );
-
-		if( window == nullptr )
-		{
-			throw std::runtime_error( "Failed to create the Z-fighting window." );
-		}
-
-		AppState app{};
-		SetWindowLongPtr( window, GWLP_USERDATA, reinterpret_cast<LONG_PTR>( &app ) );
-		ShowWindow( window, showCommand );
-		UpdateWindow( window );
+		utils::AppLdxDesc appDesc{};
+		appDesc.instance = instance;
+		appDesc.showCommand = showCommand;
+		appDesc.className = L"Ldx12ZFightingWindow";
+		appDesc.title = L"Ldx12 - Z-fighting depth offsets: 0, 1e-6, 1e-5, 1e-4, 1e-3";
+		appDesc.width = initialWidth;
+		appDesc.height = initialHeight;
+		appDesc.messageHandler = HandleImGuiMessage;
+		utils::AppLdx app( appDesc );
+		GraphicsState gfx{};
 
 		ContextDesc context{};
 		context.enableDebugLayer = true;
 		context.swapchainBufferCount = ourFramesInFlight;
 		SwapchainDesc swapchain{};
-		swapchain.window = MakeWin32WindowHandle( window );
+		swapchain.window = MakeWin32WindowHandle( app.GetWindow() );
 		swapchain.width = initialWidth;
 		swapchain.height = initialHeight;
 		swapchain.vsync = true;
-		app.deviceManager = &DeviceManager::Initialize( context, swapchain );
+		gfx.deviceManager = &DeviceManager::Initialize( context, swapchain );
+		app.SetDeviceManager( *gfx.deviceManager );
 
-		RenderDevice& device = *app.deviceManager->GetRenderDevice();
+		RenderDevice& device = *gfx.deviceManager->GetRenderDevice();
 		if( !device.SupportsSampleCount( context.swapchainFormat, ourSampleCount ) ||
 			!device.SupportsSampleCount( DXGI_FORMAT_D32_FLOAT, ourSampleCount ) )
 		{
 			throw std::runtime_error( "This GPU does not support the formats required for MSAA x4." );
 		}
-		app.singleSamplePipeline = CreatePipeline( device, 1 );
-		app.multisamplePipeline = CreatePipeline( device, ourSampleCount );
-		RecreateSceneTargets( app );
+		gfx.singleSamplePipeline = CreatePipeline( device, 1 );
+		gfx.multisamplePipeline = CreatePipeline( device, ourSampleCount );
+		RecreateSceneTargets( gfx );
 
 		IMGUI_CHECKVERSION();
 		ImGui::CreateContext();
 		ImGui::StyleColorsDark();
-		if( !ImGui_ImplWin32_Init( window ) )
+		if( !ImGui_ImplWin32_Init( app.GetWindow() ) )
 		{
 			throw std::runtime_error( "ImGui Win32 initialization failed." );
 		}
@@ -336,22 +281,11 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		float nearPlane = 0.1f;
 		float farPlane = 100.0f;
 		uint32_t frameIndex = 0;
-		MSG message{};
-		while( app.running )
+		while( app.PumpMessages() )
 		{
-			while( PeekMessage( &message, nullptr, 0, 0, PM_REMOVE ) )
+			if( app.IsWindowMinimized() )
 			{
-				if( message.message == WM_QUIT )
-				{
-					app.running = false;
-					break;
-				}
-				TranslateMessage( &message );
-				DispatchMessage( &message );
-			}
-
-			if( !app.running || app.minimized )
-			{
+				WaitMessage();
 				continue;
 			}
 
@@ -384,12 +318,12 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 			ImGui::End();
 			ImGui::Render();
 
-			RecreateSceneTargets( app );
+			RecreateSceneTargets( gfx );
 			const float elapsedTime = std::chrono::duration<float>(
 				std::chrono::steady_clock::now() - startTime ).count();
 			const float aspectRatio =
-				static_cast<float>( app.deviceManager->GetWidth() ) /
-				static_cast<float>( app.deviceManager->GetHeight() );
+				static_cast<float>( gfx.deviceManager->GetWidth() ) /
+				static_cast<float>( gfx.deviceManager->GetHeight() );
 			PushConstants constants = BuildConstants(
 				elapsedTime * 0.20f,
 				aspectRatio,
@@ -403,12 +337,12 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 			renderPass.depthStencil.depthLoadOp = LoadOp::Clear;
 			renderPass.depthStencil.clearDepth = 1.0f;
 			Framebuffer framebuffer{};
-			framebuffer.color[ 0 ].texture = enableMsaa ? app.sceneTargets.multisampleColor : backbuffer;
-			framebuffer.depthStencil.texture = enableMsaa ? app.sceneTargets.multisampleDepth : app.sceneTargets.singleSampleDepth;
+			framebuffer.color[ 0 ].texture = enableMsaa ? gfx.sceneTargets.multisampleColor : backbuffer;
+			framebuffer.depthStencil.texture = enableMsaa ? gfx.sceneTargets.multisampleDepth : gfx.sceneTargets.singleSampleDepth;
 
 			ICommandBuffer& commands = device.AcquireCommandBuffer();
 			commands.CmdBeginRendering( renderPass, framebuffer );
-			const RenderPipelineState& pipeline = enableMsaa ? app.multisamplePipeline : app.singleSamplePipeline;
+			const RenderPipelineState& pipeline = enableMsaa ? gfx.multisamplePipeline : gfx.singleSamplePipeline;
 			commands.CmdBindRenderPipeline( pipeline );
 
 			for( uint32_t index = 0; index < ourDepthOffsets.size(); ++index )
@@ -433,7 +367,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 			commands.CmdEndRendering();
 			if( enableMsaa )
 			{
-				commands.CmdResolveTexture( app.sceneTargets.multisampleColor, backbuffer );
+				commands.CmdResolveTexture( gfx.sceneTargets.multisampleColor, backbuffer );
 			}
 
 			RenderPass uiRenderPass{};
@@ -448,7 +382,6 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 			frameIndex = ( frameIndex + 1u ) % ourFramesInFlight;
 		}
 
-		SetWindowLongPtr( window, GWLP_USERDATA, 0 );
 		device.WaitIdle();
 
 		ImGui_ImplLdx12_Shutdown();
@@ -458,19 +391,14 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 
 		ImGui::DestroyContext();
 
-		DestroySceneTargets( device, app.sceneTargets );
+		DestroySceneTargets( device, gfx.sceneTargets );
 
-		app.singleSamplePipeline = {};
-		app.multisamplePipeline = {};
+		gfx.singleSamplePipeline = {};
+		gfx.multisamplePipeline = {};
 
 		DeviceManager::ShutdownSingleton();
-		app.deviceManager = nullptr;
+		gfx.deviceManager = nullptr;
 
-		if( IsWindow( window ) != FALSE )
-		{
-			DestroyWindow( window );
-		}
-		UnregisterClassW( windowClass.lpszClassName, instance );
 		return 0;
 	}
 	catch( const std::exception& error )
@@ -488,10 +416,6 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 			ImGui::DestroyContext();
 		}
 		DeviceManager::ShutdownSingleton();
-		if( window != nullptr && IsWindow( window ) != FALSE )
-		{
-			DestroyWindow( window );
-		}
 		MessageBoxA( nullptr, error.what(), "Ldx12 Z-fighting failed", MB_ICONERROR | MB_OK );
 		return 1;
 	}

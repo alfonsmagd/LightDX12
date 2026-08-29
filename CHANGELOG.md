@@ -11,14 +11,16 @@ This file lists the main user-visible changes in each Ldx12 version.
 - A bindless sampler heap with four built-in samplers and four slots for samplers created at runtime.
 - `SamplerHandle`, `SamplerDesc` and the API required to create, query and destroy custom samplers.
 - A native Ldx12 renderer for Dear ImGui that accepts `TextureHandle` directly in `ImGui::Image()`.
-- An optional `Ldx12::Utils` world renderer with predefined cube, sphere and arrow geometry, per-instance colors and multi-draw indirect batching.
+- An optional `Ldx12::Utils` `DebugRenderer` with predefined cube, sphere and arrow geometry, per-instance colors and multi-draw indirect batching.
+- Reusable `Ldx12::Utils` geometry, orbit-camera, image/cubemap-loading and resize-aware depth-target helpers.
 - Configurable multisample rendering through `TextureDesc::sampleCount`, `RenderPipelineDesc::sampleCount`, capability queries and `CmdResolveTexture()`.
 - New textured-cube, Cookbook cube, texture-sampler, Z-fighting, Ldx12 ImGui and native D3D12 ImGui samples.
 - A full-capacity test covering the documented resource, attachment, command-buffer and push-constant limits.
 - A GPU multisample test covering MSAA color/depth creation, rendering, resolve and texture readback.
 - Optional PIX GPU capture loading and HUD settings through `PixSettings`.
-- Sampled `Texture2DArray` and `TextureCube` resources with packed slice uploads and bindless SRVs.
-- A cubemap sample with a reflective cube, skybox and separate HLSL shader files.
+- Native sampled `TextureCube` support through `TextureDimension::TextureCube`: six packed faces are uploaded into one resource and exposed as a bindless `TextureCube` SRV.
+- Sampled `Texture2DArray` resources with packed slice uploads and bindless SRVs.
+- A complete cubemap sample with six image faces, a reflective cube or sphere, an orbit camera, a skybox and separate HLSL shader files.
 
 ### Changed
 
@@ -33,6 +35,9 @@ This file lists the main user-visible changes in each Ldx12 version.
 - Utils geometry is uploaded once; object changes rebuild only instance and indirect buffers, while transform changes update only instances.
 - Utils arrows now render as continuous line geometry with an outline arrowhead.
 - The Z-fighting sample can switch between single-sample rendering and MSAA x4 at runtime through a fixed ImGui control panel.
+- Repeated Win32 window, resize, input and message-loop boilerplate is shared by all Ldx12 samples through `ldx12::utils::AppLdx`; the intentionally native D3D12 sample remains standalone.
+- The cubemap sample now receives ready-to-draw GPU buffer handles from `CreateCube()` and `CreateSphere()` and keeps the Ldx12 rendering commands explicit.
+- TexturedCube reuses the cube buffers from `Ldx12Utils`, while texture-focused samples reuse the common checker-texture generator.
 
 ### Fixed
 

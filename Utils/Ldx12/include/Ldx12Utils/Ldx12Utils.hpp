@@ -86,7 +86,7 @@ namespace ldx12::utils
 		[[nodiscard]] uint32_t NumObjects() const noexcept { return objectCount_; }
 
 	private:
-		friend class RenderWorld;
+		friend class DebugRenderer;
 
 		enum class PrimitiveType : uint8_t
 		{
@@ -126,22 +126,22 @@ namespace ldx12::utils
 		uint32_t objectCount_ = 0;
 	};
 
-	struct RenderWorldDesc
+	struct DebugRendererDesc
 	{
 		DXGI_FORMAT colorFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
 		DXGI_FORMAT depthFormat = DXGI_FORMAT_D32_FLOAT;
 	};
 
-	class RenderWorld final
+	class DebugRenderer final
 	{
 	public:
-		RenderWorld( RenderDevice& device, const RenderWorldDesc& desc = {} );
-		~RenderWorld();
+		DebugRenderer( RenderDevice& device, const DebugRendererDesc& desc = {} );
+		~DebugRenderer();
 
-		RenderWorld( const RenderWorld& ) = delete;
-		RenderWorld& operator=( const RenderWorld& ) = delete;
-		RenderWorld( RenderWorld&& ) = delete;
-		RenderWorld& operator=( RenderWorld&& ) = delete;
+		DebugRenderer( const DebugRenderer& ) = delete;
+		DebugRenderer& operator=( const DebugRenderer& ) = delete;
+		DebugRenderer( DebugRenderer&& ) = delete;
+		DebugRenderer& operator=( DebugRenderer&& ) = delete;
 
 		void Render( ICommandBuffer& commands, const World& world, const Camera& camera );
 

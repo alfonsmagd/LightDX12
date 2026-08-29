@@ -1,58 +1,17 @@
 #include "Ldx12/Ldx12.hpp"
+#include "Ldx12Utils/AppLdx.hpp"
 
-#include <stdexcept>
+#include <exception>
 
 using namespace ldx12;
 
 namespace
 {
-	struct AppState
+	struct GraphicsState
 	{
 		DeviceManager* deviceManager = nullptr;
 		RenderPipelineState trianglePipeline;
-		bool running = true;
-		bool minimized = false;
 	};
-
-	LRESULT CALLBACK WindowProc( HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam )
-	{
-		auto* app = reinterpret_cast< AppState* >( GetWindowLongPtr( hwnd, GWLP_USERDATA ) );
-
-		switch( message )
-		{
-			case WM_SIZE:
-			{
-				if( app != nullptr && app->deviceManager )
-				{
-					const uint32_t width = LOWORD( lParam );
-					const uint32_t height = HIWORD( lParam );
-					app->minimized = width == 0 || height == 0;
-					if( !app->minimized )
-					{
-						app->deviceManager->Resize( width, height );
-					}
-				}
-				return 0;
-			}
-
-			case WM_DESTROY:
-				PostQuitMessage( 0 );
-				return 0;
-
-			case WM_CLOSE:
-			{
-				if( app != nullptr )
-				{
-					app->running = false;
-					app->minimized = true;
-				}
-				return 0;
-			}
-
-			default:
-				return DefWindowProc( hwnd, message, wParam, lParam );
-		}
-	}
 
 	RenderPipelineState CreateTrianglePipeline( RenderDevice& ctx )
 	{
@@ -113,78 +72,46 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 {
 	try
 	{
-		WNDCLASSEXW windowClass{};
-		windowClass.cbSize = sizeof( WNDCLASSEX );
-		windowClass.lpfnWndProc = WindowProc;
-		windowClass.hInstance = instance;
-		windowClass.lpszClassName = L"Ldx12TriangleWindow";
-		windowClass.hCursor = LoadCursor( nullptr, IDC_ARROW );
-		RegisterClassExW( &windowClass );
-
 		constexpr uint32_t kInitialWidth = 1280;
 		constexpr uint32_t kInitialHeight = 720;
 
-		HWND hwnd = CreateWindowExW(
-			0,
-			windowClass.lpszClassName,
-			L"Ldx12 Triangle",
-			WS_OVERLAPPEDWINDOW,
-			CW_USEDEFAULT,
-			CW_USEDEFAULT,
-			static_cast< int >(kInitialWidth),
-			static_cast< int >(kInitialHeight),
-			nullptr,
-			nullptr,
-			instance,
-			nullptr );
+		utils::AppLdxDesc appDesc{};
+		appDesc.instance = instance;
+		appDesc.showCommand = showCommand;
+		appDesc.className = L"Ldx12TriangleWindow";
+		appDesc.title = L"Ldx12 Triangle";
+		appDesc.width = kInitialWidth;
+		appDesc.height = kInitialHeight;
 
-		if( hwnd == nullptr )
-		{
-			throw std::runtime_error( "Failed to create Win32 window." );
-		}
+		utils::AppLdx app( appDesc );
 
-		ShowWindow( hwnd, showCommand );
-		UpdateWindow( hwnd );
-
-		AppState app{};
-		SetWindowLongPtr( hwnd, GWLP_USERDATA, reinterpret_cast< LONG_PTR >( &app ) );
+		GraphicsState gfx{};
 
 		ContextDesc contextDesc{};
 		contextDesc.enableDebugLayer = true;
 		contextDesc.swapchainBufferCount = 3;
 
 		SwapchainDesc swapchainDesc{};
-		swapchainDesc.window = MakeWin32WindowHandle( hwnd );
+		swapchainDesc.window = MakeWin32WindowHandle( app.GetWindow() );
 		swapchainDesc.width = kInitialWidth;
 		swapchainDesc.height = kInitialHeight;
 		swapchainDesc.vsync = true;
 
-		app.deviceManager = &DeviceManager::Initialize( contextDesc, swapchainDesc );
-		app.trianglePipeline = CreateTrianglePipeline( *app.deviceManager->GetRenderDevice() );
+		gfx.deviceManager = &DeviceManager::Initialize( contextDesc, swapchainDesc );
+		app.SetDeviceManager( *gfx.deviceManager );
+		RenderDevice& device = *gfx.deviceManager->GetRenderDevice();
+		gfx.trianglePipeline = CreateTrianglePipeline( device );
 
-		MSG message{};
-		while( app.running )
+		while( app.PumpMessages() )
 		{
-			while( PeekMessage( &message, nullptr, 0, 0, PM_REMOVE ) )
+			if( app.IsWindowMinimized() )
 			{
-				if( message.message == WM_QUIT )
-				{
-					app.running = false;
-					break;
-				}
-
-				TranslateMessage( &message );
-				DispatchMessage( &message );
-			}
-
-			RenderDevice* ctx = app.deviceManager ? app.deviceManager->GetRenderDevice() : nullptr;
-			if( !app.running || app.minimized || ctx == nullptr )
-			{
+				WaitMessage();
 				continue;
 			}
 
-			auto& buffer = ctx->AcquireCommandBuffer();
-			const TextureHandle currentTexture = ctx->GetCurrentSwapchainTexture();
+			ICommandBuffer& buffer = device.AcquireCommandBuffer();
+			const TextureHandle currentTexture = device.GetCurrentSwapchainTexture();
 
 			RenderPass renderPass{};
 			renderPass.color[ 0 ].loadOp = LoadOp::Clear;
@@ -193,28 +120,21 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 			Framebuffer framebuffer{};
 			framebuffer.color[ 0 ].texture = currentTexture;
 
-			buffer.CmdBeginRendering( renderPass, framebuffer );
-			buffer.CmdBindRenderPipeline( app.trianglePipeline );
-			buffer.CmdPushDebugGroupLabel( "Render Triangle", 0xff0000ff );
-			buffer.CmdDraw( 3 );
-			buffer.CmdPopDebugGroupLabel();
-			buffer.CmdEndRendering();
-			ctx->Submit( buffer, currentTexture );
+			{
+				buffer.CmdBeginRendering( renderPass, framebuffer );
+				buffer.CmdBindRenderPipeline( gfx.trianglePipeline );
+				buffer.CmdPushDebugGroupLabel( "Render Triangle", 0xff0000ff );
+				buffer.CmdDraw( 3 );
+				buffer.CmdPopDebugGroupLabel();
+				buffer.CmdEndRendering();
+			}
+			device.Submit( buffer, currentTexture );
 		}
 
-		SetWindowLongPtr( hwnd, GWLP_USERDATA, 0 );
-		if( app.deviceManager )
-		{
-			app.deviceManager->WaitIdle();
-		}
-		app.trianglePipeline = {};
+		gfx.deviceManager->WaitIdle();
+		gfx.trianglePipeline = {};
 		DeviceManager::ShutdownSingleton();
-		app.deviceManager = nullptr;
-		if( IsWindow( hwnd ) != FALSE )
-		{
-			DestroyWindow( hwnd );
-		}
-		UnregisterClassW( windowClass.lpszClassName, instance );
+		gfx.deviceManager = nullptr;
 		return 0;
 	}
 	catch( const std::exception& )

@@ -1,4 +1,6 @@
 #include "Ldx12/Ldx12.hpp"
+#include "Ldx12Utils/AppLdx.hpp"
+#include "Ldx12Utils/DepthTarget.hpp"
 #include "Ldx12Utils/Ldx12Utils.hpp"
 
 #include <cstdint>
@@ -7,152 +9,32 @@
 using namespace ldx12;
 using namespace ldx12::utils;
 
-namespace
-{
-	struct DepthTarget
-	{
-		TextureHandle texture = {};
-		uint32_t width = 0;
-		uint32_t height = 0;
-	};
-
-	struct AppState
-	{
-		DeviceManager* deviceManager = nullptr;
-		DepthTarget depthTarget = {};
-		bool running = true;
-		bool minimized = false;
-		bool toggleSphere = false;
-	};
-
-	LRESULT CALLBACK WindowProc( HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam )
-	{
-		AppState* app = reinterpret_cast<AppState*>( GetWindowLongPtr( hwnd, GWLP_USERDATA ) );
-		switch( message )
-		{
-			case WM_SIZE:
-				if( app != nullptr && app->deviceManager != nullptr )
-				{
-					const uint32_t width = LOWORD( lParam );
-					const uint32_t height = HIWORD( lParam );
-					app->minimized = width == 0 || height == 0;
-					if( !app->minimized )
-					{
-						app->deviceManager->Resize( width, height );
-					}
-				}
-				return 0;
-
-			case WM_KEYDOWN:
-				if( app != nullptr && wParam == VK_SPACE )
-				{
-					app->toggleSphere = true;
-				}
-				return 0;
-
-			case WM_CLOSE:
-				if( app != nullptr )
-				{
-					app->running = false;
-				}
-				return 0;
-
-			case WM_DESTROY:
-				PostQuitMessage( 0 );
-				return 0;
-
-			default:
-				return DefWindowProc( hwnd, message, wParam, lParam );
-		}
-	}
-
-	void DestroyDepthTarget( RenderDevice& device, DepthTarget& depthTarget )
-	{
-		if( depthTarget.texture.Valid() )
-		{
-			device.Destroy( depthTarget.texture );
-			depthTarget.texture = {};
-		}
-		depthTarget.width = 0;
-		depthTarget.height = 0;
-	}
-
-	void RecreateDepthTarget( AppState& app )
-	{
-		RenderDevice& device = *app.deviceManager->GetRenderDevice();
-		const uint32_t width = app.deviceManager->GetWidth();
-		const uint32_t height = app.deviceManager->GetHeight();
-		if( app.depthTarget.texture.Valid() && app.depthTarget.width == width && app.depthTarget.height == height )
-		{
-			return;
-		}
-
-		DestroyDepthTarget( device, app.depthTarget );
-		TextureDesc desc{};
-		desc.debugName = "World Geometry Depth";
-		desc.width = width;
-		desc.height = height;
-		desc.format = DXGI_FORMAT_D32_FLOAT;
-		desc.usage = TextureUsage::DepthStencil;
-		desc.useClearValue = true;
-		desc.clearValue.Format = desc.format;
-		desc.clearValue.DepthStencil.Depth = 1.0f;
-		app.depthTarget.texture = device.CreateTexture( desc );
-		app.depthTarget.width = width;
-		app.depthTarget.height = height;
-	}
-}
-
 int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 {
 	try
 	{
-		WNDCLASSEXW windowClass{};
-		windowClass.cbSize = sizeof( WNDCLASSEX );
-		windowClass.lpfnWndProc = WindowProc;
-		windowClass.hInstance = instance;
-		windowClass.lpszClassName = L"Ldx12WorldGeometryWindow";
-		windowClass.hCursor = LoadCursor( nullptr, IDC_ARROW );
-		RegisterClassExW( &windowClass );
-
 		constexpr uint32_t initialWidth = 1280;
 		constexpr uint32_t initialHeight = 720;
-		HWND hwnd = CreateWindowExW(
-			0,
-			windowClass.lpszClassName,
-			L"Ldx12 World - Instanced geometry and debug wireframes",
-			WS_OVERLAPPEDWINDOW,
-			CW_USEDEFAULT,
-			CW_USEDEFAULT,
-			static_cast<int>( initialWidth ),
-			static_cast<int>( initialHeight ),
-			nullptr,
-			nullptr,
-			instance,
-			nullptr );
-
-		if( hwnd == nullptr )
-		{
-			throw std::runtime_error( "Failed to create the World Geometry window." );
-		}
-
-		ShowWindow( hwnd, showCommand );
-		UpdateWindow( hwnd );
-
-		AppState app{};
-		SetWindowLongPtr( hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>( &app ) );
+		AppLdxDesc appDesc{};
+		appDesc.instance = instance;
+		appDesc.showCommand = showCommand;
+		appDesc.className = L"Ldx12WorldGeometryWindow";
+		appDesc.title = L"Ldx12 World - Instanced geometry and debug wireframes";
+		appDesc.width = initialWidth;
+		appDesc.height = initialHeight;
+		AppLdx app( appDesc );
 
 		ContextDesc contextDesc{};
 		contextDesc.enableDebugLayer = true;
 		SwapchainDesc swapchainDesc{};
-		swapchainDesc.window = MakeWin32WindowHandle( hwnd );
+		swapchainDesc.window = MakeWin32WindowHandle( app.GetWindow() );
 		swapchainDesc.width = initialWidth;
 		swapchainDesc.height = initialHeight;
 		swapchainDesc.vsync = true;
 
-		app.deviceManager = &DeviceManager::Initialize( contextDesc, swapchainDesc );
-		RenderDevice& device = *app.deviceManager->GetRenderDevice();
-		RecreateDepthTarget( app );
+		DeviceManager& manager = DeviceManager::Initialize( contextDesc, swapchainDesc );
+		app.SetDeviceManager( manager );
+		RenderDevice& device = *manager.GetRenderDevice();
 
 		World world;
 		CubeDesc cubeDesc{};
@@ -207,35 +89,25 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		arrowDesc.color = { 1.0f, 0.85f, 0.10f, 1.0f };
 		world.AddArrow( arrowDesc );
 
-		RenderWorldDesc renderWorldDesc{};
-		renderWorldDesc.colorFormat = contextDesc.swapchainFormat;
-		renderWorldDesc.depthFormat = DXGI_FORMAT_D32_FLOAT;
+		DebugRendererDesc debugRendererDesc{};
+		debugRendererDesc.colorFormat = contextDesc.swapchainFormat;
+		debugRendererDesc.depthFormat = DXGI_FORMAT_D32_FLOAT;
 		{
-			RenderWorld renderWorld( device, renderWorldDesc );
+			DebugRenderer debugRenderer( device, debugRendererDesc );
+			DepthTarget depthTarget( device );
 			Camera camera{};
 			camera.position = { 0.0f, 3.0f, -10.0f };
 			camera.target = { 0.0f, 0.4f, 0.0f };
 
-			MSG message{};
-			while( app.running )
+			while( app.PumpMessages() )
 			{
-				while( PeekMessage( &message, nullptr, 0, 0, PM_REMOVE ) )
+				if( app.IsWindowMinimized() )
 				{
-					if( message.message == WM_QUIT )
-					{
-						app.running = false;
-						break;
-					}
-					TranslateMessage( &message );
-					DispatchMessage( &message );
-				}
-
-				if( !app.running || app.minimized )
-				{
+					WaitMessage();
 					continue;
 				}
 
-				if( app.toggleSphere )
+				if( app.WasKeyPressed( VK_SPACE ) )
 				{
 					if( world.Contains( debugSphere ) )
 					{
@@ -245,12 +117,11 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 					{
 						debugSphere = world.AddSphere( debugSphereDesc );
 					}
-					app.toggleSphere = false;
 				}
 
-				RecreateDepthTarget( app );
-				camera.aspectRatio = static_cast<float>( app.deviceManager->GetWidth() ) /
-					static_cast<float>( app.deviceManager->GetHeight() );
+				depthTarget.Resize( manager.GetWidth(), manager.GetHeight() );
+				camera.aspectRatio = static_cast<float>( manager.GetWidth() ) /
+					static_cast<float>( manager.GetHeight() );
 
 				ICommandBuffer& commands = device.AcquireCommandBuffer();
 				const TextureHandle backbuffer = device.GetCurrentSwapchainTexture();
@@ -262,26 +133,18 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 
 				Framebuffer framebuffer{};
 				framebuffer.color[ 0 ].texture = backbuffer;
-				framebuffer.depthStencil.texture = app.depthTarget.texture;
+				framebuffer.depthStencil.texture = depthTarget.GetTexture();
 
 				commands.CmdBeginRendering( renderPass, framebuffer );
-				renderWorld.Render( commands, world, camera );
+				debugRenderer.Render( commands, world, camera );
 				commands.CmdEndRendering();
 				device.Submit( commands, backbuffer );
 			}
+
+			device.WaitIdle();
 		}
 
-		SetWindowLongPtr( hwnd, GWLP_USERDATA, 0 );
-		device.WaitIdle();
-		DestroyDepthTarget( device, app.depthTarget );
 		DeviceManager::ShutdownSingleton();
-		app.deviceManager = nullptr;
-
-		if( IsWindow( hwnd ) != FALSE )
-		{
-			DestroyWindow( hwnd );
-		}
-		UnregisterClassW( windowClass.lpszClassName, instance );
 		return 0;
 	}
 	catch( const std::exception& error )

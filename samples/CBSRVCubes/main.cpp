@@ -1,12 +1,14 @@
 #include "Ldx12/Ldx12.hpp"
 #include "Ldx12/HLSLLoader.hpp"
+#include "Ldx12Utils/AppLdx.hpp"
+#include "Ldx12Utils/DepthTarget.hpp"
 
 #include <array>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
+#include <exception>
 #include <filesystem>
-#include <stdexcept>
 
 using namespace ldx12;
 
@@ -54,22 +56,12 @@ namespace
 		float z = 0.0f;
 	};
 
-	struct DepthTarget
-	{
-		TextureHandle texture = {};
-		uint32_t width = 0;
-		uint32_t height = 0;
-	};
-
-	struct AppState
+	struct GraphicsState
 	{
 		DeviceManager* deviceManager = nullptr;
 		RenderPipelineState pipeline;
-		DepthTarget depthTarget;
 		BufferHandle sceneBuffer = {};
 		BufferHandle cubeBuffer = {};
-		bool running = true;
-		bool minimized = false;
 	};
 
 	constexpr std::array<std::array<float, 4>, 8> kCubeColors = {
@@ -156,77 +148,40 @@ namespace
 		return device.CreateRenderPipeline( desc );
 	}
 
-	void DestroyDepthTarget( RenderDevice& device, DepthTarget& depthTarget )
+	void UpdateSceneCbv( GraphicsState& gfx )
 	{
-		if( depthTarget.texture.Valid() )
-		{
-			device.Destroy( depthTarget.texture );
-			depthTarget.texture = {};
-		}
-		depthTarget.width = 0;
-		depthTarget.height = 0;
-	}
-
-	void RecreateDepthTarget( AppState& app )
-	{
-		RenderDevice& device = *app.deviceManager->GetRenderDevice();
-		const uint32_t width = app.deviceManager->GetWidth();
-		const uint32_t height = app.deviceManager->GetHeight();
-		if( app.depthTarget.texture.Valid() && app.depthTarget.width == width && app.depthTarget.height == height )
-		{
-			return;
-		}
-
-		DestroyDepthTarget( device, app.depthTarget );
-
-		TextureDesc desc{};
-		desc.debugName = "CB SRV Cubes Depth";
-		desc.width = width;
-		desc.height = height;
-		desc.format = DXGI_FORMAT_D32_FLOAT;
-		desc.usage = TextureUsage::DepthStencil;
-		desc.useClearValue = true;
-		desc.clearValue.Format = desc.format;
-		desc.clearValue.DepthStencil.Depth = 1.0f;
-		app.depthTarget.texture = device.CreateTexture( desc );
-		app.depthTarget.width = width;
-		app.depthTarget.height = height;
-	}
-
-	void UpdateSceneCbv( AppState& app )
-	{
-		RenderDevice& device = *app.deviceManager->GetRenderDevice();
-		if( !app.sceneBuffer.Valid() )
+		RenderDevice& device = *gfx.deviceManager->GetRenderDevice();
+		if( !gfx.sceneBuffer.Valid() )
 		{
 			BufferDesc desc{};
 			desc.debugName = "CB SRV Cubes Scene CBV";
 			desc.size = sizeof( SceneConstants );
 			desc.type = BufferType::Constant;
-			app.sceneBuffer = device.CreateBuffer( desc, ConstantBufferSlot::FreeCB0 );
+			gfx.sceneBuffer = device.CreateBuffer( desc, ConstantBufferSlot::FreeCB0 );
 		}
 
 		SceneConstants scene{};
 		scene.aspectRatio =
-			static_cast<float>( app.deviceManager->GetWidth() ) /
-			static_cast<float>( app.deviceManager->GetHeight() );
-		device.WriteBuffer( app.sceneBuffer, 0, &scene, sizeof( scene ) );
+			static_cast<float>( gfx.deviceManager->GetWidth() ) /
+			static_cast<float>( gfx.deviceManager->GetHeight() );
+		device.WriteBuffer( gfx.sceneBuffer, 0, &scene, sizeof( scene ) );
 	}
 
-	void UpdateCubeSrv( AppState& app, float animationTime )
+	void UpdateCubeSrv( GraphicsState& gfx, float animationTime )
 	{
-		RenderDevice& device = *app.deviceManager->GetRenderDevice();
-		if( !app.cubeBuffer.Valid() )
+		RenderDevice& device = *gfx.deviceManager->GetRenderDevice();
+		if( !gfx.cubeBuffer.Valid() )
 		{
 			BufferDesc desc{};
 			desc.debugName = "CB SRV Cubes Data SRV";
 			desc.size = sizeof( CubeData ) * kCubeCount;
 			desc.stride = sizeof( CubeData );
 			desc.type = BufferType::Structured;
-			app.cubeBuffer = device.CreateBuffer( desc, ShaderResourceSlot::FreeSRV0 );
+			gfx.cubeBuffer = device.CreateBuffer( desc, ShaderResourceSlot::FreeSRV0 );
 		}
 
 		const std::array<CubeData, kCubeCount> cubes = BuildCubeData( animationTime );
-		device.WriteBuffer( app.cubeBuffer, 0, cubes.data(), sizeof( cubes ) );
+		device.WriteBuffer( gfx.cubeBuffer, 0, cubes.data(), sizeof( cubes ) );
 	}
 
 	void DestroyBuffer( RenderDevice& device, BufferHandle& buffer )
@@ -238,156 +193,84 @@ namespace
 		}
 	}
 
-	LRESULT CALLBACK WindowProc( HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam )
-	{
-		auto* app = reinterpret_cast<AppState*>( GetWindowLongPtr( hwnd, GWLP_USERDATA ) );
-
-		switch( message )
-		{
-			case WM_SIZE:
-				if( app != nullptr && app->deviceManager != nullptr )
-				{
-					const uint32_t width = LOWORD( lParam );
-					const uint32_t height = HIWORD( lParam );
-					app->minimized = width == 0 || height == 0;
-					if( !app->minimized )
-					{
-						app->deviceManager->Resize( width, height );
-					}
-				}
-				return 0;
-
-			case WM_CLOSE:
-				if( app != nullptr )
-				{
-					app->running = false;
-				}
-				return 0;
-
-			case WM_DESTROY:
-				PostQuitMessage( 0 );
-				return 0;
-
-			default:
-				return DefWindowProc( hwnd, message, wParam, lParam );
-		}
-	}
 }
 
 int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 {
 	try
 	{
-		WNDCLASSEXW windowClass{};
-		windowClass.cbSize = sizeof( WNDCLASSEX );
-		windowClass.lpfnWndProc = WindowProc;
-		windowClass.hInstance = instance;
-		windowClass.lpszClassName = L"Ldx12CBSRVCubesWindow";
-		windowClass.hCursor = LoadCursor( nullptr, IDC_ARROW );
-		RegisterClassExW( &windowClass );
-
 		constexpr uint32_t kInitialWidth = 1280;
 		constexpr uint32_t kInitialHeight = 800;
-		HWND hwnd = CreateWindowExW(
-			0,
-			windowClass.lpszClassName,
-			L"Ldx12 CBV + SRV Cubes",
-			WS_OVERLAPPEDWINDOW,
-			CW_USEDEFAULT,
-			CW_USEDEFAULT,
-			static_cast<int>( kInitialWidth ),
-			static_cast<int>( kInitialHeight ),
-			nullptr,
-			nullptr,
-			instance,
-			nullptr );
+		utils::AppLdxDesc appDesc{};
+		appDesc.instance = instance;
+		appDesc.showCommand = showCommand;
+		appDesc.className = L"Ldx12CBSRVCubesWindow";
+		appDesc.title = L"Ldx12 CBV + SRV Cubes";
+		appDesc.width = kInitialWidth;
+		appDesc.height = kInitialHeight;
+		utils::AppLdx app( appDesc );
 
-		if( hwnd == nullptr )
-		{
-			throw std::runtime_error( "Failed to create Win32 window." );
-		}
-
-		ShowWindow( hwnd, showCommand );
-		UpdateWindow( hwnd );
-
-		AppState app{};
-		SetWindowLongPtr( hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>( &app ) );
+		GraphicsState gfx{};
 		HLSLLoader::SetRootDirectory( std::filesystem::path( __FILE__ ).parent_path() );
 
 		ContextDesc contextDesc{};
 		contextDesc.enableDebugLayer = true;
 
 		SwapchainDesc swapchainDesc{};
-		swapchainDesc.window = MakeWin32WindowHandle( hwnd );
+		swapchainDesc.window = MakeWin32WindowHandle( app.GetWindow() );
 		swapchainDesc.width = kInitialWidth;
 		swapchainDesc.height = kInitialHeight;
 		swapchainDesc.vsync = true;
 
-		app.deviceManager = &DeviceManager::Initialize( contextDesc, swapchainDesc );
-		RenderDevice& device = *app.deviceManager->GetRenderDevice();
-		app.pipeline = CreatePipeline( device, contextDesc.swapchainFormat, DXGI_FORMAT_D32_FLOAT );
-		RecreateDepthTarget( app );
-
-		const auto animationStart = std::chrono::steady_clock::now();
-		MSG message{};
-		while( app.running )
+		gfx.deviceManager = &DeviceManager::Initialize( contextDesc, swapchainDesc );
+		app.SetDeviceManager( *gfx.deviceManager );
+		RenderDevice& device = *gfx.deviceManager->GetRenderDevice();
+		gfx.pipeline = CreatePipeline( device, contextDesc.swapchainFormat, DXGI_FORMAT_D32_FLOAT );
 		{
-			while( PeekMessage( &message, nullptr, 0, 0, PM_REMOVE ) )
+			utils::DepthTarget depthTarget( device );
+			const std::chrono::steady_clock::time_point animationStart = std::chrono::steady_clock::now();
+			while( app.PumpMessages() )
 			{
-				if( message.message == WM_QUIT )
+				if( app.IsWindowMinimized() )
 				{
-					app.running = false;
-					break;
+					WaitMessage();
+					continue;
 				}
-				TranslateMessage( &message );
-				DispatchMessage( &message );
+
+				const float animationTime =
+					std::chrono::duration<float>( std::chrono::steady_clock::now() - animationStart ).count();
+				depthTarget.Resize( gfx.deviceManager->GetWidth(), gfx.deviceManager->GetHeight() );
+				UpdateSceneCbv( gfx );
+				UpdateCubeSrv( gfx, animationTime );
+
+				ICommandBuffer& commands = device.AcquireCommandBuffer();
+				const TextureHandle backbuffer = device.GetCurrentSwapchainTexture();
+
+				RenderPass renderPass{};
+				renderPass.color[ 0 ].loadOp = LoadOp::Clear;
+				renderPass.color[ 0 ].clearColor = { 0.035f, 0.045f, 0.065f, 1.0f };
+				renderPass.depthStencil.depthLoadOp = LoadOp::Clear;
+				renderPass.depthStencil.clearDepth = 1.0f;
+
+				Framebuffer framebuffer{};
+				framebuffer.color[ 0 ].texture = backbuffer;
+				framebuffer.depthStencil.texture = depthTarget.GetTexture();
+
+				commands.CmdBeginRendering( renderPass, framebuffer );
+				commands.CmdBindRenderPipeline( gfx.pipeline );
+				commands.CmdDraw( 36, kCubeCount );
+				commands.CmdEndRendering();
+				device.Submit( commands, backbuffer );
 			}
 
-			if( !app.running || app.minimized )
-			{
-				continue;
-			}
-
-			const float animationTime =
-				std::chrono::duration<float>( std::chrono::steady_clock::now() - animationStart ).count();
-			RecreateDepthTarget( app );
-			UpdateSceneCbv( app );
-			UpdateCubeSrv( app, animationTime );
-
-			ICommandBuffer& commands = device.AcquireCommandBuffer();
-			const TextureHandle backbuffer = device.GetCurrentSwapchainTexture();
-
-			RenderPass renderPass{};
-			renderPass.color[ 0 ].loadOp = LoadOp::Clear;
-			renderPass.color[ 0 ].clearColor = { 0.035f, 0.045f, 0.065f, 1.0f };
-			renderPass.depthStencil.depthLoadOp = LoadOp::Clear;
-			renderPass.depthStencil.clearDepth = 1.0f;
-
-			Framebuffer framebuffer{};
-			framebuffer.color[ 0 ].texture = backbuffer;
-			framebuffer.depthStencil.texture = app.depthTarget.texture;
-
-			commands.CmdBeginRendering( renderPass, framebuffer );
-			commands.CmdBindRenderPipeline( app.pipeline );
-			commands.CmdDraw( 36, kCubeCount );
-			commands.CmdEndRendering();
-			device.Submit( commands, backbuffer );
+			gfx.deviceManager->WaitIdle();
 		}
 
-		SetWindowLongPtr( hwnd, GWLP_USERDATA, 0 );
-		app.deviceManager->WaitIdle();
-		DestroyDepthTarget( device, app.depthTarget );
-		DestroyBuffer( device, app.sceneBuffer );
-		DestroyBuffer( device, app.cubeBuffer );
-		app.pipeline = {};
+		DestroyBuffer( device, gfx.sceneBuffer );
+		DestroyBuffer( device, gfx.cubeBuffer );
+		gfx.pipeline = {};
 		DeviceManager::ShutdownSingleton();
-		app.deviceManager = nullptr;
-
-		if( IsWindow( hwnd ) != FALSE )
-		{
-			DestroyWindow( hwnd );
-		}
-		UnregisterClassW( windowClass.lpszClassName, instance );
+		gfx.deviceManager = nullptr;
 		return 0;
 	}
 	catch( const std::exception& error )

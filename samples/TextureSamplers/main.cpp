@@ -1,17 +1,14 @@
 #include "Ldx12/Ldx12.hpp"
+#include "Ldx12Utils/AppLdx.hpp"
+#include "Ldx12Utils/TextureLoader.hpp"
 
-#include <array>
 #include <cstdint>
 #include <exception>
-#include <stdexcept>
 
 using namespace ldx12;
 
 namespace
 {
-	constexpr uint32_t ourTextureWidth = 64;
-	constexpr uint32_t ourTextureHeight = 64;
-	constexpr uint32_t ourCheckerSize = 8;
 	constexpr uint32_t ourDrawCount = 6;
 
 	struct DrawConstants
@@ -26,52 +23,14 @@ namespace
 		uint32_t samplerIndex = 0;
 	};
 
-	struct AppState
+	struct GraphicsState
 	{
 		DeviceManager* deviceManager = nullptr;
 		RenderPipelineState pipeline;
 		TextureHandle checkerTexture{};
 		SamplerHandle pointMirrorOnceSampler{};
 		SamplerHandle redBorderSampler{};
-		bool running = true;
-		bool minimized = false;
 	};
-
-	LRESULT CALLBACK WindowProc( HWND window, UINT message, WPARAM wParam, LPARAM lParam )
-	{
-		AppState* app = reinterpret_cast<AppState*>( GetWindowLongPtr( window, GWLP_USERDATA ) );
-		switch( message )
-		{
-			case WM_SIZE:
-			{
-				if( app != nullptr && app->deviceManager != nullptr )
-				{
-					const uint32_t width = LOWORD( lParam );
-					const uint32_t height = HIWORD( lParam );
-					app->minimized = width == 0 || height == 0;
-					if( !app->minimized )
-					{
-						app->deviceManager->Resize( width, height );
-					}
-				}
-				return 0;
-			}
-
-			case WM_CLOSE:
-				if( app != nullptr )
-				{
-					app->running = false;
-				}
-				return 0;
-
-			case WM_DESTROY:
-				PostQuitMessage( 0 );
-				return 0;
-
-			default:
-				return DefWindowProc( window, message, wParam, lParam );
-		}
-	}
 
 	RenderPipelineState CreateTexturePipeline( RenderDevice& device )
 	{
@@ -146,45 +105,21 @@ float4 PSMain(PixelInput input) : SV_Target0
 		return device.CreateRenderPipeline( desc );
 	}
 
-	TextureHandle CreateCheckerTexture( RenderDevice& device )
+	void RenderFrame( GraphicsState& gfx )
 	{
-		std::array<uint32_t, ourTextureWidth * ourTextureHeight> pixels{};
-		for( uint32_t y = 0; y < ourTextureHeight; ++y )
-		{
-			for( uint32_t x = 0; x < ourTextureWidth; ++x )
-			{
-				const bool white = ( ( x / ourCheckerSize ) + ( y / ourCheckerSize ) ) % 2u == 0u;
-				pixels[ y * ourTextureWidth + x ] = white ? 0xffffffffu : 0xff101010u;
-			}
-		}
-
-		TextureDesc desc{};
-		desc.debugName = "64x64 checker texture";
-		desc.width = ourTextureWidth;
-		desc.height = ourTextureHeight;
-		desc.format = DXGI_FORMAT_R8G8B8A8_UNORM;
-		desc.usage = TextureUsage::Sampled;
-		desc.data = pixels.data();
-		desc.rowPitch = ourTextureWidth * sizeof( uint32_t );
-		desc.slicePitch = desc.rowPitch * ourTextureHeight;
-		return device.CreateTexture( desc );
-	}
-
-	void RenderFrame( AppState& app )
-	{
-		RenderDevice& device = *app.deviceManager->GetRenderDevice();
-		const uint32_t width = app.deviceManager->GetWidth();
-		const uint32_t height = app.deviceManager->GetHeight();
+		RenderDevice& device = *gfx.deviceManager->GetRenderDevice();
+		const uint32_t width = gfx.deviceManager->GetWidth();
+		const uint32_t height = gfx.deviceManager->GetHeight();
 		const TextureHandle backBuffer = device.GetCurrentSwapchainTexture();
 
 		// The same texture is deliberately paired with six different sampler slots.
 		const TextureSample samples[ ourDrawCount ] = {
-			TextureSample{ app.checkerTexture, ToSamplerIndex( SamplerSlot::LinearClamp ) },
-			TextureSample{ app.checkerTexture, ToSamplerIndex( SamplerSlot::LinearWrap ) },
-			TextureSample{ app.checkerTexture, ToSamplerIndex( SamplerSlot::PointClamp ) },
-			TextureSample{ app.checkerTexture, ToSamplerIndex( SamplerSlot::ShadowComparison ) },
-			TextureSample{ app.checkerTexture, device.GetSamplerIndex( app.pointMirrorOnceSampler ) },
-			TextureSample{ app.checkerTexture, device.GetSamplerIndex( app.redBorderSampler ) }
+			TextureSample{ gfx.checkerTexture, ToSamplerIndex( SamplerSlot::LinearClamp ) },
+			TextureSample{ gfx.checkerTexture, ToSamplerIndex( SamplerSlot::LinearWrap ) },
+			TextureSample{ gfx.checkerTexture, ToSamplerIndex( SamplerSlot::PointClamp ) },
+			TextureSample{ gfx.checkerTexture, ToSamplerIndex( SamplerSlot::ShadowComparison ) },
+			TextureSample{ gfx.checkerTexture, device.GetSamplerIndex( gfx.pointMirrorOnceSampler ) },
+			TextureSample{ gfx.checkerTexture, device.GetSamplerIndex( gfx.redBorderSampler ) }
 		};
 
 		RenderPass renderPass{};
@@ -195,7 +130,7 @@ float4 PSMain(PixelInput input) : SV_Target0
 
 		ICommandBuffer& commands = device.AcquireCommandBuffer();
 		commands.CmdBeginRendering( renderPass, framebuffer );
-		commands.CmdBindRenderPipeline( app.pipeline );
+		commands.CmdBindRenderPipeline( gfx.pipeline );
 
 		const int32_t margin = 18;
 		const int32_t gap = 12;
@@ -239,100 +174,64 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 {
 	try
 	{
-		WNDCLASSEXW windowClass{};
-		windowClass.cbSize = sizeof( WNDCLASSEXW );
-		windowClass.lpfnWndProc = WindowProc;
-		windowClass.hInstance = instance;
-		windowClass.lpszClassName = L"Ldx12TextureSamplersWindow";
-		windowClass.hCursor = LoadCursor( nullptr, IDC_ARROW );
-		if( RegisterClassExW( &windowClass ) == 0 )
-		{
-			throw std::runtime_error( "Failed to register the Win32 window class." );
-		}
-
 		constexpr uint32_t initialWidth = 1280;
 		constexpr uint32_t initialHeight = 720;
-		HWND window = CreateWindowExW(
-			0,
-			windowClass.lpszClassName,
-			L"Ldx12 - One texture, six samplers",
-			WS_OVERLAPPEDWINDOW,
-			CW_USEDEFAULT,
-			CW_USEDEFAULT,
-			static_cast<int>( initialWidth ),
-			static_cast<int>( initialHeight ),
-			nullptr,
-			nullptr,
-			instance,
-			nullptr );
-		if( window == nullptr )
-		{
-			throw std::runtime_error( "Failed to create the Win32 window." );
-		}
 
-		AppState app{};
-		SetWindowLongPtr( window, GWLP_USERDATA, reinterpret_cast<LONG_PTR>( &app ) );
-		ShowWindow( window, showCommand );
-		UpdateWindow( window );
+		utils::AppLdxDesc appDesc{};
+		appDesc.instance = instance;
+		appDesc.showCommand = showCommand;
+		appDesc.className = L"Ldx12TextureSamplersWindow";
+		appDesc.title = L"Ldx12 - One texture, six samplers";
+		appDesc.width = initialWidth;
+		appDesc.height = initialHeight;
+
+		utils::AppLdx app( appDesc );
+
+		GraphicsState gfx{};
 
 		ContextDesc context{};
 		SwapchainDesc swapchain{};
-		swapchain.window = MakeWin32WindowHandle( window );
+		swapchain.window = MakeWin32WindowHandle( app.GetWindow() );
 		swapchain.width = initialWidth;
 		swapchain.height = initialHeight;
 		swapchain.vsync = true;
-		app.deviceManager = &DeviceManager::Initialize( context, swapchain );
+		gfx.deviceManager = &DeviceManager::Initialize( context, swapchain );
+		app.SetDeviceManager( *gfx.deviceManager );
 
-		RenderDevice& device = *app.deviceManager->GetRenderDevice();
-		app.pipeline = CreateTexturePipeline( device );
-		app.checkerTexture = CreateCheckerTexture( device );
+		RenderDevice& device = *gfx.deviceManager->GetRenderDevice();
+		gfx.pipeline = CreateTexturePipeline( device );
+		gfx.checkerTexture = utils::CreateCheckerTexture( device, 0xffffffffu, 0xff101010u );
 
 		SamplerDesc pointMirrorOnceDesc{};
 		pointMirrorOnceDesc.filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
 		pointMirrorOnceDesc.addressU = D3D12_TEXTURE_ADDRESS_MODE_MIRROR_ONCE;
 		pointMirrorOnceDesc.addressV = D3D12_TEXTURE_ADDRESS_MODE_MIRROR_ONCE;
 		pointMirrorOnceDesc.addressW = D3D12_TEXTURE_ADDRESS_MODE_MIRROR_ONCE;
-		app.pointMirrorOnceSampler = device.CreateSampler( pointMirrorOnceDesc );
+		gfx.pointMirrorOnceSampler = device.CreateSampler( pointMirrorOnceDesc );
 
 		SamplerDesc redBorderDesc{};
 		redBorderDesc.addressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
 		redBorderDesc.addressV = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
 		redBorderDesc.addressW = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
 		redBorderDesc.borderColor = { 0.85f, 0.05f, 0.05f, 1.0f };
-		app.redBorderSampler = device.CreateSampler( redBorderDesc );
+		gfx.redBorderSampler = device.CreateSampler( redBorderDesc );
 
-		MSG message{};
-		while( app.running )
+		while( app.PumpMessages() )
 		{
-			while( PeekMessage( &message, nullptr, 0, 0, PM_REMOVE ) )
+			if( app.IsWindowMinimized() )
 			{
-				if( message.message == WM_QUIT )
-				{
-					app.running = false;
-					break;
-				}
-				TranslateMessage( &message );
-				DispatchMessage( &message );
+				WaitMessage();
+				continue;
 			}
-
-			if( app.running && !app.minimized )
-			{
-				RenderFrame( app );
-			}
+			RenderFrame( gfx );
 		}
 
-		SetWindowLongPtr( window, GWLP_USERDATA, 0 );
-		device.Destroy( app.pointMirrorOnceSampler );
-		device.Destroy( app.redBorderSampler );
-		device.Destroy( app.checkerTexture );
-		app.pipeline = {};
+		device.Destroy( gfx.pointMirrorOnceSampler );
+		device.Destroy( gfx.redBorderSampler );
+		device.Destroy( gfx.checkerTexture );
+		gfx.pipeline = {};
 		DeviceManager::ShutdownSingleton();
-		app.deviceManager = nullptr;
-		if( IsWindow( window ) != FALSE )
-		{
-			DestroyWindow( window );
-		}
-		UnregisterClassW( windowClass.lpszClassName, instance );
+		gfx.deviceManager = nullptr;
 		return 0;
 	}
 	catch( const std::exception& exception )

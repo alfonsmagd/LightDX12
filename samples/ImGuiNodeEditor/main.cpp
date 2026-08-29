@@ -4,6 +4,7 @@
 #include "App/NodeGraph.hpp"
 #include "App/imgui_impl_ldx12.h"
 #include "Ldx12/Ldx12.hpp"
+#include "Ldx12Utils/AppLdx.hpp"
 
 #include "imgui.h"
 
@@ -54,17 +55,14 @@ namespace
 		TextureHandle imguiTexture{};
 	};
 
-	struct WindowState
+	struct GraphicsState
 	{
-		DeviceManager* deviceManager = nullptr;
 		std::unique_ptr<App::ImGuiLayer> imgui;
 		TextureHandle demoTexture{};
 		std::vector<uint32_t> cpuPixels;
 		EditorState editor;
 		std::array<SubmitHandle, kFramesInFlight> frameSubmissions{};
 		uint32_t frameIndex = 0;
-		bool running = true;
-		bool minimized = false;
 	};
 
 	ImU32 PinColor( App::NodeValueType type )
@@ -513,11 +511,11 @@ namespace
 		return device.CreateTexture( desc );
 	}
 
-	void ApplyCpuInvert( WindowState& state, RenderDevice& device )
+	void ApplyCpuInvert( GraphicsState& gfx, RenderDevice& device )
 	{
 		// This is the CPU modification: decode each RGBA8 pixel, invert RGB and
 		// keep alpha unchanged. No shader or GPU compute work is involved.
-		for( uint32_t& pixel : state.cpuPixels )
+		for( uint32_t& pixel : gfx.cpuPixels )
 		{
 			const uint32_t red = 255u - ( pixel & 0xffu );
 			const uint32_t green = 255u - ( ( pixel >> 8u ) & 0xffu );
@@ -526,34 +524,16 @@ namespace
 		}
 
 		device.WaitIdle();
-		device.Destroy( state.demoTexture );
-		state.demoTexture = UploadCpuTexture( device, state.cpuPixels );
-		state.editor.imguiTexture = state.demoTexture;
-		state.editor.status = "Textura invertida recorriendo 65.536 pixels en CPU.";
-		state.editor.cpuInvertRequested = false;
+		device.Destroy( gfx.demoTexture );
+		gfx.demoTexture = UploadCpuTexture( device, gfx.cpuPixels );
+		gfx.editor.imguiTexture = gfx.demoTexture;
+		gfx.editor.status = "Textura invertida recorriendo 65.536 pixels en CPU.";
+		gfx.editor.cpuInvertRequested = false;
 	}
 
-	LRESULT CALLBACK WindowProc( HWND window, UINT message, WPARAM wParam, LPARAM lParam )
+	bool HandleImGuiMessage( HWND window, UINT message, WPARAM wParam, LPARAM lParam, void* )
 	{
-		auto* state = reinterpret_cast<WindowState*>( GetWindowLongPtr( window, GWLP_USERDATA ) );
-		App::ImGuiLayer::HandleMessage( window, message, wParam, lParam );
-		switch( message )
-		{
-			case WM_SIZE:
-				if( state && state->deviceManager )
-				{
-					const uint32_t width = LOWORD( lParam );
-					const uint32_t height = HIWORD( lParam );
-					state->minimized = wParam == SIZE_MINIMIZED || width == 0 || height == 0;
-					if( !state->minimized ) state->deviceManager->Resize( width, height );
-				}
-				return 0;
-			case WM_DESTROY:
-				PostQuitMessage( 0 );
-				return 0;
-			default:
-				return DefWindowProc( window, message, wParam, lParam );
-		}
+		return App::ImGuiLayer::HandleMessage( window, message, wParam, lParam );
 	}
 }
 
@@ -561,58 +541,46 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 {
 	try
 	{
-		WNDCLASSEXW windowClass{};
-		windowClass.cbSize = sizeof( WNDCLASSEXW );
-		windowClass.lpfnWndProc = WindowProc;
-		windowClass.hInstance = instance;
-		windowClass.lpszClassName = L"Ldx12ImGuiNodeEditor";
-		windowClass.hCursor = LoadCursor( nullptr, IDC_ARROW );
-		RegisterClassExW( &windowClass );
-
 		constexpr uint32_t initialWidth = 1500;
 		constexpr uint32_t initialHeight = 900;
-		HWND window = CreateWindowExW( 0, windowClass.lpszClassName, L"Ldx12 - ImGui Node Editor", WS_OVERLAPPEDWINDOW,
-			CW_USEDEFAULT, CW_USEDEFAULT, initialWidth, initialHeight, nullptr, nullptr, instance, nullptr );
-		if( !window ) throw std::runtime_error( "No se pudo crear la ventana." );
+		utils::AppLdxDesc appDesc{};
+		appDesc.instance = instance;
+		appDesc.showCommand = showCommand;
+		appDesc.className = L"Ldx12ImGuiNodeEditor";
+		appDesc.title = L"Ldx12 - ImGui Node Editor";
+		appDesc.width = initialWidth;
+		appDesc.height = initialHeight;
+		appDesc.messageHandler = HandleImGuiMessage;
+		utils::AppLdx app( appDesc );
 
-		WindowState state;
-		SetWindowLongPtr( window, GWLP_USERDATA, reinterpret_cast<LONG_PTR>( &state ) );
-		ShowWindow( window, showCommand );
-		UpdateWindow( window );
+		GraphicsState gfx{};
 
 		ContextDesc contextDesc{};
 		contextDesc.enableDebugLayer = true;
 		contextDesc.swapchainBufferCount = kFramesInFlight;
 		SwapchainDesc swapchainDesc{};
-		swapchainDesc.window = MakeWin32WindowHandle( window );
+		swapchainDesc.window = MakeWin32WindowHandle( app.GetWindow() );
 		swapchainDesc.width = initialWidth;
 		swapchainDesc.height = initialHeight;
 		swapchainDesc.vsync = true;
-		state.deviceManager = &DeviceManager::Initialize( contextDesc, swapchainDesc );
-		RenderDevice& device = *state.deviceManager->GetRenderDevice();
-		state.imgui = std::make_unique<App::ImGuiLayer>( window, device, contextDesc.swapchainFormat, DXGI_FORMAT_UNKNOWN, kFramesInFlight );
-		state.cpuPixels = CreateDemoPixels();
-		state.demoTexture = UploadCpuTexture( device, state.cpuPixels );
-		state.editor.imguiTexture = state.demoTexture;
-		BuildExampleGraph( state.editor );
+		DeviceManager& manager = DeviceManager::Initialize( contextDesc, swapchainDesc );
+		app.SetDeviceManager( manager );
+		RenderDevice& device = *manager.GetRenderDevice();
+		gfx.imgui = std::make_unique<App::ImGuiLayer>( app.GetWindow(), device, contextDesc.swapchainFormat, DXGI_FORMAT_UNKNOWN, kFramesInFlight );
+		gfx.cpuPixels = CreateDemoPixels();
+		gfx.demoTexture = UploadCpuTexture( device, gfx.cpuPixels );
+		gfx.editor.imguiTexture = gfx.demoTexture;
+		BuildExampleGraph( gfx.editor );
 
-		MSG message{};
-		while( state.running )
+		while( app.PumpMessages() )
 		{
-			while( PeekMessage( &message, nullptr, 0, 0, PM_REMOVE ) )
-			{
-				if( message.message == WM_QUIT ) { state.running = false; break; }
-				TranslateMessage( &message );
-				DispatchMessage( &message );
-			}
-			if( !state.running ) break;
-			if( state.minimized ) { WaitMessage(); continue; }
-			if( state.editor.cpuInvertRequested ) ApplyCpuInvert( state, device );
+			if( app.IsWindowMinimized() ) { WaitMessage(); continue; }
+			if( gfx.editor.cpuInvertRequested ) ApplyCpuInvert( gfx, device );
 
-			device.Wait( state.frameSubmissions[ state.frameIndex ] );
-			state.imgui->NewFrame();
-			DrawPalette( state.editor );
-			DrawEditor( state.editor );
+			device.Wait( gfx.frameSubmissions[ gfx.frameIndex ] );
+			gfx.imgui->NewFrame();
+			DrawPalette( gfx.editor );
+			DrawEditor( gfx.editor );
 
 			ICommandBuffer& commands = device.AcquireCommandBuffer();
 			const TextureHandle backBuffer = device.GetCurrentSwapchainTexture();
@@ -622,24 +590,23 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 			Framebuffer framebuffer{};
 			framebuffer.color[0].texture = backBuffer;
 			commands.CmdBeginRendering( renderPass, framebuffer );
-			state.imgui->Render( commands );
+			gfx.imgui->Render( commands );
 			commands.CmdEndRendering();
-			state.frameSubmissions[ state.frameIndex ] = device.Submit( commands, backBuffer );
-			state.frameIndex = ( state.frameIndex + 1 ) % kFramesInFlight;
+			gfx.frameSubmissions[ gfx.frameIndex ] = device.Submit( commands, backBuffer );
+			gfx.frameIndex = ( gfx.frameIndex + 1 ) % kFramesInFlight;
 		}
 
-		state.deviceManager->WaitIdle();
-		state.editor.imguiTexture = {};
-		device.Destroy( state.demoTexture );
-		state.demoTexture = {};
-		state.imgui.reset();
-		SetWindowLongPtr( window, GWLP_USERDATA, 0 );
+		manager.WaitIdle();
+		gfx.editor.imguiTexture = {};
+		device.Destroy( gfx.demoTexture );
+		gfx.demoTexture = {};
+		gfx.imgui.reset();
 		DeviceManager::ShutdownSingleton();
-		state.deviceManager = nullptr;
 		return 0;
 	}
 	catch( const std::exception& exception )
 	{
+		DeviceManager::ShutdownSingleton();
 		MessageBoxA( nullptr, exception.what(), "ImGui Node Editor error", MB_OK | MB_ICONERROR );
 		return 1;
 	}

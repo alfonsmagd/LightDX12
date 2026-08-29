@@ -78,7 +78,7 @@ float4 main(PSInput input) : SV_Target0
 
 		RenderPipelineState CreateWorldPipeline(
 			RenderDevice& device,
-			const RenderWorldDesc& worldDesc,
+			const DebugRendererDesc& worldDesc,
 			D3D12_FILL_MODE fillMode,
 			D3D12_PRIMITIVE_TOPOLOGY_TYPE primitiveType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
 			D3D_PRIMITIVE_TOPOLOGY topology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST )
@@ -283,7 +283,7 @@ float4 main(PSInput input) : SV_Target0
 		}
 	}
 
-	RenderWorld::RenderWorld( RenderDevice& device, const RenderWorldDesc& desc ):
+	DebugRenderer::DebugRenderer( RenderDevice& device, const DebugRendererDesc& desc ):
 		device_( &device ),
 		solidPipeline_( CreateWorldPipeline( device, desc, D3D12_FILL_MODE_SOLID ) ),
 		wireframePipeline_( CreateWorldPipeline( device, desc, D3D12_FILL_MODE_WIREFRAME ) ),
@@ -298,12 +298,12 @@ float4 main(PSInput input) : SV_Target0
 		UploadStaticGeometry();
 	}
 
-	RenderWorld::~RenderWorld()
+	DebugRenderer::~DebugRenderer()
 	{
 		ReleaseBuffers();
 	}
 
-	void RenderWorld::Render( ICommandBuffer& commands, const World& world, const Camera& camera )
+	void DebugRenderer::Render( ICommandBuffer& commands, const World& world, const Camera& camera )
 	{
 		Synchronize( world );
 		if( indirectDraws_.empty() )
@@ -344,7 +344,7 @@ float4 main(PSInput input) : SV_Target0
 		}
 	}
 
-	void RenderWorld::Synchronize( const World& world )
+	void DebugRenderer::Synchronize( const World& world )
 	{
 		if( synchronizedWorld_ != &world || uploadedObjectRevision_ != world.objectRevision_ )
 		{
@@ -365,7 +365,7 @@ float4 main(PSInput input) : SV_Target0
 		}
 	}
 
-	void RenderWorld::RebuildRenderData( const World& world )
+	void DebugRenderer::RebuildRenderData( const World& world )
 	{
 		instances_.clear();
 		indirectDraws_.clear();
@@ -405,7 +405,7 @@ float4 main(PSInput input) : SV_Target0
 		}
 	}
 
-	void RenderWorld::RebuildInstancesOnly( const World& world )
+	void DebugRenderer::RebuildInstancesOnly( const World& world )
 	{
 		for( size_t slotIndex = 0; slotIndex < world.objects_.size(); ++slotIndex )
 		{
@@ -418,7 +418,7 @@ float4 main(PSInput input) : SV_Target0
 		}
 	}
 
-	void RenderWorld::BuildBatch( const World& world, World::PrimitiveType primitive, bool wireframe )
+	void DebugRenderer::BuildBatch( const World& world, World::PrimitiveType primitive, bool wireframe )
 	{
 		const uint32_t primitiveIndex = static_cast<uint32_t>( primitive );
 		const GeometryRange& geometry = geometries_[ primitiveIndex ];
@@ -451,7 +451,7 @@ float4 main(PSInput input) : SV_Target0
 		indirectDraws_.push_back( draw );
 	}
 
-	void RenderWorld::BuildPrimitiveGeometry()
+	void DebugRenderer::BuildPrimitiveGeometry()
 	{
 		GeometryRange& cube = geometries_[ static_cast<uint32_t>( World::PrimitiveType::Cube ) ];
 		cube.firstVertex = static_cast<int32_t>( vertices_.size() );
@@ -473,7 +473,7 @@ float4 main(PSInput input) : SV_Target0
 		arrow.indexCount = static_cast<uint32_t>( indices_.size() ) - arrow.firstIndex;
 	}
 
-	void RenderWorld::AppendCubeGeometry()
+	void DebugRenderer::AppendCubeGeometry()
 	{
 		struct Face
 		{
@@ -510,7 +510,7 @@ float4 main(PSInput input) : SV_Target0
 		}
 	}
 
-	void RenderWorld::AppendSphereGeometry()
+	void DebugRenderer::AppendSphereGeometry()
 	{
 		const uint32_t columns = ourSphereLongitudeSegments + 1u;
 		for( uint32_t latitude = 0; latitude <= ourSphereLatitudeSegments; ++latitude )
@@ -548,7 +548,7 @@ float4 main(PSInput input) : SV_Target0
 		}
 	}
 
-	void RenderWorld::AppendArrowGeometry()
+	void DebugRenderer::AppendArrowGeometry()
 	{
 		vertices_.push_back( { { 0.0f, 0.0f, 0.0f } } );
 		vertices_.push_back( { { 0.0f, 0.0f, 1.0f } } );
@@ -563,7 +563,7 @@ float4 main(PSInput input) : SV_Target0
 		indices_.push_back( 3u );
 	}
 
-	void RenderWorld::UploadStaticGeometry()
+	void DebugRenderer::UploadStaticGeometry()
 	{
 		BufferDesc vertexDesc{};
 		vertexDesc.debugName = "Ldx12 Utils World Vertices";
@@ -582,7 +582,7 @@ float4 main(PSInput input) : SV_Target0
 		indexBuffer_ = device_->CreateBuffer( indexDesc );
 	}
 
-	void RenderWorld::UploadInstanceBuffer()
+	void DebugRenderer::UploadInstanceBuffer()
 	{
 		UploadDynamicBuffer(
 			instanceBuffer_,
@@ -594,7 +594,7 @@ float4 main(PSInput input) : SV_Target0
 			"Ldx12 Utils World Instances" );
 	}
 
-	void RenderWorld::UploadIndirectBuffer()
+	void DebugRenderer::UploadIndirectBuffer()
 	{
 		UploadDynamicBuffer(
 			indirectBuffer_,
@@ -606,7 +606,7 @@ float4 main(PSInput input) : SV_Target0
 			"Ldx12 Utils World Indirect Draws" );
 	}
 
-	void RenderWorld::UploadDynamicBuffer(
+	void DebugRenderer::UploadDynamicBuffer(
 		BufferHandle& buffer,
 		uint64_t& capacity,
 		const void* data,
@@ -639,7 +639,7 @@ float4 main(PSInput input) : SV_Target0
 		device_->WriteBuffer( buffer, 0, data, requiredSize );
 	}
 
-	void RenderWorld::RetireBuffer( BufferHandle& buffer )
+	void DebugRenderer::RetireBuffer( BufferHandle& buffer )
 	{
 		if( buffer.Valid() )
 		{
@@ -648,7 +648,7 @@ float4 main(PSInput input) : SV_Target0
 		}
 	}
 
-	void RenderWorld::ReleaseBuffers()
+	void DebugRenderer::ReleaseBuffers()
 	{
 		if( device_ == nullptr )
 		{
@@ -686,7 +686,7 @@ float4 main(PSInput input) : SV_Target0
 		retiredBuffers_.clear();
 	}
 
-	uint64_t RenderWorld::GrowCapacity( uint64_t requiredSize )
+	uint64_t DebugRenderer::GrowCapacity( uint64_t requiredSize )
 	{
 		uint64_t capacity = 1;
 		while( capacity < requiredSize )
@@ -700,7 +700,7 @@ float4 main(PSInput input) : SV_Target0
 		return capacity;
 	}
 
-	RenderWorld::GpuInstance RenderWorld::BuildGpuInstance( const World::Object& object )
+	DebugRenderer::GpuInstance DebugRenderer::BuildGpuInstance( const World::Object& object )
 	{
 		if( object.primitive == World::PrimitiveType::Arrow )
 		{
@@ -765,7 +765,7 @@ float4 main(PSInput input) : SV_Target0
 		return result;
 	}
 
-	RenderWorld::PushConstants RenderWorld::BuildPushConstants( RenderDevice& device, BufferHandle instanceBuffer, const Camera& camera )
+	DebugRenderer::PushConstants DebugRenderer::BuildPushConstants( RenderDevice& device, BufferHandle instanceBuffer, const Camera& camera )
 	{
 		if( camera.aspectRatio <= 0.0f ||
 			camera.nearPlane <= 0.0f ||

@@ -10,9 +10,19 @@ endif()
 set(LDX12_UTILS_ROOT "${CMAKE_CURRENT_SOURCE_DIR}")
 set(LDX12_UTILS_PUBLIC_HEADERS
     "${LDX12_UTILS_ROOT}/include/Ldx12Utils/Ldx12Utils.hpp"
+    "${LDX12_UTILS_ROOT}/include/Ldx12Utils/AppLdx.hpp"
+    "${LDX12_UTILS_ROOT}/include/Ldx12Utils/DepthTarget.hpp"
+    "${LDX12_UTILS_ROOT}/include/Ldx12Utils/Geometry.hpp"
+    "${LDX12_UTILS_ROOT}/include/Ldx12Utils/OrbitCamera.hpp"
+    "${LDX12_UTILS_ROOT}/include/Ldx12Utils/TextureLoader.hpp"
 )
 set(LDX12_UTILS_SOURCES
     "${LDX12_UTILS_ROOT}/src/Ldx12Utils.cpp"
+    "${LDX12_UTILS_ROOT}/src/AppLdx.cpp"
+    "${LDX12_UTILS_ROOT}/src/DepthTarget.cpp"
+    "${LDX12_UTILS_ROOT}/src/Geometry.cpp"
+    "${LDX12_UTILS_ROOT}/src/OrbitCamera.cpp"
+    "${LDX12_UTILS_ROOT}/src/TextureLoader.cpp"
 )
 
 add_library(Ldx12Utils STATIC
@@ -28,7 +38,10 @@ target_include_directories(Ldx12Utils
         "$<BUILD_INTERFACE:${LDX12_UTILS_ROOT}/include>"
         "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
 )
-target_link_libraries(Ldx12Utils PUBLIC Ldx12::Ldx12)
+target_link_libraries(Ldx12Utils
+    PUBLIC Ldx12::Ldx12
+    PRIVATE windowscodecs ole32
+)
 
 if(MSVC)
     target_compile_options(Ldx12Utils PRIVATE /W4 /EHsc /permissive- /MP)
