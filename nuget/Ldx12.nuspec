@@ -20,6 +20,7 @@
   <files>
     <file src="nuget\PackageREADME.md" target="README.md" />
     <file src="nuget\Ldx12.png" target="Ldx12.png" />
+    <file src="nuget\Ldx12Banner.png" target="Ldx12Banner.png" />
     <file src="Ldx12\docs\images\bindless-layout.png" target="docs\bindless-layout.png" />
     <file src="LICENSE" target="LICENSE" />
     <file src="THIRD_PARTY_NOTICES.md" target="THIRD_PARTY_NOTICES.md" />

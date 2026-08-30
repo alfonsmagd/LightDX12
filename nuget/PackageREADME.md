@@ -1,4 +1,4 @@
-![Ldx12](https://raw.githubusercontent.com/alfonsmagd/LightDX12/v0.2.0/nuget/Ldx12.png)
+![Ldx12](https://raw.githubusercontent.com/alfonsmagd/LightDX12/v0.2.0/nuget/Ldx12Banner.png)
 
 # Ldx12 0.2.0
 

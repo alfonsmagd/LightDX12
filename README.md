@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="nuget/Ldx12.png" alt="Ldx12 — DirectX 12" width="760">
+  <img src="nuget/Ldx12Banner.png" alt="Ldx12 — DirectX 12" width="760">
 </p>
 
 # Ldx12
