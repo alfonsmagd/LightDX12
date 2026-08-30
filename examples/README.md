@@ -93,3 +93,13 @@ An opaque cube followed by three depth-tested transparent quads with different a
 ## 14. ImGuiDemoNative
 
 [View source](../samples/ImGuiDemoNative)
+
+## 15. DepthPass
+
+Three moving cubes at different distances rendered into the backbuffer after a depth prepass. Dear ImGui displays the sampled depth buffer over the scene.
+
+Inspecting the depth buffer makes scene depth visible and can help identify incorrect clockwise/counter-clockwise winding, unexpected face culling and badly oriented primitives.
+
+![15. Depth prepass](images/15-depth-prepass.png)
+
+[View source](../samples/DepthPass)

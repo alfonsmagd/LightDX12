@@ -166,3 +166,4 @@ Ldx12 is available under the [MIT License](LICENSE). Third-party attribution is 
 | **12. [Transparency](samples/Transparency)**<br>[![Transparency](examples/images/12-transparency.png)](samples/Transparency) |
 | **13. [CookbookChapter02](samples/CookbookChapter02)** |
 | **14. [ImGuiDemoNative](samples/ImGuiDemoNative)** |
+| **15. [DepthPass](samples/DepthPass)**<br>[![Depth prepass](examples/images/15-depth-prepass.png)](samples/DepthPass) |

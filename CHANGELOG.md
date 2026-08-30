@@ -24,6 +24,7 @@ This file lists the main user-visible changes in each Ldx12 version.
 - Reusable `CreateQuad()` geometry in `Ldx12Utils`.
 - A `Texture2DArray` sample with four independently moving triangles, each sampling a different array slice.
 - A transparency sample that separates opaque depth-writing from alpha-blended rendering over a cubemap skybox.
+- A depth-prepass sample that renders three moving cubes at different distances into the backbuffer and displays the sampled depth buffer through Dear ImGui.
 
 ### Changed
 
@@ -41,7 +42,8 @@ This file lists the main user-visible changes in each Ldx12 version.
 - Repeated Win32 window, resize, input and message-loop boilerplate is shared by all Ldx12 samples through `ldx12::utils::AppLdx`; the intentionally native D3D12 sample remains standalone.
 - The cubemap sample now receives ready-to-draw GPU buffer handles from `CreateCube()` and `CreateSphere()` and keeps the Ldx12 rendering commands explicit.
 - TexturedCube reuses the cube buffers from `Ldx12Utils`, while texture-focused samples reuse the common checker-texture generator.
-- Sample projects are numbered consistently from 01 to 14 in Visual Studio and in the documentation.
+- Sample projects are numbered consistently from 01 to 15 in Visual Studio and in the documentation.
+- Sampled depth SRVs replicate their depth value across RGB, so they can be inspected directly with `ImGui::Image()`.
 
 ### Fixed
 
