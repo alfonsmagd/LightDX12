@@ -110,6 +110,15 @@
 			background: var(--green);
 		}
 
+		.section-legend {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 10px 22px;
+			width: fit-content;
+			min-width: 0;
+			margin: -8px 0 18px;
+		}
+
 		.diagram {
 			margin-bottom: 28px;
 			padding: 24px;
@@ -607,17 +616,17 @@
 		<h1>Ldx12 Architecture</h1>
 		<div class="header-row">
 			<p class="intro">Read from top to bottom. The public user-facing API delegates to DeviceManager, DeviceManager owns the internal systems, and each system maps to a specific D3D12 or DXGI area.</p>
-			<div class="legend" aria-label="Architecture color legend">
+		</div>
+
+		<section class="diagram" id="component-map">
+			<h2>1. Component map</h2>
+			<div class="legend section-legend" aria-label="Architecture color legend">
 				<span style="color: var(--blue)"><i></i>Public user-facing API</span>
 				<span style="color: var(--purple)"><i></i>Ownership and orchestration</span>
 				<span style="color: var(--cyan)"><i></i>Internal implementation</span>
 				<span style="color: var(--orange)"><i></i>Native D3D12 / DXGI</span>
 				<span class="flow-key" style="color: var(--green)"><i></i>Execution or lifetime flow</span>
 			</div>
-		</div>
-
-		<section class="diagram" id="component-map">
-			<h2>1. Component map</h2>
 
 			<div class="layer">
 				<div class="layer-title" style="color: var(--blue)">Public user-facing API</div>
@@ -747,6 +756,13 @@
 
 		<section class="diagram" id="bindless-layout">
 			<h2>4. Bindless layout and root signature</h2>
+			<div class="legend section-legend" aria-label="Bindless diagram color legend">
+				<span style="color: var(--blue)"><i></i>Public user-facing API</span>
+				<span style="color: var(--purple)"><i></i>Ownership and orchestration</span>
+				<span style="color: var(--cyan)"><i></i>Internal implementation</span>
+				<span style="color: var(--orange)"><i></i>Native D3D12 / DXGI</span>
+				<span class="flow-key" style="color: var(--green)"><i></i>Execution or lifetime flow</span>
+			</div>
 			<div class="bindless-picture-shell">
 				<svg class="bindless-picture" viewBox="0 0 1400 790" role="img" aria-labelledby="bindless-title bindless-description">
 					<title id="bindless-title">Ldx12 bindless root signature and descriptor heaps</title>
