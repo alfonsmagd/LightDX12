@@ -1,0 +1,883 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Ldx12 Architecture</title>
+	<style>
+		:root {
+			color-scheme: light;
+			--background: #f5f6f7;
+			--surface: #ffffff;
+			--surface-strong: #fafbfc;
+			--border: #cfd5dc;
+			--text: #20242a;
+			--muted: #606975;
+			--blue: #2f6fbd;
+			--purple: #7651a6;
+			--green: #2f855a;
+			--orange: #b56b1c;
+			--cyan: #257f8c;
+		}
+
+		* {
+			box-sizing: border-box;
+		}
+
+		body {
+			margin: 0;
+			background: var(--background);
+			color: var(--text);
+			font-family: "Segoe UI", Arial, sans-serif;
+		}
+
+		main {
+			width: min(1480px, 100%);
+			margin: 0 auto;
+			padding: 30px;
+		}
+
+		h1, h2, h3, p {
+			margin-top: 0;
+		}
+
+		h1 {
+			margin-bottom: 8px;
+			font-size: clamp(28px, 3vw, 38px);
+			font-weight: 600;
+			letter-spacing: -0.02em;
+		}
+
+		h2 {
+			margin-bottom: 20px;
+			font-size: 20px;
+			font-weight: 600;
+		}
+
+		h3 {
+			margin-bottom: 8px;
+			font-size: 16px;
+			font-weight: 600;
+		}
+
+		.intro {
+			max-width: 750px;
+			margin-bottom: 28px;
+			color: var(--muted);
+		}
+
+		.header-row {
+			display: flex;
+			align-items: end;
+			justify-content: space-between;
+			gap: 28px;
+			margin-bottom: 28px;
+		}
+
+		.header-row .intro {
+			margin-bottom: 0;
+		}
+
+		.legend {
+			display: grid;
+			grid-template-columns: 1fr 1fr;
+			gap: 10px 20px;
+			min-width: 410px;
+			padding: 4px 0;
+			color: var(--muted);
+			font-size: 12px;
+		}
+
+		.legend span {
+			display: flex;
+			align-items: center;
+			gap: 9px;
+		}
+
+		.legend i {
+			width: 13px;
+			height: 13px;
+			border: 2px solid currentColor;
+			border-radius: 1px;
+			background: color-mix(in srgb, currentColor 16%, transparent);
+		}
+
+		.legend .flow-key i {
+			width: 22px;
+			height: 3px;
+			border: 0;
+			border-radius: 2px;
+			background: var(--green);
+		}
+
+		.diagram {
+			margin-bottom: 28px;
+			padding: 24px;
+			border: 1px solid var(--border);
+			border-radius: 4px;
+			background: var(--surface);
+		}
+
+		.layer {
+			padding: 18px;
+			border: 1px solid var(--border);
+			border-radius: 3px;
+			background: var(--surface-strong);
+		}
+
+		.layer-title {
+			margin-bottom: 14px;
+			color: var(--muted);
+			font-size: 13px;
+			font-weight: 700;
+			letter-spacing: 0.12em;
+			text-transform: uppercase;
+		}
+
+		.api-grid {
+			display: grid;
+			grid-template-columns: repeat(5, minmax(150px, 1fr));
+			gap: 14px;
+		}
+
+		.api-node,
+		.owner-node,
+		.system,
+		.native-node,
+		.flow-node {
+			border-radius: 3px;
+			background: var(--surface-strong);
+		}
+
+		.api-node {
+			min-height: 86px;
+			padding: 16px;
+			border: 1px solid rgba(90, 167, 255, 0.72);
+			text-align: center;
+		}
+
+		.api-node b,
+		.flow-node b {
+			display: block;
+			margin-bottom: 6px;
+		}
+
+		.api-node span,
+		.flow-node span,
+		.system p,
+		.native-node span {
+			color: var(--muted);
+			font-size: 12px;
+		}
+
+		.down {
+			display: grid;
+			min-height: 66px;
+			place-items: center;
+			color: var(--purple);
+			font-size: 32px;
+			line-height: 1;
+		}
+
+		.down small {
+			display: block;
+			margin-top: -13px;
+			color: var(--muted);
+			font-size: 12px;
+		}
+
+		.owner-node {
+			max-width: 680px;
+			margin: 0 auto;
+			padding: 20px 28px;
+			border: 1px solid rgba(182, 124, 255, 0.75);
+			text-align: center;
+		}
+
+		.owner-node p {
+			margin: 0;
+			color: var(--muted);
+			font-size: 13px;
+		}
+
+		.system-grid {
+			display: grid;
+			grid-template-columns: repeat(4, 1fr);
+			gap: 14px;
+		}
+
+		.system-column {
+			display: grid;
+			grid-template-rows: auto 48px auto;
+			min-width: 0;
+		}
+
+		.system {
+			padding: 18px;
+			border: 1px solid rgba(101, 212, 230, 0.55);
+		}
+
+		.system ul {
+			margin: 14px 0 0;
+			padding: 0;
+			list-style: none;
+		}
+
+		.system li {
+			padding: 8px 10px;
+			border-top: 1px solid rgba(158, 171, 192, 0.16);
+			color: var(--text);
+			font-family: Consolas, monospace;
+			font-size: 12px;
+		}
+
+		.system li:first-child {
+			border-top: 0;
+		}
+
+		.map-arrow {
+			display: grid;
+			place-items: center;
+			color: var(--orange);
+			font-size: 27px;
+		}
+
+		.native-node {
+			min-height: 96px;
+			padding: 16px;
+			border: 1px dashed rgba(255, 180, 94, 0.65);
+			text-align: center;
+		}
+
+		.native-node b {
+			display: block;
+			margin-bottom: 8px;
+			font-size: 13px;
+		}
+
+		.native-note {
+			margin: 16px 0 0;
+			color: var(--muted);
+			font-size: 12px;
+			text-align: center;
+		}
+
+		.flow {
+			display: grid;
+			grid-template-columns: repeat(7, minmax(120px, 1fr));
+			gap: 30px;
+			overflow-x: auto;
+			padding: 2px 2px 8px;
+		}
+
+		.flow.six {
+			grid-template-columns: repeat(6, minmax(140px, 1fr));
+		}
+
+		.flow-node {
+			position: relative;
+			min-width: 120px;
+			padding: 15px;
+			border: 1px solid var(--border);
+		}
+
+		.flow-node:not(:last-child)::after {
+			content: "→";
+			position: absolute;
+			top: 50%;
+			left: calc(100% + 7px);
+			width: 18px;
+			color: var(--green);
+			font-size: 25px;
+			line-height: 1;
+			text-align: center;
+			transform: translateY(-50%);
+		}
+
+		.binding-grid {
+			display: grid;
+			grid-template-columns: minmax(300px, 0.8fr) minmax(680px, 1.7fr);
+			gap: 20px;
+		}
+
+		.bindless-picture-shell {
+			overflow-x: auto;
+			margin-bottom: 20px;
+			padding: 14px;
+			border: 1px solid var(--border);
+			border-radius: 3px;
+			background: #ffffff;
+		}
+
+		.bindless-picture {
+			display: block;
+			width: 100%;
+			min-width: 1050px;
+			height: auto;
+		}
+
+		.bindless-picture .picture-container {
+			fill: #fafbfc;
+			stroke: var(--border);
+			stroke-width: 2;
+		}
+
+		.bindless-picture .picture-public {
+			fill: rgba(90, 167, 255, 0.16);
+			stroke: var(--blue);
+			stroke-width: 2;
+		}
+
+		.bindless-picture .picture-internal {
+			fill: rgba(101, 212, 230, 0.12);
+			stroke: var(--cyan);
+			stroke-width: 2;
+		}
+
+		.bindless-picture .picture-native {
+			fill: rgba(255, 180, 94, 0.08);
+			stroke: var(--orange);
+			stroke-width: 2;
+			stroke-dasharray: 7 6;
+		}
+
+		.bindless-picture .picture-title {
+			fill: var(--text);
+			font-size: 25px;
+			font-weight: 650;
+		}
+
+		.bindless-picture .picture-heading {
+			fill: var(--text);
+			font-size: 17px;
+			font-weight: 650;
+			text-anchor: middle;
+		}
+
+		.bindless-picture .picture-copy {
+			fill: var(--muted);
+			font-size: 13px;
+			text-anchor: middle;
+		}
+
+		.bindless-picture .picture-flow {
+			fill: none;
+			stroke: var(--green);
+			stroke-width: 3;
+			stroke-dasharray: 6 7;
+			marker-end: url(#bindless-arrow);
+		}
+
+		.bindless-picture .picture-flow-label {
+			fill: var(--green);
+			font-size: 12px;
+			font-weight: 650;
+			text-anchor: middle;
+		}
+
+		.binding-card {
+			padding: 18px;
+			border: 1px solid rgba(101, 212, 230, 0.58);
+			border-radius: 3px;
+			background: var(--surface);
+		}
+
+		.binding-card > p {
+			margin-bottom: 16px;
+			color: var(--muted);
+			font-size: 12px;
+		}
+
+		.root-parameter {
+			margin-top: 12px;
+			padding: 14px;
+			border: 1px dashed rgba(255, 180, 94, 0.68);
+			border-radius: 2px;
+			background: rgba(255, 180, 94, 0.05);
+		}
+
+		.root-parameter b,
+		.root-parameter span {
+			display: block;
+		}
+
+		.root-parameter span {
+			margin-top: 4px;
+			color: var(--muted);
+			font-size: 12px;
+		}
+
+		.root-flags {
+			margin-top: 14px;
+			padding: 12px;
+			border-left: 3px solid var(--cyan);
+			background: rgba(101, 212, 230, 0.06);
+			color: var(--muted);
+			font-size: 12px;
+		}
+
+		.heap-list {
+			display: grid;
+			gap: 14px;
+		}
+
+		.heap-card {
+			padding: 14px;
+			border: 1px dashed rgba(255, 180, 94, 0.58);
+			border-radius: 2px;
+			background: rgba(255, 180, 94, 0.035);
+		}
+
+		.heap-header {
+			display: flex;
+			align-items: baseline;
+			justify-content: space-between;
+			gap: 16px;
+			margin-bottom: 11px;
+		}
+
+		.heap-header b {
+			font-size: 13px;
+		}
+
+		.heap-header span {
+			color: var(--muted);
+			font-size: 11px;
+			text-align: right;
+		}
+
+		.heap-layout {
+			display: flex;
+			min-height: 76px;
+			overflow: hidden;
+			border: 1px solid var(--border);
+			border-radius: 1px;
+		}
+
+		.heap-slot {
+			display: grid;
+			flex: 1 1 0;
+			min-width: 82px;
+			padding: 10px 8px;
+			border-right: 1px solid var(--border);
+			place-content: center;
+			text-align: center;
+		}
+
+		.heap-slot:last-child {
+			border-right: 0;
+		}
+
+		.heap-slot b,
+		.heap-slot span {
+			display: block;
+		}
+
+		.heap-slot b {
+			font-size: 12px;
+		}
+
+		.heap-slot span {
+			margin-top: 4px;
+			color: var(--muted);
+			font-size: 10px;
+		}
+
+		.heap-slot.public-slot {
+			background: rgba(90, 167, 255, 0.12);
+		}
+
+		.heap-slot.internal-slot {
+			background: rgba(101, 212, 230, 0.09);
+		}
+
+		.heap-slot.dynamic-slot {
+			flex-grow: 2.3;
+			background: repeating-linear-gradient(135deg, rgba(101, 212, 230, 0.10) 0 8px, rgba(101, 212, 230, 0.035) 8px 16px);
+		}
+
+		.heap-slot.invalid-slot {
+			flex-grow: 0.55;
+			background: rgba(158, 171, 192, 0.04);
+		}
+
+		.heap-summary {
+			display: grid;
+			grid-template-columns: repeat(2, 1fr);
+			gap: 12px;
+		}
+
+		.compact-heap {
+			padding: 14px;
+			border: 1px dashed rgba(255, 180, 94, 0.58);
+			border-radius: 2px;
+			background: rgba(255, 180, 94, 0.035);
+		}
+
+		.compact-heap b,
+		.compact-heap span {
+			display: block;
+		}
+
+		.compact-heap span {
+			margin-top: 5px;
+			color: var(--muted);
+			font-size: 11px;
+		}
+
+		.binding-notes {
+			display: grid;
+			grid-template-columns: repeat(3, 1fr);
+			gap: 12px;
+			margin-top: 18px;
+		}
+
+		.binding-note {
+			padding: 13px;
+			border-left: 3px solid var(--green);
+			background: rgba(86, 217, 149, 0.055);
+			color: var(--muted);
+			font-size: 12px;
+		}
+
+		.node-public {
+			border-color: rgba(90, 167, 255, 0.72);
+		}
+
+		.node-owner {
+			border-color: rgba(182, 124, 255, 0.72);
+		}
+
+		.node-internal {
+			border-color: rgba(101, 212, 230, 0.72);
+		}
+
+		.node-native {
+			border-color: rgba(255, 180, 94, 0.72);
+		}
+
+		@media (max-width: 1000px) {
+			main {
+				padding: 18px;
+			}
+
+			.api-grid,
+			.system-grid {
+				grid-template-columns: 1fr 1fr;
+			}
+
+			.header-row {
+				align-items: stretch;
+				flex-direction: column;
+			}
+
+			.legend {
+				min-width: 0;
+			}
+
+			.binding-grid {
+				grid-template-columns: 1fr;
+			}
+
+			.heap-layout {
+				overflow-x: auto;
+			}
+		}
+
+		@media (max-width: 620px) {
+			.api-grid,
+			.system-grid {
+				grid-template-columns: 1fr;
+			}
+
+			.system-column {
+				grid-template-rows: auto 42px auto;
+			}
+
+			.legend,
+			.heap-summary,
+			.binding-notes {
+				grid-template-columns: 1fr;
+			}
+		}
+	</style>
+</head>
+<body>
+	<main>
+		<h1>Ldx12 Architecture</h1>
+		<div class="header-row">
+			<p class="intro">Read from top to bottom. The public user-facing API delegates to DeviceManager, DeviceManager owns the internal systems, and each system maps to a specific D3D12 or DXGI area.</p>
+			<div class="legend" aria-label="Architecture color legend">
+				<span style="color: var(--blue)"><i></i>Public user-facing API</span>
+				<span style="color: var(--purple)"><i></i>Ownership and orchestration</span>
+				<span style="color: var(--cyan)"><i></i>Internal implementation</span>
+				<span style="color: var(--orange)"><i></i>Native D3D12 / DXGI</span>
+				<span class="flow-key" style="color: var(--green)"><i></i>Execution or lifetime flow</span>
+			</div>
+		</div>
+
+		<section class="diagram" id="component-map">
+			<h2>1. Component map</h2>
+
+			<div class="layer">
+				<div class="layer-title" style="color: var(--blue)">Public user-facing API</div>
+				<div class="api-grid">
+					<div class="api-node"><b>DeviceManager</b><span>Initialization, device and swapchains</span></div>
+					<div class="api-node"><b>RenderDevice</b><span>Resources, pipelines, submit and wait</span></div>
+					<div class="api-node"><b>ICommandBuffer</b><span>Graphics command recording</span></div>
+					<div class="api-node"><b>Handles + Descs</b><span>Lightweight data exposed to the user</span></div>
+					<div class="api-node"><b>D3D12Native</b><span>Explicit native access when required</span></div>
+				</div>
+			</div>
+
+			<div class="down">↓<small>delegates and retrieves services</small></div>
+
+			<div class="owner-node">
+				<h3>DeviceManager · ownership root</h3>
+				<p>Creates the factory, selects the adapter, validates capabilities and owns the device, queue, descriptor heaps and resource registries.</p>
+			</div>
+
+			<div class="down">↓<small>owns and initializes</small></div>
+
+			<div class="layer">
+				<div class="layer-title" style="color: var(--cyan)">Internal systems and their native mapping</div>
+				<div class="system-grid">
+					<div class="system-column">
+						<div class="system">
+							<h3>Commands</h3>
+							<p>Acquisition, recording, batching, fences and recycling.</p>
+							<ul>
+								<li>ImmediateCommands</li>
+								<li>CommandBufferImpl</li>
+								<li>CommandListWrapper</li>
+								<li>SubmitCommandBufferBatch</li>
+							</ul>
+						</div>
+						<div class="map-arrow">↓</div>
+						<div class="native-node">
+							<b>D3D12 commands</b>
+							<span>CommandAllocator<br>GraphicsCommandList<br>CommandQueue + Fence</span>
+						</div>
+					</div>
+
+					<div class="system-column">
+						<div class="system">
+							<h3>Resources</h3>
+							<p>Generational handles and GPU-safe destruction.</p>
+							<ul>
+								<li>SlotMap&lt;T&gt;</li>
+								<li>BufferResource</li>
+								<li>TextureResource</li>
+								<li>SamplerResource</li>
+								<li>DeferredRelease</li>
+							</ul>
+						</div>
+						<div class="map-arrow">↓</div>
+						<div class="native-node">
+							<b>D3D12 resources</b>
+							<span>ID3D12Resource<br>GPU virtual address<br>Resource states</span>
+						</div>
+					</div>
+
+					<div class="system-column">
+						<div class="system">
+							<h3>Binding and pipelines</h3>
+							<p>Shared bindless model used by command buffers.</p>
+							<ul>
+								<li>CBV / SRV / UAV heap</li>
+								<li>Sampler heap</li>
+								<li>RTV / DSV heaps</li>
+								<li>RootSignature</li>
+								<li>IndirectSignature</li>
+							</ul>
+						</div>
+						<div class="map-arrow">↓</div>
+						<div class="native-node">
+							<b>D3D12 binding</b>
+							<span>DescriptorHeaps<br>RootSignature<br>PipelineState</span>
+						</div>
+					</div>
+
+					<div class="system-column">
+						<div class="system">
+							<h3>Presentation and data</h3>
+							<p>Backbuffers, uploads, readback and mip generation.</p>
+							<ul>
+								<li>Swapchain</li>
+								<li>StagingDevice</li>
+								<li>BaseMips</li>
+								<li>SwapchainResource</li>
+							</ul>
+						</div>
+						<div class="map-arrow">↓</div>
+						<div class="native-node">
+							<b>DXGI + transfer</b>
+							<span>IDXGISwapChain4<br>Upload / readback heaps<br>Compute dispatch</span>
+						</div>
+					</div>
+				</div>
+				<p class="native-note">Orange boxes are the native D3D12/DXGI objects. D3D12Native exposes them explicitly without making them the primary API.</p>
+			</div>
+		</section>
+
+		<section class="diagram" id="command-flow">
+			<h2>2. Command flow</h2>
+			<div class="flow">
+				<div class="flow-node node-public"><b>Acquire</b><span>RenderDevice returns a free command buffer.</span></div>
+				<div class="flow-node node-public"><b>Record</b><span>ICommandBuffer records draws and states.</span></div>
+				<div class="flow-node node-internal"><b>Close</b><span>The associated command list is closed.</span></div>
+				<div class="flow-node node-public"><b>SubmitBatch</b><span>Public submission entry point.</span></div>
+				<div class="flow-node node-native"><b>Execute</b><span>The native queue executes the batch.</span></div>
+				<div class="flow-node node-native"><b>Signal</b><span>The native fence produces a SubmitHandle.</span></div>
+				<div class="flow-node node-internal"><b>Recycle</b><span>The allocator and list return to the pool.</span></div>
+			</div>
+		</section>
+
+		<section class="diagram" id="resource-lifetime">
+			<h2>3. Resource lifetime</h2>
+			<div class="flow six">
+				<div class="flow-node node-public"><b>Desc</b><span>The user describes a buffer, texture or sampler.</span></div>
+				<div class="flow-node node-public"><b>Create</b><span>RenderDevice creates the requested resource.</span></div>
+				<div class="flow-node node-internal"><b>SlotMap</b><span>Stores the object and creates its handle.</span></div>
+				<div class="flow-node node-internal"><b>Descriptor</b><span>Allocates CBV, SRV, UAV, RTV, DSV or sampler.</span></div>
+				<div class="flow-node node-public"><b>Use</b><span>Commands reference the handle or bindless index.</span></div>
+				<div class="flow-node node-internal"><b>Destroy</b><span>DeferredRelease waits for the fence before freeing.</span></div>
+			</div>
+		</section>
+
+		<section class="diagram" id="bindless-layout">
+			<h2>4. Bindless layout and root signature</h2>
+			<div class="bindless-picture-shell">
+				<svg class="bindless-picture" viewBox="0 0 1400 790" role="img" aria-labelledby="bindless-title bindless-description">
+					<title id="bindless-title">Ldx12 bindless root signature and descriptor heaps</title>
+					<desc id="bindless-description">The root signature contains two groups of root constants and direct heap indexing flags. The flags connect to the shader-visible CBV SRV UAV and sampler heaps. RTV and DSV heaps are selected separately by CmdBeginRendering.</desc>
+					<defs>
+						<marker id="bindless-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+							<path d="M 0 0 L 10 5 L 0 10 z" fill="#56d995"/>
+						</marker>
+					</defs>
+
+					<rect class="picture-container" x="30" y="30" width="520" height="500" rx="3"/>
+					<text class="picture-title" x="60" y="75">Root Signature</text>
+					<text class="picture-copy" x="290" y="101">2 root parameters · 0 descriptor tables</text>
+
+					<rect class="picture-public" x="60" y="125" width="460" height="105" rx="2"/>
+					<text class="picture-heading" x="290" y="164">Root parameter 0 · b0</text>
+					<text class="picture-copy" x="290" y="190">63 × 32-bit constants · 252 bytes</text>
+					<text class="picture-copy" x="290" y="211">CmdPushConstants()</text>
+
+					<rect class="picture-internal" x="60" y="250" width="460" height="105" rx="2"/>
+					<text class="picture-heading" x="290" y="289">Root parameter 1 · b1</text>
+					<text class="picture-copy" x="290" y="315">1 × 32-bit constant · indirect draw index</text>
+					<text class="picture-copy" x="290" y="336">Written by CommandSignature</text>
+
+					<rect class="picture-internal" x="60" y="375" width="460" height="125" rx="2"/>
+					<text class="picture-heading" x="290" y="414">Direct heap indexing flags</text>
+					<text class="picture-copy" x="290" y="443">CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED</text>
+					<text class="picture-copy" x="290" y="468">SAMPLER_HEAP_DIRECTLY_INDEXED</text>
+
+					<rect class="picture-container" x="650" y="30" width="720" height="500" rx="3"/>
+					<text class="picture-title" x="680" y="75">Shader-visible Descriptor Heaps</text>
+
+					<rect class="picture-native" x="680" y="105" width="660" height="235" rx="2"/>
+					<text class="picture-heading" x="1010" y="139">CBV / SRV / UAV heap · 4,096 descriptors</text>
+					<rect class="picture-public" x="705" y="165" width="190" height="72" rx="2"/>
+					<text class="picture-heading" x="800" y="196">User fixed</text>
+					<text class="picture-copy" x="800" y="219">CBV · SRV · UAV</text>
+					<rect class="picture-internal" x="915" y="165" width="190" height="72" rx="2"/>
+					<text class="picture-heading" x="1010" y="196">Engine fixed</text>
+					<text class="picture-copy" x="1010" y="219">CBV · SRV · UAV</text>
+					<rect class="picture-internal" x="1125" y="165" width="190" height="72" rx="2"/>
+					<text class="picture-heading" x="1220" y="196">Dynamic</text>
+					<text class="picture-copy" x="1220" y="219">slots 26–4,095</text>
+					<text class="picture-copy" x="1010" y="282">One shared physical heap · direct shader indexing</text>
+					<text class="picture-copy" x="1010" y="308">ResourceDescriptorHeap[index]</text>
+
+					<rect class="picture-native" x="680" y="365" width="660" height="135" rx="2"/>
+					<text class="picture-heading" x="1010" y="399">Sampler heap · 8 descriptors</text>
+					<rect class="picture-internal" x="705" y="420" width="290" height="56" rx="2"/>
+					<text class="picture-heading" x="850" y="446">Built-in samplers · 0–3</text>
+					<text class="picture-copy" x="850" y="466">Linear · Point · Shadow</text>
+					<rect class="picture-public" x="1015" y="420" width="300" height="56" rx="2"/>
+					<text class="picture-heading" x="1165" y="446">Custom samplers · 4–7</text>
+					<text class="picture-copy" x="1165" y="466">4 runtime slots</text>
+
+					<path class="picture-flow" d="M 520 420 C 610 420, 585 225, 680 225"/>
+					<path class="picture-flow" d="M 520 460 C 610 460, 600 432, 680 432"/>
+					<text class="picture-flow-label" x="603" y="325">direct indexing</text>
+
+					<rect class="picture-container" x="30" y="580" width="1340" height="170" rx="3"/>
+					<text class="picture-title" x="60" y="623">Output Attachment Heaps</text>
+					<text class="picture-copy" x="700" y="623">CPU-only · not indexed through the root signature</text>
+					<rect class="picture-public" x="80" y="655" width="300" height="66" rx="2"/>
+					<text class="picture-heading" x="230" y="684">CmdBeginRendering</text>
+					<text class="picture-copy" x="230" y="706">Framebuffer attachments</text>
+					<rect class="picture-native" x="535" y="655" width="300" height="66" rx="2"/>
+					<text class="picture-heading" x="685" y="680">RTV heap · 256 descriptors</text>
+					<text class="picture-copy" x="685" y="702">Up to 8 active per render pass</text>
+					<rect class="picture-native" x="990" y="655" width="300" height="66" rx="2"/>
+					<text class="picture-heading" x="1140" y="680">DSV heap · 64 descriptors</text>
+					<text class="picture-copy" x="1140" y="702">Up to 1 active per render pass</text>
+					<path class="picture-flow" d="M 380 688 L 535 688"/>
+					<path class="picture-flow" d="M 380 706 C 650 770, 790 688, 990 688"/>
+				</svg>
+			</div>
+
+			<div class="binding-card">
+					<h3>Exact descriptor ranges</h3>
+					<p>CBV, SRV and UAV share one physical shader-visible heap. Samplers use a second shader-visible heap. RTV and DSV remain separate CPU-only heaps.</p>
+
+					<div class="heap-list">
+						<div class="heap-card">
+							<div class="heap-header">
+								<b>CBV / SRV / UAV bindless heap</b>
+								<span>Shader visible · default 4,096 · configurable up to 4,096</span>
+							</div>
+							<div class="heap-layout" aria-label="CBV SRV UAV descriptor heap layout">
+								<div class="heap-slot invalid-slot"><b>Invalid</b><span>slot 0</span></div>
+								<div class="heap-slot public-slot"><b>User CBV</b><span>1–5 · 5 slots</span></div>
+								<div class="heap-slot internal-slot"><b>Engine CBV</b><span>6–10 · 5 slots</span></div>
+								<div class="heap-slot public-slot"><b>User SRV</b><span>11–15 · 5 slots</span></div>
+								<div class="heap-slot internal-slot"><b>Engine SRV</b><span>16–20 · 5 slots</span></div>
+								<div class="heap-slot public-slot"><b>User UAV</b><span>21–23 · 3 slots</span></div>
+								<div class="heap-slot internal-slot"><b>Engine UAV</b><span>24–25 · 2 slots</span></div>
+								<div class="heap-slot dynamic-slot"><b>Dynamic descriptors</b><span>26–4,095 · 4,070 slots by default</span></div>
+							</div>
+						</div>
+
+						<div class="heap-card">
+							<div class="heap-header">
+								<b>Sampler heap</b>
+								<span>Shader visible · 8 descriptors</span>
+							</div>
+							<div class="heap-layout" aria-label="Sampler descriptor heap layout">
+								<div class="heap-slot internal-slot"><b>LinearClamp</b><span>slot 0</span></div>
+								<div class="heap-slot internal-slot"><b>LinearWrap</b><span>slot 1</span></div>
+								<div class="heap-slot internal-slot"><b>PointClamp</b><span>slot 2</span></div>
+								<div class="heap-slot internal-slot"><b>ShadowComparison</b><span>slot 3</span></div>
+								<div class="heap-slot public-slot"><b>Custom samplers</b><span>slots 4–7 · 4 runtime slots</span></div>
+							</div>
+						</div>
+
+						<div class="heap-summary">
+							<div class="compact-heap">
+								<b>RTV heap · 256 default / maximum</b>
+								<span>Descriptor storage capacity. A render pass can bind up to 8 color attachments simultaneously. The heap is CPU only and is not directly indexed by shaders.</span>
+							</div>
+							<div class="compact-heap">
+								<b>DSV heap · 64 default / maximum</b>
+								<span>Descriptor storage capacity. A render pass can bind one depth/stencil attachment. The heap is CPU only and is not directly indexed by shaders.</span>
+							</div>
+						</div>
+					</div>
+			</div>
+
+			<div class="binding-notes">
+				<div class="binding-note"><b>CBV</b><br>Constant Buffer View. Fixed public slots 1–5 and fixed engine slots 6–10.</div>
+				<div class="binding-note"><b>SRV / UAV</b><br>Read-only and read-write resource views. Fixed slots cover common bindings; dynamic slots hold ordinary bindless resources.</div>
+				<div class="binding-note"><b>Capacity is not simultaneous usage</b><br>The heaps store 256 RTV and 64 DSV descriptors, while one render pass can activate at most 8 RTVs and 1 DSV through CmdBeginRendering.</div>
+			</div>
+		</section>
+	</main>
+</body>
+</html>

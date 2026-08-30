@@ -34,6 +34,18 @@ device.Submit( commands, backbuffer );
 
 Ldx12 manages the device, swapchain, descriptor heaps, root signature, command-list recycling, fences, resource states and deferred resource releases behind this flow.
 
+## Architecture
+
+The public API stays small while `DeviceManager` owns the internal command, resource, binding and presentation systems that map to D3D12 and DXGI.
+
+![Ldx12 component architecture](Ldx12/docs/images/architecture-overview.png)
+
+The bindless model uses direct heap indexing, two root-constant parameters, a shared CBV/SRV/UAV heap and a separate sampler heap. RTV and DSV descriptors are output attachments and remain outside the shader-visible heaps.
+
+![Ldx12 bindless layout](Ldx12/docs/images/bindless-layout.png)
+
+The complete standalone diagram is available in [`Ldx12/docs/architecture.html`](Ldx12/docs/architecture.html).
+
 ## Get started
 
 Requirements: Windows 10/11, Visual Studio 2022 with Desktop development with C++, the Windows SDK with DXC, and an x64 target.
