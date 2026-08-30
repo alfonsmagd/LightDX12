@@ -22,6 +22,7 @@ namespace ldx12::utils
 		uint32_t indexCount = 0;
 	};
 
+	GeometryBuffers CreateQuad( RenderDevice& device );
 	GeometryBuffers CreateCube( RenderDevice& device );
 	GeometryBuffers CreateSphere( RenderDevice& device, uint32_t rings = 16, uint32_t segments = 32 );
 	void DestroyGeometry( RenderDevice& device, GeometryBuffers& geometry );

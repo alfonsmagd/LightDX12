@@ -69,3 +69,27 @@ Reflective cube or sphere rendered inside a six-face cubemap skybox.
 ![10. Cube map](images/10-cubemap.png)
 
 [View source](../samples/CubeMap)
+
+## 11. Texture2DArray
+
+Four moving triangles, each sampling a different slice of the same texture array.
+
+![11. Texture2DArray](images/11-texture2d-array.png)
+
+[View source](../samples/Texture2DArray)
+
+## 12. Transparency
+
+An opaque cube followed by three depth-tested transparent quads with different alpha values.
+
+![12. Transparency](images/12-transparency.png)
+
+[View source](../samples/Transparency)
+
+## 13. CookbookChapter02
+
+[View source](../samples/CookbookChapter02)
+
+## 14. ImGuiDemoNative
+
+[View source](../samples/ImGuiDemoNative)

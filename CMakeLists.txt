@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(Ldx12 VERSION 0.1.0 LANGUAGES CXX)
+project(Ldx12 VERSION 0.2.0 LANGUAGES CXX)
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 option(LDX12_BUILD_APP "Build the optional App support library" ${PROJECT_IS_TOP_LEVEL})
@@ -256,6 +256,11 @@ if(LDX12_BUILD_EXAMPLES)
     set(Z_FIGHTING_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/samples/ZFighting/main.cpp")
     set(VIEWPORT_SCISSOR_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/samples/ViewportScissor/main.cpp")
     set(TEXTURE_SAMPLERS_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/samples/TextureSamplers/main.cpp")
+    set(TEXTURE_2D_ARRAY_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/samples/Texture2DArray/main.cpp")
+    set(TRANSPARENCY_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/samples/Transparency/main.cpp")
+    set(TRANSPARENCY_COMMON_SHADER "${CMAKE_CURRENT_SOURCE_DIR}/samples/Transparency/shaders/TransparencyCommon.hlsli")
+    set(TRANSPARENCY_QUAD_SHADER "${CMAKE_CURRENT_SOURCE_DIR}/samples/Transparency/shaders/TransparencyQuad.hlsl")
+    set(TRANSPARENCY_SKYBOX_SHADER "${CMAKE_CURRENT_SOURCE_DIR}/samples/Transparency/shaders/TransparencySkybox.hlsl")
     set(CUBE_MAP_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/samples/CubeMap/main.cpp")
     set(CUBE_MAP_COMMON_SHADER "${CMAKE_CURRENT_SOURCE_DIR}/samples/CubeMap/shaders/CubeMapCommon.hlsli")
     set(CUBE_MAP_OBJECT_SHADER "${CMAKE_CURRENT_SOURCE_DIR}/samples/CubeMap/shaders/CubeMapObject.hlsl")
@@ -281,56 +286,72 @@ if(LDX12_BUILD_EXAMPLES)
         "${CUBE_MAP_COMMON_SHADER}"
         "${CUBE_MAP_OBJECT_SHADER}"
         "${CUBE_MAP_SKYBOX_SHADER}"
+        "${TRANSPARENCY_COMMON_SHADER}"
+        "${TRANSPARENCY_QUAD_SHADER}"
+        "${TRANSPARENCY_SKYBOX_SHADER}"
         ${CUBE_MAP_MEDIA}
         PROPERTIES HEADER_FILE_ONLY TRUE
     )
-    add_ldx12_utils_sample(Triangle "${TRIANGLE_SOURCE}")
-    add_ldx12_utils_sample(TexturedCube "${TEXTURED_CUBE_SOURCE}")
-    add_ldx12_sample(ZFighting "${Z_FIGHTING_SOURCE}")
-    target_link_libraries(ZFighting PRIVATE Ldx12::ImGui Ldx12::Utils)
-    add_ldx12_utils_sample(ViewportScissor "${VIEWPORT_SCISSOR_SOURCE}")
-    add_ldx12_utils_sample(TextureSamplers "${TEXTURE_SAMPLERS_SOURCE}")
-    add_ldx12_utils_sample(CubeMap
+    add_ldx12_utils_sample(01_Triangle "${TRIANGLE_SOURCE}")
+    add_ldx12_utils_sample(06_TexturedCube "${TEXTURED_CUBE_SOURCE}")
+    add_ldx12_sample(05_ZFighting "${Z_FIGHTING_SOURCE}")
+    target_link_libraries(05_ZFighting PRIVATE Ldx12::ImGui Ldx12::Utils)
+    add_ldx12_utils_sample(02_ViewportScissor "${VIEWPORT_SCISSOR_SOURCE}")
+    add_ldx12_utils_sample(07_TextureSamplers "${TEXTURE_SAMPLERS_SOURCE}")
+    add_ldx12_utils_sample(11_Texture2DArray "${TEXTURE_2D_ARRAY_SOURCE}")
+    add_ldx12_utils_sample(12_Transparency
+        "${TRANSPARENCY_SOURCE}"
+        "${TRANSPARENCY_COMMON_SHADER}"
+        "${TRANSPARENCY_QUAD_SHADER}"
+        "${TRANSPARENCY_SKYBOX_SHADER}"
+        ${CUBE_MAP_MEDIA}
+    )
+    add_ldx12_utils_sample(10_CubeMap
         "${CUBE_MAP_SOURCE}"
         "${CUBE_MAP_COMMON_SHADER}"
         "${CUBE_MAP_OBJECT_SHADER}"
         "${CUBE_MAP_SKYBOX_SHADER}"
         ${CUBE_MAP_MEDIA}
     )
-    add_ldx12_utils_sample(CBSRVCubes "${CBSRVCUBES_SOURCE}" "${CBSRVCUBES_README}" "${CBSRVCUBES_SHADER}")
-    add_ldx12_utils_sample(CookbookChapter02 "${COOKBOOK_CHAPTER02_SOURCE}" "${COOKBOOK_CHAPTER02_README}" "${COOKBOOK_CHAPTER02_SHADER}")
+    add_ldx12_utils_sample(03_CBSRVCubes "${CBSRVCUBES_SOURCE}" "${CBSRVCUBES_README}" "${CBSRVCUBES_SHADER}")
+    add_ldx12_utils_sample(13_CookbookChapter02 "${COOKBOOK_CHAPTER02_SOURCE}" "${COOKBOOK_CHAPTER02_README}" "${COOKBOOK_CHAPTER02_SHADER}")
 
     if(LDX12_UTILS_AVAILABLE)
         set(WORLD_GEOMETRY_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/samples/WorldGeometry/main.cpp")
-        add_ldx12_sample(WorldGeometry "${WORLD_GEOMETRY_SOURCE}")
-        target_link_libraries(WorldGeometry PRIVATE Ldx12::Utils)
+        add_ldx12_sample(09_WorldGeometry "${WORLD_GEOMETRY_SOURCE}")
+        target_link_libraries(09_WorldGeometry PRIVATE Ldx12::Utils)
     endif()
 
     set(IMGUI_DEMO_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/samples/ImGuiDemo/main.cpp")
-    add_executable(ImGuiDemo WIN32 "${IMGUI_DEMO_SOURCE}")
-    target_compile_features(ImGuiDemo PRIVATE cxx_std_20)
-    target_compile_definitions(ImGuiDemo PRIVATE LDX12_MEDIA_DIRECTORY="${CMAKE_CURRENT_SOURCE_DIR}/media")
-    target_link_libraries(ImGuiDemo PRIVATE Ldx12::ImGui Ldx12::Utils)
+    add_executable(08_ImGuiDemo WIN32 "${IMGUI_DEMO_SOURCE}")
+    target_compile_features(08_ImGuiDemo PRIVATE cxx_std_20)
+    target_compile_definitions(08_ImGuiDemo PRIVATE LDX12_MEDIA_DIRECTORY="${CMAKE_CURRENT_SOURCE_DIR}/media")
+    target_link_libraries(08_ImGuiDemo PRIVATE Ldx12::ImGui Ldx12::Utils)
     if(MSVC)
-        target_compile_options(ImGuiDemo PRIVATE /W4 /EHsc /permissive- /MP)
+        target_compile_options(08_ImGuiDemo PRIVATE /W4 /EHsc /permissive- /MP)
     endif()
 
     set(IMGUI_DEMO_NATIVE_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/samples/ImGuiDemoNative/main.cpp")
-    add_executable(ImGuiDemoNative WIN32 "${IMGUI_DEMO_NATIVE_SOURCE}")
-    target_compile_features(ImGuiDemoNative PRIVATE cxx_std_20)
-    target_compile_definitions(ImGuiDemoNative PRIVATE LDX12_MEDIA_DIRECTORY="${CMAKE_CURRENT_SOURCE_DIR}/media")
-    target_link_libraries(ImGuiDemoNative PRIVATE DearImGui)
+    add_executable(14_ImGuiDemoNative WIN32 "${IMGUI_DEMO_NATIVE_SOURCE}")
+    target_compile_features(14_ImGuiDemoNative PRIVATE cxx_std_20)
+    target_compile_definitions(14_ImGuiDemoNative PRIVATE LDX12_MEDIA_DIRECTORY="${CMAKE_CURRENT_SOURCE_DIR}/media")
+    target_link_libraries(14_ImGuiDemoNative PRIVATE DearImGui)
     if(MSVC)
-        target_compile_options(ImGuiDemoNative PRIVATE /W4 /EHsc /permissive- /MP)
+        target_compile_options(14_ImGuiDemoNative PRIVATE /W4 /EHsc /permissive- /MP)
     endif()
 
-    set(LDX12_EXAMPLE_TARGETS Triangle TexturedCube ZFighting ViewportScissor TextureSamplers CubeMap CBSRVCubes CookbookChapter02 WorldGeometry ImGuiDemo ImGuiDemoNative)
+    set(LDX12_EXAMPLE_TARGETS 01_Triangle 02_ViewportScissor 03_CBSRVCubes 05_ZFighting 06_TexturedCube 07_TextureSamplers 08_ImGuiDemo 09_WorldGeometry 10_CubeMap 11_Texture2DArray 12_Transparency 13_CookbookChapter02 14_ImGuiDemoNative)
     set(LDX12_EXAMPLE_SOURCES
         "${TRIANGLE_SOURCE}"
         "${TEXTURED_CUBE_SOURCE}"
         "${Z_FIGHTING_SOURCE}"
         "${VIEWPORT_SCISSOR_SOURCE}"
         "${TEXTURE_SAMPLERS_SOURCE}"
+        "${TEXTURE_2D_ARRAY_SOURCE}"
+        "${TRANSPARENCY_SOURCE}"
+        "${TRANSPARENCY_COMMON_SHADER}"
+        "${TRANSPARENCY_QUAD_SHADER}"
+        "${TRANSPARENCY_SKYBOX_SHADER}"
         "${CUBE_MAP_SOURCE}"
         "${CUBE_MAP_COMMON_SHADER}"
         "${CUBE_MAP_OBJECT_SHADER}"
@@ -350,19 +371,33 @@ if(LDX12_BUILD_EXAMPLES)
     if(LDX12_BUILD_APP)
         set(IMGUI_NODE_EDITOR_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/samples/ImGuiNodeEditor/main.cpp")
         set(IMGUI_NODE_EDITOR_README "${CMAKE_CURRENT_SOURCE_DIR}/samples/ImGuiNodeEditor/README.md")
-        add_executable(ImGuiNodeEditor WIN32 "${IMGUI_NODE_EDITOR_SOURCE}" "${IMGUI_NODE_EDITOR_README}")
-        target_compile_features(ImGuiNodeEditor PRIVATE cxx_std_20)
-        target_compile_definitions(ImGuiNodeEditor PRIVATE LDX12_MEDIA_DIRECTORY="${CMAKE_CURRENT_SOURCE_DIR}/media")
-        target_link_libraries(ImGuiNodeEditor PRIVATE Ldx12::Ldx12 Ldx12::Utils Ldx12::App DearImGui)
+        add_executable(04_ImGuiNodeEditor WIN32 "${IMGUI_NODE_EDITOR_SOURCE}" "${IMGUI_NODE_EDITOR_README}")
+        target_compile_features(04_ImGuiNodeEditor PRIVATE cxx_std_20)
+        target_compile_definitions(04_ImGuiNodeEditor PRIVATE LDX12_MEDIA_DIRECTORY="${CMAKE_CURRENT_SOURCE_DIR}/media")
+        target_link_libraries(04_ImGuiNodeEditor PRIVATE Ldx12::Ldx12 Ldx12::Utils Ldx12::App DearImGui)
         if(MSVC)
-            target_compile_options(ImGuiNodeEditor PRIVATE /W4 /EHsc /permissive- /MP)
+            target_compile_options(04_ImGuiNodeEditor PRIVATE /W4 /EHsc /permissive- /MP)
         endif()
-        list(APPEND LDX12_EXAMPLE_TARGETS ImGuiNodeEditor)
+        list(APPEND LDX12_EXAMPLE_TARGETS 04_ImGuiNodeEditor)
         list(APPEND LDX12_EXAMPLE_SOURCES "${IMGUI_NODE_EDITOR_SOURCE}" "${IMGUI_NODE_EDITOR_README}")
+        set_target_properties(04_ImGuiNodeEditor PROPERTIES PROJECT_LABEL "04. ImGuiNodeEditor" OUTPUT_NAME "ImGuiNodeEditor")
     endif()
 
+    set_target_properties(01_Triangle PROPERTIES PROJECT_LABEL "01. Triangle" OUTPUT_NAME "Triangle")
+    set_target_properties(02_ViewportScissor PROPERTIES PROJECT_LABEL "02. ViewportScissor" OUTPUT_NAME "ViewportScissor")
+    set_target_properties(03_CBSRVCubes PROPERTIES PROJECT_LABEL "03. CBSRVCubes" OUTPUT_NAME "CBSRVCubes")
+    set_target_properties(05_ZFighting PROPERTIES PROJECT_LABEL "05. ZFighting" OUTPUT_NAME "ZFighting")
+    set_target_properties(06_TexturedCube PROPERTIES PROJECT_LABEL "06. TexturedCube" OUTPUT_NAME "TexturedCube")
+    set_target_properties(07_TextureSamplers PROPERTIES PROJECT_LABEL "07. TextureSamplers" OUTPUT_NAME "TextureSamplers")
+    set_target_properties(08_ImGuiDemo PROPERTIES PROJECT_LABEL "08. ImGuiDemo" OUTPUT_NAME "ImGuiDemo")
+    set_target_properties(09_WorldGeometry PROPERTIES PROJECT_LABEL "09. WorldGeometry" OUTPUT_NAME "WorldGeometry")
+    set_target_properties(10_CubeMap PROPERTIES PROJECT_LABEL "10. CubeMap" OUTPUT_NAME "CubeMap")
+    set_target_properties(11_Texture2DArray PROPERTIES PROJECT_LABEL "11. Texture2DArray" OUTPUT_NAME "Texture2DArray")
+    set_target_properties(12_Transparency PROPERTIES PROJECT_LABEL "12. Transparency" OUTPUT_NAME "Transparency")
+    set_target_properties(13_CookbookChapter02 PROPERTIES PROJECT_LABEL "13. CookbookChapter02" OUTPUT_NAME "CookbookChapter02")
+    set_target_properties(14_ImGuiDemoNative PROPERTIES PROJECT_LABEL "14. ImGuiDemoNative" OUTPUT_NAME "ImGuiDemoNative")
     set_target_properties(${LDX12_EXAMPLE_TARGETS} PROPERTIES FOLDER "examples")
-    set_property(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" PROPERTY VS_STARTUP_PROJECT Triangle)
+    set_property(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" PROPERTY VS_STARTUP_PROJECT 01_Triangle)
 endif()
 
 set(LDX12_TEST_SOURCES)

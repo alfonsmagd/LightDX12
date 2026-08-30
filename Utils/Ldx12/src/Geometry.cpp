@@ -8,6 +8,17 @@ namespace ldx12::utils
 {
 	namespace
 	{
+		static constexpr std::array<GeometryVertex, 4> ourQuadVertices = {
+			GeometryVertex{ { -1.0f, -1.0f, 0.0f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 1.0f } },
+			GeometryVertex{ { -1.0f,  1.0f, 0.0f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 0.0f } },
+			GeometryVertex{ {  1.0f,  1.0f, 0.0f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 0.0f } },
+			GeometryVertex{ {  1.0f, -1.0f, 0.0f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 1.0f } }
+		};
+
+		static constexpr std::array<uint32_t, 6> ourQuadIndices = {
+			0, 1, 2, 0, 2, 3
+		};
+
 		static constexpr std::array<GeometryVertex, 24> ourCubeVertices = {
 			GeometryVertex{ { -1.0f, -1.0f, -1.0f }, {  0.0f,  0.0f, -1.0f }, { 0.0f, 1.0f } },
 			GeometryVertex{ { -1.0f,  1.0f, -1.0f }, {  0.0f,  0.0f, -1.0f }, { 0.0f, 0.0f } },
@@ -73,6 +84,18 @@ namespace ldx12::utils
 			geometry.indexCount = static_cast<uint32_t>( indexCount );
 			return geometry;
 		}
+	}
+
+	GeometryBuffers CreateQuad( RenderDevice& device )
+	{
+		return CreateGeometryBuffers(
+			device,
+			ourQuadVertices.data(),
+			ourQuadVertices.size(),
+			ourQuadIndices.data(),
+			ourQuadIndices.size(),
+			"Quad vertices",
+			"Quad indices" );
 	}
 
 	GeometryBuffers CreateCube( RenderDevice& device )

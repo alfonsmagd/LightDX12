@@ -56,7 +56,7 @@ Run:
 GenerateSolution.bat
 ```
 
-Then open `build\Ldx12.sln`. It contains the library, tests and samples, with `Triangle` as the startup project.
+Then open `build\Ldx12.sln`. It contains the library, tests and numbered samples, with `01_Triangle` as the startup project.
 
 ### CMake
 
@@ -162,5 +162,7 @@ Ldx12 is available under the [MIT License](LICENSE). Third-party attribution is 
 | **8. [Ldx12 + Dear ImGui](samples/ImGuiDemo)**<br>[![Ldx12 + Dear ImGui](examples/images/08-imgui-demo.png)](samples/ImGuiDemo) |
 | **9. [WorldGeometry](samples/WorldGeometry)**<br>[![WorldGeometry](examples/images/09-world-geometry.png)](samples/WorldGeometry) |
 | **10. [CubeMap](samples/CubeMap)**<br>[![CubeMap](examples/images/10-cubemap.png)](samples/CubeMap) |
-
-Additional samples: [CookbookChapter02](samples/CookbookChapter02) · [ImGuiDemoNative](samples/ImGuiDemoNative)
+| **11. [Texture2DArray](samples/Texture2DArray)**<br>[![Texture2DArray](examples/images/11-texture2d-array.png)](samples/Texture2DArray) |
+| **12. [Transparency](samples/Transparency)**<br>[![Transparency](examples/images/12-transparency.png)](samples/Transparency) |
+| **13. [CookbookChapter02](samples/CookbookChapter02)** |
+| **14. [ImGuiDemoNative](samples/ImGuiDemoNative)** |

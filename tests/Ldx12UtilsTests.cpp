@@ -38,8 +38,12 @@ int main()
 		DeviceManager& manager = DeviceManager::Initialize( contextDesc );
 		RenderDevice& device = *manager.GetRenderDevice();
 
+		GeometryBuffers quadGeometry = CreateQuad( device );
 		GeometryBuffers cubeGeometry = CreateCube( device );
 		GeometryBuffers sphereGeometry = CreateSphere( device );
+		assert( quadGeometry.vertexBuffer.Valid() );
+		assert( quadGeometry.indexBuffer.Valid() );
+		assert( quadGeometry.indexCount == 6 );
 		assert( cubeGeometry.vertexBuffer.Valid() );
 		assert( cubeGeometry.indexBuffer.Valid() );
 		assert( cubeGeometry.indexCount == 36 );
@@ -48,6 +52,7 @@ int main()
 		assert( sphereGeometry.indexCount > 0 );
 		DestroyGeometry( device, sphereGeometry );
 		DestroyGeometry( device, cubeGeometry );
+		DestroyGeometry( device, quadGeometry );
 
 		TextureDesc colorDesc{};
 		colorDesc.debugName = "Ldx12 Utils Test Color";
