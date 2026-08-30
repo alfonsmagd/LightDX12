@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [ValidatePattern( '^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$' )]
-    [string] $Version = '0.1.0-local',
+    [string] $Version = '0.2.0-local',
     [string] $NuGetExe = ''
 )
 
@@ -50,10 +50,11 @@ Invoke-Checked 'cmake' @(
     '-DLDX12_BUILD_APP=OFF',
     '-DLDX12_BUILD_EXAMPLES=OFF',
     '-DLDX12_BUILD_TESTS=OFF',
+	'-DLDX12_BUILD_UTILS=ON',
     '-DLDX12_INSTALL=ON'
 )
-Invoke-Checked 'cmake' @( '--build', $packageBuildDirectory, '--config', 'Debug', '--target', 'Ldx12', '--parallel' )
-Invoke-Checked 'cmake' @( '--build', $packageBuildDirectory, '--config', 'Release', '--target', 'Ldx12', '--parallel' )
+Invoke-Checked 'cmake' @( '--build', $packageBuildDirectory, '--config', 'Debug', '--target', 'Ldx12Utils', '--parallel' )
+Invoke-Checked 'cmake' @( '--build', $packageBuildDirectory, '--config', 'Release', '--target', 'Ldx12Utils', '--parallel' )
 Invoke-Checked 'cmake' @( '--install', $packageBuildDirectory, '--config', 'Debug', '--prefix', $installDirectory )
 Invoke-Checked 'cmake' @( '--install', $packageBuildDirectory, '--config', 'Release', '--prefix', $installDirectory )
 

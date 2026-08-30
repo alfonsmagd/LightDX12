@@ -2,27 +2,32 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
   <metadata>
     <id>Ldx12</id>
-    <version>0.1.0</version>
+    <version>0.2.0</version>
     <title>Ldx12</title>
     <authors>alfonsmagd</authors>
-    <description>Lightweight native Direct3D 12 rendering library for Windows and Visual Studio 2022.</description>
+    <description>Lightweight and fully bindless C++20 Direct3D 12 rendering library with Ldx12Utils helpers for Windows and Visual Studio 2022.</description>
     <projectUrl>https://github.com/alfonsmagd/LightDX12</projectUrl>
     <repository type="git" url="https://github.com/alfonsmagd/LightDX12.git" />
     <license type="expression">MIT</license>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <icon>Ldx12.png</icon>
     <readme>README.md</readme>
-    <tags>native nativepackage c++ cpp directx12 d3d12 graphics rendering</tags>
+    <tags>native nativepackage c++ cpp directx12 d3d12 bindless graphics rendering</tags>
     <dependencies>
       <group targetFramework="native" />
     </dependencies>
   </metadata>
   <files>
-    <file src="README.md" target="README.md" />
+    <file src="nuget\PackageREADME.md" target="README.md" />
+    <file src="nuget\Ldx12.png" target="Ldx12.png" />
+    <file src="Ldx12\docs\images\bindless-layout.png" target="docs\bindless-layout.png" />
     <file src="LICENSE" target="LICENSE" />
     <file src="THIRD_PARTY_NOTICES.md" target="THIRD_PARTY_NOTICES.md" />
     <file src="build\nuget-install\include\**\*" target="build\native\include" />
     <file src="build\nuget-install\lib\Ldx12.lib" target="build\native\lib\x64" />
     <file src="build\nuget-install\lib\Ldx12d.lib" target="build\native\lib\x64" />
+    <file src="build\nuget-install\lib\Ldx12Utils.lib" target="build\native\lib\x64" />
+    <file src="build\nuget-install\lib\Ldx12Utilsd.lib" target="build\native\lib\x64" />
     <file src="nuget\Ldx12.props" target="build\native" />
     <file src="nuget\Ldx12.targets" target="build\native" />
     <file src="nuget\_._" target="lib\native" />

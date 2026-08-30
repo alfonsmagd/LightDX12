@@ -266,7 +266,7 @@ jobs:
           if ( $env:GITHUB_REF_TYPE -eq "tag" ) {
               $version = $env:GITHUB_REF_NAME -replace '^v', ''
           } else {
-              $version = "0.1.0-ci.$env:GITHUB_RUN_NUMBER"
+              $version = "0.2.0-ci.$env:GITHUB_RUN_NUMBER"
           }
 
           ./nuget/Pack.ps1 -Version $version -NuGetExe ( Get-Command nuget.exe ).Source

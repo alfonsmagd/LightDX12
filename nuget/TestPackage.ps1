@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [ValidatePattern( '^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$' )]
-    [string] $Version = '0.1.0-local',
+    [string] $Version = '0.2.0-local',
     [string] $NuGetExe = ''
 )
 
@@ -90,4 +90,4 @@ foreach( $configuration in @( 'Debug', 'Release' ) )
     Invoke-Checked $executable @()
 }
 
-Write-Host 'The Ldx12 NuGet package passed the Visual Studio 2022 Debug and Release consumer tests.'
+Write-Host 'The Ldx12 and Ldx12Utils NuGet package passed the Visual Studio 2022 Debug and Release consumer tests.'

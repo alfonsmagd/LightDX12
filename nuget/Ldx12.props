@@ -15,5 +15,8 @@
     <ClInclude Include="$(Ldx12IncludeDirectory)\Ldx12\*.hpp">
       <Link>Ldx12 Headers\%(Filename)%(Extension)</Link>
     </ClInclude>
+    <ClInclude Include="$(Ldx12IncludeDirectory)\Ldx12Utils\*.hpp">
+      <Link>Ldx12 Utils Headers\%(Filename)%(Extension)</Link>
+    </ClInclude>
   </ItemGroup>
 </Project>

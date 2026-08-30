@@ -9,8 +9,8 @@
   <ItemDefinitionGroup Condition="'$(Platform)' == 'x64'">
     <Link>
       <AdditionalLibraryDirectories>$(Ldx12PackageRoot)lib\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies Condition="'$(UseDebugLibraries)' == 'true'">Ldx12d.lib;d3d12.lib;d3dcompiler.lib;dxgi.lib;dxguid.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalDependencies Condition="'$(UseDebugLibraries)' != 'true'">Ldx12.lib;d3d12.lib;d3dcompiler.lib;dxgi.lib;dxguid.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies Condition="'$(UseDebugLibraries)' == 'true'">Ldx12Utilsd.lib;Ldx12d.lib;windowscodecs.lib;ole32.lib;d3d12.lib;d3dcompiler.lib;dxgi.lib;dxguid.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies Condition="'$(UseDebugLibraries)' != 'true'">Ldx12Utils.lib;Ldx12.lib;windowscodecs.lib;ole32.lib;d3d12.lib;d3dcompiler.lib;dxgi.lib;dxguid.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
 </Project>
