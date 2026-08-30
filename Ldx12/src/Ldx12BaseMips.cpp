@@ -23,7 +23,7 @@ namespace ldx12
 		}
 	}
 
-	BaseMips::BaseMips( DeviceManager& manager ): manager_( manager )
+	BaseMips::BaseMips( DeviceManager& manager ) : manager_( manager )
 	{
 		ComputePipelineDesc pipelineDesc{};
 		pipelineDesc.computeShader.source = detail::ourBaseMipsShaderSource;
@@ -36,8 +36,7 @@ namespace ldx12
 		psoDesc.pRootSignature = manager_.rootSignature_.Get();
 		psoDesc.CS = shader.Bytecode();
 
-		C_RESULT(
-			manager_.device_->CreateComputePipelineState( &psoDesc, IID_PPV_ARGS( pipelineState_.GetAddressOf() ) ),
+		C_RESULT( manager_.device_->CreateComputePipelineState( &psoDesc, IID_PPV_ARGS( pipelineState_.GetAddressOf() ) ),
 			"Failed to create BaseMips compute pipeline state." );
 	}
 
@@ -57,16 +56,12 @@ namespace ldx12
 		CommandListWrapper& wrapper = queue.immediateCommands_->Acquire();
 		ID3D12GraphicsCommandList4* commandList = wrapper.commandList_.Get();
 
-		ID3D12DescriptorHeap* descriptorHeaps[] = {
-			manager_.bindlessHeap_.Get(),
-			manager_.samplerHeap_.Get()
-		};
+		ID3D12DescriptorHeap* descriptorHeaps[] = { manager_.bindlessHeap_.Get(), manager_.samplerHeap_.Get() };
 		commandList->SetDescriptorHeaps( static_cast<UINT>( std::size( descriptorHeaps ) ), descriptorHeaps );
 		commandList->SetComputeRootSignature( manager_.rootSignature_.Get() );
 		commandList->SetPipelineState( pipelineState_.Get() );
 
-		TransitionSubresource(
-			commandList,
+		TransitionSubresource( commandList,
 			texture.resource_.Get(),
 			CalculateSubresourceIndex( 0u, texture.mipLevels_ ),
 			finalState,
@@ -80,12 +75,7 @@ namespace ldx12
 			const uint32_t destinationHeight = std::max( 1u, sourceHeight >> 1u );
 			const uint32_t destinationSubresource = CalculateSubresourceIndex( mipLevel, texture.mipLevels_ );
 
-			TransitionSubresource(
-				commandList,
-				texture.resource_.Get(),
-				destinationSubresource,
-				finalState,
-				D3D12_RESOURCE_STATE_UNORDERED_ACCESS );
+			TransitionSubresource( commandList, texture.resource_.Get(), destinationSubresource, finalState, D3D12_RESOURCE_STATE_UNORDERED_ACCESS );
 
 			PushConstants constants{};
 			constants.sourceTextureIndex = texture.srvIndex_;
@@ -96,15 +86,13 @@ namespace ldx12
 			constants.writeSrgb = IsSrgbFormat( texture.format_ ) ? 1u : 0u;
 
 			commandList->SetComputeRoot32BitConstants( 0, sizeof( PushConstants ) / sizeof( uint32_t ), &constants, 0 );
-			commandList->Dispatch(
-				( destinationWidth + ourThreadGroupSize - 1u ) / ourThreadGroupSize,
+			commandList->Dispatch( ( destinationWidth + ourThreadGroupSize - 1u ) / ourThreadGroupSize,
 				( destinationHeight + ourThreadGroupSize - 1u ) / ourThreadGroupSize,
 				1u );
 
 			if( mipLevel + 1u < texture.mipLevels_ )
 			{
-				TransitionSubresource(
-					commandList,
+				TransitionSubresource( commandList,
 					texture.resource_.Get(),
 					destinationSubresource,
 					D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
@@ -115,8 +103,7 @@ namespace ldx12
 			sourceHeight = destinationHeight;
 		}
 
-		TransitionSubresource(
-			commandList,
+		TransitionSubresource( commandList,
 			texture.resource_.Get(),
 			CalculateSubresourceIndex( 0u, texture.mipLevels_ ),
 			D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
@@ -124,8 +111,7 @@ namespace ldx12
 
 		for( uint16_t mipLevel = 1; mipLevel < texture.mipLevels_; ++mipLevel )
 		{
-			TransitionSubresource(
-				commandList,
+			TransitionSubresource( commandList,
 				texture.resource_.Get(),
 				CalculateSubresourceIndex( mipLevel, texture.mipLevels_ ),
 				mipLevel + 1u < texture.mipLevels_ ? D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE : D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
@@ -137,8 +123,7 @@ namespace ldx12
 		queue.immediateCommands_->Wait( handle );
 	}
 
-	void BaseMips::TransitionSubresource(
-		ID3D12GraphicsCommandList* commandList,
+	void BaseMips::TransitionSubresource( ID3D12GraphicsCommandList* commandList,
 		ID3D12Resource* resource,
 		uint32_t subresource,
 		D3D12_RESOURCE_STATES before,

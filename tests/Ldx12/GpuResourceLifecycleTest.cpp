@@ -27,8 +27,7 @@ namespace ldx12::tests
 		for( uint32_t index = 0; index < ourCustomSamplerCount; ++index )
 		{
 			samplers[ index ] = device.CreateSampler( samplerDesc );
-			Require( device.GetSamplerIndex( samplers[ index ] ) ==
-				LDX12_CUSTOM_SAMPLER_SLOT_FIRST + index,
+			Require( device.GetSamplerIndex( samplers[ index ] ) == LDX12_CUSTOM_SAMPLER_SLOT_FIRST + index,
 				"Custom sampler was not created in its reserved descriptor slot." );
 		}
 
@@ -47,8 +46,7 @@ namespace ldx12::tests
 		device.Destroy( samplers[ 1 ] );
 		Require( !device.IsAlive( samplers[ 1 ] ), "Destroyed sampler handle remained alive." );
 		samplers[ 1 ] = device.CreateSampler( samplerDesc );
-		Require( device.GetSamplerIndex( samplers[ 1 ] ) == recycledSamplerIndex,
-			"Destroyed custom sampler slot was not recycled." );
+		Require( device.GetSamplerIndex( samplers[ 1 ] ) == recycledSamplerIndex, "Destroyed custom sampler slot was not recycled." );
 
 		const std::array<uint32_t, 16> initialBufferData = {};
 		BufferDesc genericBufferDesc{};
@@ -59,12 +57,11 @@ namespace ldx12::tests
 		const BufferHandle genericBuffer = device.CreateBuffer( genericBufferDesc );
 		Require( genericBuffer.Valid(), "Generic buffer creation returned an invalid handle." );
 		ID3D12Resource* genericNativeResource = native.GetResource( genericBuffer );
-		Require( genericNativeResource != nullptr,
-			"Buffer does not expose a native D3D12 resource." );
+		Require( genericNativeResource != nullptr, "Buffer does not expose a native D3D12 resource." );
 		D3D12_HEAP_PROPERTIES genericHeapProperties{};
 		D3D12_HEAP_FLAGS genericHeapFlags = D3D12_HEAP_FLAG_NONE;
 		Require( SUCCEEDED( genericNativeResource->GetHeapProperties( &genericHeapProperties, &genericHeapFlags ) ) &&
-			genericHeapProperties.Type == D3D12_HEAP_TYPE_UPLOAD,
+					 genericHeapProperties.Type == D3D12_HEAP_TYPE_UPLOAD,
 			"CpuToGpu buffer was not created in an upload heap." );
 		Require( device.GetBindlessIndex( genericBuffer ) == LDX12_DESCRIPTOR_SLOT_INVALID,
 			"A buffer without an SRV unexpectedly owns a bindless descriptor." );
@@ -73,11 +70,8 @@ namespace ldx12::tests
 
 		const std::array<uint32_t, 4> updateData = { 11u, 22u, 33u, 44u };
 		device.WriteBuffer( genericBuffer, 16u, updateData.data(), sizeof( updateData ) );
-		RequireThrows<std::runtime_error>(
-			[&device, genericBuffer, &updateData]
-			{
-				device.WriteBuffer( genericBuffer, 60u, updateData.data(), sizeof( updateData ) );
-			},
+		RequireThrows<std::runtime_error>( [ &device, genericBuffer, &updateData ]
+			{ device.WriteBuffer( genericBuffer, 60u, updateData.data(), sizeof( updateData ) ); },
 			"WriteBuffer accepted a range outside the resource." );
 
 		BufferDesc structuredBufferDesc{};
@@ -91,10 +85,9 @@ namespace ldx12::tests
 		D3D12_HEAP_PROPERTIES structuredHeapProperties{};
 		D3D12_HEAP_FLAGS structuredHeapFlags = D3D12_HEAP_FLAG_NONE;
 		Require( SUCCEEDED( native.GetResource( structuredBuffer )->GetHeapProperties( &structuredHeapProperties, &structuredHeapFlags ) ) &&
-			structuredHeapProperties.Type == D3D12_HEAP_TYPE_DEFAULT,
+					 structuredHeapProperties.Type == D3D12_HEAP_TYPE_DEFAULT,
 			"GpuLocal buffer was not created in a default heap." );
-		Require( structuredSrv >= LDX12_BINDLESS_DYNAMIC_SLOT_FIRST &&
-			structuredSrv < context.bindlessCapacity,
+		Require( structuredSrv >= LDX12_BINDLESS_DYNAMIC_SLOT_FIRST && structuredSrv < context.bindlessCapacity,
 			"Structured buffer SRV index is outside the bindless heap." );
 
 		BufferDesc constantBufferDesc{};
@@ -102,21 +95,17 @@ namespace ldx12::tests
 		constantBufferDesc.size = 100;
 		constantBufferDesc.type = BufferType::Constant;
 		constantBufferDesc.memory = BufferMemory::CpuToGpu;
-		const BufferHandle constantBuffer =
-			device.CreateBuffer( constantBufferDesc, ConstantBufferSlot::FreeCB0 );
-		Require( device.GetConstantBufferIndex( constantBuffer ) ==
-			ToSlotIndex( ConstantBufferSlot::FreeCB0 ),
+		const BufferHandle constantBuffer = device.CreateBuffer( constantBufferDesc, ConstantBufferSlot::FreeCB0 );
+		Require( device.GetConstantBufferIndex( constantBuffer ) == ToSlotIndex( ConstantBufferSlot::FreeCB0 ),
 			"Constant buffer was not created in its requested fixed slot." );
-		Require( native.GetResource( constantBuffer )->GetDesc().Width == 256,
-			"Constant buffer allocation was not aligned to 256 bytes." );
+		Require( native.GetResource( constantBuffer )->GetDesc().Width == 256, "Constant buffer allocation was not aligned to 256 bytes." );
 
 		BufferDesc rawBufferDesc{};
 		rawBufferDesc.debugName = "Ldx12Tests raw buffer";
 		rawBufferDesc.size = 64;
 		rawBufferDesc.type = BufferType::Raw;
 		const BufferHandle rawBuffer = device.CreateBuffer( rawBufferDesc );
-		Require( device.GetBindlessIndex( rawBuffer ) != LDX12_DESCRIPTOR_SLOT_INVALID,
-			"Raw buffer did not receive a shader-resource descriptor." );
+		Require( device.GetBindlessIndex( rawBuffer ) != LDX12_DESCRIPTOR_SLOT_INVALID, "Raw buffer did not receive a shader-resource descriptor." );
 
 		TextureDesc textureDesc{};
 		textureDesc.debugName = "Ldx12Tests sampled UAV texture";
@@ -129,32 +118,21 @@ namespace ldx12::tests
 		Require( texture.Valid(), "Texture creation returned an invalid handle." );
 		const uint32_t textureSrv = device.GetBindlessIndex( texture );
 		const uint32_t textureUav = device.GetUnorderedAccessIndex( texture );
-		Require( textureSrv >= LDX12_BINDLESS_DYNAMIC_SLOT_FIRST &&
-			textureSrv < context.bindlessCapacity,
-			"Texture SRV index is outside the bindless heap." );
-		Require( textureUav >= LDX12_BINDLESS_DYNAMIC_SLOT_FIRST &&
-			textureUav < context.bindlessCapacity && textureUav != textureSrv,
+		Require( textureSrv >= LDX12_BINDLESS_DYNAMIC_SLOT_FIRST && textureSrv < context.bindlessCapacity, "Texture SRV index is outside the bindless heap." );
+		Require( textureUav >= LDX12_BINDLESS_DYNAMIC_SLOT_FIRST && textureUav < context.bindlessCapacity && textureUav != textureSrv,
 			"Texture UAV index is invalid or aliases its SRV." );
 
 		ID3D12Resource* nativeTexture = native.GetResource( texture );
 		Require( nativeTexture != nullptr, "Texture does not expose a native D3D12 resource." );
 		const D3D12_RESOURCE_DESC nativeTextureDesc = nativeTexture->GetDesc();
-		Require( nativeTextureDesc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE2D,
-			"Native texture dimension is incorrect." );
-		Require( nativeTextureDesc.Width == textureDesc.width &&
-			nativeTextureDesc.Height == textureDesc.height,
+		Require( nativeTextureDesc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE2D, "Native texture dimension is incorrect." );
+		Require( nativeTextureDesc.Width == textureDesc.width && nativeTextureDesc.Height == textureDesc.height,
 			"Native texture dimensions differ from TextureDesc." );
-		Require( nativeTextureDesc.MipLevels == textureDesc.countMipMap,
-			"Native texture mip count differs from TextureDesc." );
-		Require( nativeTextureDesc.Format == textureDesc.format,
-			"Native texture format differs from TextureDesc." );
-		Require( ( nativeTextureDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS ) != 0,
-			"Native UAV texture is missing its D3D12 resource flag." );
+		Require( nativeTextureDesc.MipLevels == textureDesc.countMipMap, "Native texture mip count differs from TextureDesc." );
+		Require( nativeTextureDesc.Format == textureDesc.format, "Native texture format differs from TextureDesc." );
+		Require( ( nativeTextureDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS ) != 0, "Native UAV texture is missing its D3D12 resource flag." );
 
-		const std::array<uint32_t, 8> arrayPixels = {
-			0xffff0000u, 0xffff0000u, 0xffff0000u, 0xffff0000u,
-			0xff00ff00u, 0xff00ff00u, 0xff00ff00u, 0xff00ff00u
-		};
+		const std::array<uint32_t, 8> arrayPixels = { 0xffff0000u, 0xffff0000u, 0xffff0000u, 0xffff0000u, 0xff00ff00u, 0xff00ff00u, 0xff00ff00u, 0xff00ff00u };
 		TextureDesc arrayTextureDesc{};
 		arrayTextureDesc.debugName = "Ldx12Tests Texture2DArray";
 		arrayTextureDesc.width = 2;
@@ -166,11 +144,9 @@ namespace ldx12::tests
 		arrayTextureDesc.slicePitch = arrayTextureDesc.rowPitch * 2;
 		const TextureHandle arrayTexture = device.CreateTexture( arrayTextureDesc );
 		const D3D12_RESOURCE_DESC nativeArrayDesc = native.GetResource( arrayTexture )->GetDesc();
-		Require( nativeArrayDesc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE2D &&
-			nativeArrayDesc.DepthOrArraySize == arrayTextureDesc.depthOrArraySize,
+		Require( nativeArrayDesc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE2D && nativeArrayDesc.DepthOrArraySize == arrayTextureDesc.depthOrArraySize,
 			"Texture2DArray did not create the requested native array slices." );
-		Require( device.GetBindlessIndex( arrayTexture ) != LDX12_DESCRIPTOR_SLOT_INVALID,
-			"Texture2DArray did not receive a bindless SRV." );
+		Require( device.GetBindlessIndex( arrayTexture ) != LDX12_DESCRIPTOR_SLOT_INVALID, "Texture2DArray did not receive a bindless SRV." );
 
 		std::array<uint32_t, ourCubeMapFaceCount * 4> cubePixels{};
 		for( uint32_t face = 0; face < ourCubeMapFaceCount; ++face )
@@ -191,16 +167,13 @@ namespace ldx12::tests
 		cubeTextureDesc.slicePitch = cubeTextureDesc.rowPitch * 2;
 		const TextureHandle cubeTexture = device.CreateTexture( cubeTextureDesc );
 		const D3D12_RESOURCE_DESC nativeCubeDesc = native.GetResource( cubeTexture )->GetDesc();
-		Require( nativeCubeDesc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE2D &&
-			nativeCubeDesc.DepthOrArraySize == ourCubeMapFaceCount,
+		Require( nativeCubeDesc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE2D && nativeCubeDesc.DepthOrArraySize == ourCubeMapFaceCount,
 			"TextureCube did not create its six native array slices." );
-		Require( device.GetBindlessIndex( cubeTexture ) != LDX12_DESCRIPTOR_SLOT_INVALID,
-			"TextureCube did not receive a bindless SRV." );
+		Require( device.GetBindlessIndex( cubeTexture ) != LDX12_DESCRIPTOR_SLOT_INVALID, "TextureCube did not receive a bindless SRV." );
 
 		TextureDesc invalidTextureDesc{};
 		invalidTextureDesc.usage = TextureUsage::RenderTarget | TextureUsage::DepthStencil;
-		RequireThrows<std::runtime_error>(
-			[&device, &invalidTextureDesc] { device.CreateTexture( invalidTextureDesc ); },
+		RequireThrows<std::runtime_error>( [ &device, &invalidTextureDesc ] { device.CreateTexture( invalidTextureDesc ); },
 			"Texture creation accepted incompatible render-target and depth usage." );
 
 		const uint32_t oldTextureIndex = texture.Index();
@@ -208,23 +181,17 @@ namespace ldx12::tests
 		device.WaitIdle();
 		device.Destroy( texture );
 		const TextureHandle replacementTexture = device.CreateTexture( textureDesc );
-		Require( replacementTexture.Index() == oldTextureIndex,
-			"Texture destruction did not release its SlotMap entry." );
-		Require( replacementTexture.Gen() != oldTextureGeneration,
-			"Recreated texture did not receive a new handle generation." );
-		Require( device.GetBindlessIndex( replacementTexture ) == textureSrv,
-			"Recreated texture did not recycle the released SRV descriptor." );
-		Require( device.GetUnorderedAccessIndex( replacementTexture ) == textureUav,
-			"Recreated texture did not recycle the released UAV descriptor." );
+		Require( replacementTexture.Index() == oldTextureIndex, "Texture destruction did not release its SlotMap entry." );
+		Require( replacementTexture.Gen() != oldTextureGeneration, "Recreated texture did not receive a new handle generation." );
+		Require( device.GetBindlessIndex( replacementTexture ) == textureSrv, "Recreated texture did not recycle the released SRV descriptor." );
+		Require( device.GetUnorderedAccessIndex( replacementTexture ) == textureUav, "Recreated texture did not recycle the released UAV descriptor." );
 
 		const uint32_t oldBufferIndex = structuredBuffer.Index();
 		const uint32_t oldBufferGeneration = structuredBuffer.Gen();
 		device.Destroy( structuredBuffer );
 		const BufferHandle replacementBuffer = device.CreateBuffer( structuredBufferDesc );
-		Require( replacementBuffer.Index() == oldBufferIndex,
-			"Buffer destruction did not release its SlotMap entry." );
-		Require( replacementBuffer.Gen() != oldBufferGeneration,
-			"Recreated buffer did not receive a new handle generation." );
+		Require( replacementBuffer.Index() == oldBufferIndex, "Buffer destruction did not release its SlotMap entry." );
+		Require( replacementBuffer.Gen() != oldBufferGeneration, "Recreated buffer did not receive a new handle generation." );
 
 		device.Destroy( replacementBuffer );
 		device.Destroy( replacementTexture );
@@ -232,10 +199,8 @@ namespace ldx12::tests
 		device.Destroy( arrayTexture );
 		device.Destroy( rawBuffer );
 		device.Destroy( constantBuffer );
-		const BufferHandle reusedConstantBuffer =
-			device.CreateBuffer( constantBufferDesc, ConstantBufferSlot::FreeCB0 );
-		Require( device.GetConstantBufferIndex( reusedConstantBuffer ) ==
-			ToSlotIndex( ConstantBufferSlot::FreeCB0 ),
+		const BufferHandle reusedConstantBuffer = device.CreateBuffer( constantBufferDesc, ConstantBufferSlot::FreeCB0 );
+		Require( device.GetConstantBufferIndex( reusedConstantBuffer ) == ToSlotIndex( ConstantBufferSlot::FreeCB0 ),
 			"Destroyed fixed descriptor slot could not be reused." );
 		device.Destroy( reusedConstantBuffer );
 		device.Destroy( genericBuffer );

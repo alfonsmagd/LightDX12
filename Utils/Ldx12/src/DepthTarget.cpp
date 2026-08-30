@@ -2,9 +2,7 @@
 
 namespace ldx12::utils
 {
-	DepthTarget::DepthTarget( RenderDevice& device, DXGI_FORMAT format ):
-		device_( &device ),
-		format_( format )
+	DepthTarget::DepthTarget( RenderDevice& device, DXGI_FORMAT format ) : device_( &device ), format_( format )
 	{
 	}
 

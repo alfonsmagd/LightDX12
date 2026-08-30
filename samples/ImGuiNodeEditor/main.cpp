@@ -69,9 +69,12 @@ namespace
 	{
 		switch( type )
 		{
-			case App::NodeValueType::Float: return IM_COL32( 77, 166, 255, 255 );
-			case App::NodeValueType::Vector3: return IM_COL32( 255, 166, 66, 255 );
-			case App::NodeValueType::Texture2D: return IM_COL32( 92, 214, 139, 255 );
+		case App::NodeValueType::Float:
+			return IM_COL32( 77, 166, 255, 255 );
+		case App::NodeValueType::Vector3:
+			return IM_COL32( 255, 166, 66, 255 );
+		case App::NodeValueType::Texture2D:
+			return IM_COL32( 92, 214, 139, 255 );
 		}
 		return IM_COL32_WHITE;
 	}
@@ -80,15 +83,24 @@ namespace
 	{
 		switch( kind )
 		{
-			case App::NodeKind::FloatConstant: return IM_COL32( 67, 91, 119, 255 );
-			case App::NodeKind::Add: return IM_COL32( 38, 125, 91, 255 );
-			case App::NodeKind::Subtract: return IM_COL32( 145, 83, 48, 255 );
-			case App::NodeKind::Multiply: return IM_COL32( 117, 69, 145, 255 );
-			case App::NodeKind::ComposeVector3: return IM_COL32( 166, 105, 35, 255 );
-			case App::NodeKind::VectorLength: return IM_COL32( 42, 113, 143, 255 );
-			case App::NodeKind::TextureSource: return IM_COL32( 58, 122, 79, 255 );
-			case App::NodeKind::TextureCpuModifier: return IM_COL32( 128, 82, 40, 255 );
-			case App::NodeKind::TexturePreview: return IM_COL32( 45, 137, 104, 255 );
+		case App::NodeKind::FloatConstant:
+			return IM_COL32( 67, 91, 119, 255 );
+		case App::NodeKind::Add:
+			return IM_COL32( 38, 125, 91, 255 );
+		case App::NodeKind::Subtract:
+			return IM_COL32( 145, 83, 48, 255 );
+		case App::NodeKind::Multiply:
+			return IM_COL32( 117, 69, 145, 255 );
+		case App::NodeKind::ComposeVector3:
+			return IM_COL32( 166, 105, 35, 255 );
+		case App::NodeKind::VectorLength:
+			return IM_COL32( 42, 113, 143, 255 );
+		case App::NodeKind::TextureSource:
+			return IM_COL32( 58, 122, 79, 255 );
+		case App::NodeKind::TextureCpuModifier:
+			return IM_COL32( 128, 82, 40, 255 );
+		case App::NodeKind::TexturePreview:
+			return IM_COL32( 45, 137, 104, 255 );
 		}
 		return IM_COL32( 80, 80, 80, 255 );
 	}
@@ -123,8 +135,9 @@ namespace
 	App::NodeId AddEditorNode( EditorState& editor, App::NodeKind kind, ImVec2 graphPosition, float value = 0.0f )
 	{
 		const App::NodeId id = editor.graph.AddNode( kind, value );
-		editor.positions[id] = graphPosition;
-		if( kind == App::NodeKind::TextureSource ) editor.graph.FindNode( id )->textureValue = editor.demoTexture;
+		editor.positions[ id ] = graphPosition;
+		if( kind == App::NodeKind::TextureSource )
+			editor.graph.FindNode( id )->textureValue = editor.demoTexture;
 		editor.selectedNode = id;
 		return id;
 	}
@@ -134,7 +147,7 @@ namespace
 		const App::GraphNode* source = editor.graph.FindNode( outputNode );
 		const App::GraphNode* destination = editor.graph.FindNode( inputNode );
 		if( source && destination && !source->outputs.empty() && inputIndex < destination->inputs.size() )
-			editor.graph.Connect( source->outputs[0].id, destination->inputs[inputIndex].id );
+			editor.graph.Connect( source->outputs[ 0 ].id, destination->inputs[ inputIndex ].id );
 	}
 
 	void BuildExampleGraph( EditorState& editor )
@@ -172,8 +185,17 @@ namespace
 		const bool selected = editor.selectedNode && *editor.selectedNode == node.id;
 		drawList->AddRectFilled( layout.minimum + ImVec2( 4, 5 ), layout.maximum + ImVec2( 4, 5 ), IM_COL32( 0, 0, 0, 75 ), 7.0f );
 		drawList->AddRectFilled( layout.minimum, layout.maximum, IM_COL32( 31, 35, 43, 248 ), 7.0f );
-		drawList->AddRectFilled( layout.minimum, ImVec2( layout.maximum.x, layout.minimum.y + kHeaderHeight ), NodeHeaderColor( node.kind ), 7.0f, ImDrawFlags_RoundCornersTop );
-		drawList->AddRect( layout.minimum, layout.maximum, selected ? IM_COL32( 255, 208, 92, 255 ) : IM_COL32( 83, 91, 107, 255 ), 7.0f, 0, selected ? 2.5f : 1.0f );
+		drawList->AddRectFilled( layout.minimum,
+			ImVec2( layout.maximum.x, layout.minimum.y + kHeaderHeight ),
+			NodeHeaderColor( node.kind ),
+			7.0f,
+			ImDrawFlags_RoundCornersTop );
+		drawList->AddRect( layout.minimum,
+			layout.maximum,
+			selected ? IM_COL32( 255, 208, 92, 255 ) : IM_COL32( 83, 91, 107, 255 ),
+			7.0f,
+			0,
+			selected ? 2.5f : 1.0f );
 		drawList->AddText( layout.minimum + ImVec2( 10, 7 ), IM_COL32_WHITE, node.title.c_str() );
 
 		if( node.kind == App::NodeKind::FloatConstant )
@@ -189,25 +211,26 @@ namespace
 		{
 			ImGui::SetCursorScreenPos( layout.minimum + ImVec2( 10, kHeaderHeight + 8 ) );
 			ImGui::PushID( static_cast<int>( node.id ) );
-			if( ImGui::Button( "Invertir RGB en CPU", ImVec2( kNodeWidth - 20.0f, 0.0f ) ) ) editor.cpuInvertRequested = true;
+			if( ImGui::Button( "Invertir RGB en CPU", ImVec2( kNodeWidth - 20.0f, 0.0f ) ) )
+				editor.cpuInvertRequested = true;
 			editor.valueEditorHovered = editor.valueEditorHovered || ImGui::IsItemHovered() || ImGui::IsItemActive();
 			ImGui::PopID();
 		}
 
 		for( size_t index = 0; index < node.inputs.size(); ++index )
 		{
-			const App::NodePin& pin = node.inputs[index];
+			const App::NodePin& pin = node.inputs[ index ];
 			const ImVec2 position( layout.minimum.x, layout.contentTop.y + static_cast<float>( index ) * kPinRowHeight + kPinRowHeight * 0.5f );
-			editor.pinPositions[pin.id] = position;
+			editor.pinPositions[ pin.id ] = position;
 			drawList->AddCircleFilled( position, 6.0f, PinColor( pin.type ) );
 			drawList->AddCircle( position, 8.0f, IM_COL32( 220, 225, 235, 180 ), 0, 1.0f );
 			drawList->AddText( position + ImVec2( 12, -8 ), IM_COL32( 220, 225, 235, 255 ), pin.name.c_str() );
 		}
 		for( size_t index = 0; index < node.outputs.size(); ++index )
 		{
-			const App::NodePin& pin = node.outputs[index];
+			const App::NodePin& pin = node.outputs[ index ];
 			const ImVec2 position( layout.maximum.x, layout.contentTop.y + static_cast<float>( index ) * kPinRowHeight + kPinRowHeight * 0.5f );
-			editor.pinPositions[pin.id] = position;
+			editor.pinPositions[ pin.id ] = position;
 			drawList->AddCircleFilled( position, 6.0f, PinColor( pin.type ) );
 			drawList->AddCircle( position, 8.0f, IM_COL32( 220, 225, 235, 180 ), 0, 1.0f );
 			const ImVec2 textSize = ImGui::CalcTextSize( pin.name.c_str() );
@@ -217,7 +240,8 @@ namespace
 		const App::EvaluationResult result = editor.graph.Evaluate( node.id );
 		if( node.kind == App::NodeKind::TexturePreview )
 		{
-			const float pinsBottom = layout.contentTop.y + static_cast<float>( std::max<size_t>( 1, std::max( node.inputs.size(), node.outputs.size() ) ) ) * kPinRowHeight;
+			const float pinsBottom =
+				layout.contentTop.y + static_cast<float>( std::max<size_t>( 1, std::max( node.inputs.size(), node.outputs.size() ) ) ) * kPinRowHeight;
 			const ImVec2 imageMinimum( layout.minimum.x + 10.0f, pinsBottom + 4.0f );
 			const ImVec2 imageMaximum( layout.maximum.x - 10.0f, pinsBottom + 118.0f );
 			const auto* texture = result.valid ? std::get_if<App::TextureReference>( &result.value ) : nullptr;
@@ -233,28 +257,35 @@ namespace
 			drawList->AddRect( imageMinimum, imageMaximum, IM_COL32( 100, 110, 125, 255 ), 4.0f );
 		}
 		const std::string resultText = result.valid ? "= " + App::NodeValueText( result.value ) : "Error: " + result.error;
-		drawList->AddLine( ImVec2( layout.minimum.x + 8, layout.resultY - 3 ), ImVec2( layout.maximum.x - 8, layout.resultY - 3 ), IM_COL32( 75, 82, 96, 255 ) );
-		drawList->AddText( ImVec2( layout.minimum.x + 10, layout.resultY + 4 ), result.valid ? IM_COL32( 155, 224, 175, 255 ) : IM_COL32( 255, 105, 105, 255 ), resultText.c_str() );
+		drawList->AddLine( ImVec2( layout.minimum.x + 8, layout.resultY - 3 ),
+			ImVec2( layout.maximum.x - 8, layout.resultY - 3 ),
+			IM_COL32( 75, 82, 96, 255 ) );
+		drawList->AddText( ImVec2( layout.minimum.x + 10, layout.resultY + 4 ),
+			result.valid ? IM_COL32( 155, 224, 175, 255 ) : IM_COL32( 255, 105, 105, 255 ),
+			resultText.c_str() );
 	}
 
 	std::optional<App::PinId> FindHoveredPin( const EditorState& editor, ImVec2 mouse )
 	{
-		for( const auto& [pinId, position] : editor.pinPositions )
+		for( const auto& [ pinId, position ] : editor.pinPositions )
 		{
 			const ImVec2 delta = mouse - position;
-			if( delta.x * delta.x + delta.y * delta.y <= 100.0f ) return pinId;
+			if( delta.x * delta.x + delta.y * delta.y <= 100.0f )
+				return pinId;
 		}
 		return std::nullopt;
 	}
 
 	void CreateNodeMenu( EditorState& editor )
 	{
-		if( !ImGui::BeginPopup( "CreateNode" ) ) return;
+		if( !ImGui::BeginPopup( "CreateNode" ) )
+			return;
 		ImGui::TextDisabled( "Crear nodo" );
 		ImGui::Separator();
-		const auto add = [&editor]( const char* label, App::NodeKind kind, float value = 0.0f )
+		const auto add = [ &editor ]( const char* label, App::NodeKind kind, float value = 0.0f )
 		{
-			if( ImGui::MenuItem( label ) ) AddEditorNode( editor, kind, editor.popupGraphPosition, value );
+			if( ImGui::MenuItem( label ) )
+				AddEditorNode( editor, kind, editor.popupGraphPosition, value );
 		};
 		add( "Constante float", App::NodeKind::FloatConstant, 1.0f );
 		add( "Suma", App::NodeKind::Add );
@@ -282,8 +313,8 @@ namespace
 		// InvisibleButton here would capture clicks before overlaid InputFloat
 		// controls can receive keyboard focus.
 		ImGui::Dummy( canvasSize );
-		const bool canvasHovered = ImGui::IsWindowHovered( ImGuiHoveredFlags_AllowWhenBlockedByActiveItem ) &&
-			ImGui::IsMouseHoveringRect( canvasOrigin, canvasMaximum );
+		const bool canvasHovered =
+			ImGui::IsWindowHovered( ImGuiHoveredFlags_AllowWhenBlockedByActiveItem ) && ImGui::IsMouseHoveringRect( canvasOrigin, canvasMaximum );
 		ImDrawList* drawList = ImGui::GetWindowDrawList();
 		drawList->PushClipRect( canvasOrigin, canvasMaximum, true );
 		drawList->AddRectFilled( canvasOrigin, canvasMaximum, IM_COL32( 19, 22, 28, 255 ) );
@@ -300,11 +331,13 @@ namespace
 		for( const App::GraphNode& node : editor.graph.Nodes() )
 		{
 			const NodeLayout layout = CalculateLayout( node, editor, canvasOrigin );
-			layouts[node.id] = layout;
+			layouts[ node.id ] = layout;
 			for( size_t index = 0; index < node.inputs.size(); ++index )
-				editor.pinPositions[node.inputs[index].id] = { layout.minimum.x, layout.contentTop.y + static_cast<float>( index ) * kPinRowHeight + kPinRowHeight * 0.5f };
+				editor.pinPositions[ node.inputs[ index ].id ] = { layout.minimum.x,
+					layout.contentTop.y + static_cast<float>( index ) * kPinRowHeight + kPinRowHeight * 0.5f };
 			for( size_t index = 0; index < node.outputs.size(); ++index )
-				editor.pinPositions[node.outputs[index].id] = { layout.maximum.x, layout.contentTop.y + static_cast<float>( index ) * kPinRowHeight + kPinRowHeight * 0.5f };
+				editor.pinPositions[ node.outputs[ index ].id ] = { layout.maximum.x,
+					layout.contentTop.y + static_cast<float>( index ) * kPinRowHeight + kPinRowHeight * 0.5f };
 		}
 
 		for( const App::GraphLink& link : editor.graph.Links() )
@@ -317,7 +350,7 @@ namespace
 		}
 
 		for( App::GraphNode& node : editor.graph.Nodes() )
-			DrawNode( editor, node, layouts[node.id], drawList );
+			DrawNode( editor, node, layouts[ node.id ], drawList );
 
 		const ImVec2 mouse = ImGui::GetIO().MousePos;
 		const std::optional<App::PinId> hoveredPin = FindHoveredPin( editor, mouse );
@@ -326,7 +359,7 @@ namespace
 			const App::NodePin* pin = editor.graph.FindPin( *hoveredPin );
 			if( pin )
 			{
-				drawList->AddCircle( editor.pinPositions[*hoveredPin], 10.0f, IM_COL32_WHITE, 0, 2.0f );
+				drawList->AddCircle( editor.pinPositions[ *hoveredPin ], 10.0f, IM_COL32_WHITE, 0, 2.0f );
 				ImGui::SetTooltip( "%s: %s", pin->name.c_str(), App::NodeValueTypeName( pin->type ) );
 			}
 		}
@@ -334,21 +367,25 @@ namespace
 		if( editor.draggedPin )
 		{
 			const App::NodePin* pin = editor.graph.FindPin( *editor.draggedPin );
-			const ImVec2 start = editor.pinPositions[*editor.draggedPin];
-			if( pin && pin->input ) DrawConnection( drawList, mouse, start, PinColor( pin->type ), 2.0f );
-			else if( pin ) DrawConnection( drawList, start, mouse, PinColor( pin->type ), 2.0f );
+			const ImVec2 start = editor.pinPositions[ *editor.draggedPin ];
+			if( pin && pin->input )
+				DrawConnection( drawList, mouse, start, PinColor( pin->type ), 2.0f );
+			else if( pin )
+				DrawConnection( drawList, start, mouse, PinColor( pin->type ), 2.0f );
 		}
 
-		if( canvasHovered && !editor.valueEditorHovered && ImGui::IsMouseDragging( ImGuiMouseButton_Middle, 0.0f ) ) editor.pan = editor.pan + ImGui::GetIO().MouseDelta;
+		if( canvasHovered && !editor.valueEditorHovered && ImGui::IsMouseDragging( ImGuiMouseButton_Middle, 0.0f ) )
+			editor.pan = editor.pan + ImGui::GetIO().MouseDelta;
 		if( !editor.valueEditorHovered && ImGui::IsMouseClicked( ImGuiMouseButton_Left ) )
 		{
-			if( hoveredPin ) editor.draggedPin = hoveredPin;
+			if( hoveredPin )
+				editor.draggedPin = hoveredPin;
 			else
 			{
 				editor.selectedNode.reset();
 				for( auto iterator = editor.graph.Nodes().rbegin(); iterator != editor.graph.Nodes().rend(); ++iterator )
 				{
-					const NodeLayout& layout = layouts[iterator->id];
+					const NodeLayout& layout = layouts[ iterator->id ];
 					if( ImGui::IsMouseHoveringRect( layout.minimum, ImVec2( layout.maximum.x, layout.minimum.y + kHeaderHeight ) ) )
 					{
 						editor.selectedNode = iterator->id;
@@ -360,7 +397,7 @@ namespace
 			}
 		}
 		if( editor.draggedNode && ImGui::IsMouseDown( ImGuiMouseButton_Left ) )
-			editor.positions[*editor.draggedNode] = mouse - canvasOrigin - editor.pan - editor.nodeDragOffset;
+			editor.positions[ *editor.draggedNode ] = mouse - canvasOrigin - editor.pan - editor.nodeDragOffset;
 		if( ImGui::IsMouseReleased( ImGuiMouseButton_Left ) )
 		{
 			if( editor.draggedPin )
@@ -368,8 +405,10 @@ namespace
 				if( hoveredPin && *hoveredPin != *editor.draggedPin )
 				{
 					std::string error;
-					if( editor.graph.Connect( *editor.draggedPin, *hoveredPin, &error ) ) editor.status = "Conexion creada.";
-					else editor.status = error;
+					if( editor.graph.Connect( *editor.draggedPin, *hoveredPin, &error ) )
+						editor.status = "Conexion creada.";
+					else
+						editor.status = error;
 				}
 				editor.draggedPin.reset();
 			}
@@ -392,7 +431,8 @@ namespace
 			ImGui::OpenPopup( "CreateNode" );
 		}
 
-		if( editor.selectedNode && ImGui::IsWindowFocused( ImGuiFocusedFlags_RootAndChildWindows ) && !ImGui::IsAnyItemActive() && ImGui::IsKeyPressed( ImGuiKey_Delete ) )
+		if( editor.selectedNode && ImGui::IsWindowFocused( ImGuiFocusedFlags_RootAndChildWindows ) && !ImGui::IsAnyItemActive() &&
+			ImGui::IsKeyPressed( ImGuiKey_Delete ) )
 		{
 			editor.graph.RemoveNode( *editor.selectedNode );
 			editor.positions.erase( *editor.selectedNode );
@@ -413,7 +453,7 @@ namespace
 		ImGui::Begin( "Nodos", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse );
 		ImGui::TextWrapped( "Ejemplo de grafo tipado sobre ImGui y App::NodeGraph." );
 		ImGui::SeparatorText( "Crear nodo" );
-		const auto addButton = [&editor]( const char* label, App::NodeKind kind, float value = 0.0f )
+		const auto addButton = [ &editor ]( const char* label, App::NodeKind kind, float value = 0.0f )
 		{
 			if( ImGui::Button( label, ImVec2( -1, 0 ) ) )
 			{
@@ -431,7 +471,8 @@ namespace
 		addButton( "Invertir textura CPU", App::NodeKind::TextureCpuModifier );
 		addButton( "Visualizar textura", App::NodeKind::TexturePreview );
 		ImGui::Spacing();
-		if( ImGui::Button( "Restaurar ejemplo", ImVec2( -1, 0 ) ) ) BuildExampleGraph( editor );
+		if( ImGui::Button( "Restaurar ejemplo", ImVec2( -1, 0 ) ) )
+			BuildExampleGraph( editor );
 		if( ImGui::Button( "Limpiar grafo", ImVec2( -1, 0 ) ) )
 		{
 			editor.graph.Clear();
@@ -451,8 +492,10 @@ namespace
 				const App::EvaluationResult result = editor.graph.Evaluate( node->id );
 				ImGui::SeparatorText( "Seleccion" );
 				ImGui::Text( "%s (#%llu)", node->title.c_str(), static_cast<unsigned long long>( node->id ) );
-				if( result.valid ) ImGui::TextWrapped( "Resultado: %s", App::NodeValueText( result.value ).c_str() );
-				else ImGui::TextColored( ImVec4( 1, 0.35f, 0.35f, 1 ), "%s", result.error.c_str() );
+				if( result.valid )
+					ImGui::TextWrapped( "Resultado: %s", App::NodeValueText( result.value ).c_str() );
+				else
+					ImGui::TextColored( ImVec4( 1, 0.35f, 0.35f, 1 ), "%s", result.error.c_str() );
 			}
 		}
 
@@ -488,7 +531,7 @@ namespace
 				const uint32_t red = checker ? 42u + x * 180u / width : 18u;
 				const uint32_t green = checker ? 95u + y * 140u / height : 42u;
 				const uint32_t blue = checker ? 210u : 92u + x * 100u / width;
-				pixels[static_cast<size_t>( y ) * width + x] = red | ( green << 8u ) | ( blue << 16u ) | 0xff000000u;
+				pixels[ static_cast<size_t>( y ) * width + x ] = red | ( green << 8u ) | ( blue << 16u ) | 0xff000000u;
 			}
 		}
 		return pixels;
@@ -574,8 +617,13 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 
 		while( app.PumpMessages() )
 		{
-			if( app.IsWindowMinimized() ) { WaitMessage(); continue; }
-			if( gfx.editor.cpuInvertRequested ) ApplyCpuInvert( gfx, device );
+			if( app.IsWindowMinimized() )
+			{
+				WaitMessage();
+				continue;
+			}
+			if( gfx.editor.cpuInvertRequested )
+				ApplyCpuInvert( gfx, device );
 
 			device.Wait( gfx.frameSubmissions[ gfx.frameIndex ] );
 			gfx.imgui->NewFrame();
@@ -585,10 +633,10 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 			ICommandBuffer& commands = device.AcquireCommandBuffer();
 			const TextureHandle backBuffer = device.GetCurrentSwapchainTexture();
 			RenderPass renderPass{};
-			renderPass.color[0].loadOp = LoadOp::Clear;
-			renderPass.color[0].clearColor = { 0.012f, 0.015f, 0.021f, 1.0f };
+			renderPass.color[ 0 ].loadOp = LoadOp::Clear;
+			renderPass.color[ 0 ].clearColor = { 0.012f, 0.015f, 0.021f, 1.0f };
 			Framebuffer framebuffer{};
-			framebuffer.color[0].texture = backBuffer;
+			framebuffer.color[ 0 ].texture = backBuffer;
 			commands.CmdBeginRendering( renderPass, framebuffer );
 			gfx.imgui->Render( commands );
 			commands.CmdEndRendering();

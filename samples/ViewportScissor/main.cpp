@@ -135,7 +135,10 @@ float4 main() : SV_Target0
 			for( uint32_t index = 0; index < ourRegionCount; ++index )
 			{
 				const int32_t top = margin + static_cast<int32_t>( index ) * ( leftViewportHeight + gap );
-				commands.CmdSetViewport( static_cast<float>( margin ), static_cast<float>( top ), static_cast<float>( leftViewportWidth ), static_cast<float>( leftViewportHeight ) );
+				commands.CmdSetViewport( static_cast<float>( margin ),
+					static_cast<float>( top ),
+					static_cast<float>( leftViewportWidth ),
+					static_cast<float>( leftViewportHeight ) );
 				DrawShape( commands, 0, Shape::FullscreenTriangle );
 				DrawShape( commands, index + 1u, Shape::Triangle );
 			}
@@ -146,7 +149,10 @@ float4 main() : SV_Target0
 			const int32_t rightBottom = windowHeight - margin;
 			const int32_t rightWidth = rightRight - rightLeft;
 			const int32_t rightHeight = rightBottom - rightTop;
-			commands.CmdSetViewport( static_cast<float>( rightLeft ), static_cast<float>( rightTop ), static_cast<float>( rightWidth ), static_cast<float>( rightHeight ) );
+			commands.CmdSetViewport( static_cast<float>( rightLeft ),
+				static_cast<float>( rightTop ),
+				static_cast<float>( rightWidth ),
+				static_cast<float>( rightHeight ) );
 			commands.CmdSetScissor( rightLeft, rightTop, rightRight, rightBottom );
 			DrawShape( commands, 4, Shape::FullscreenTriangle );
 			DrawShape( commands, 5, Shape::Triangle );

@@ -120,8 +120,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 				}
 
 				depthTarget.Resize( manager.GetWidth(), manager.GetHeight() );
-				camera.aspectRatio = static_cast<float>( manager.GetWidth() ) /
-					static_cast<float>( manager.GetHeight() );
+				camera.aspectRatio = static_cast<float>( manager.GetWidth() ) / static_cast<float>( manager.GetHeight() );
 
 				ICommandBuffer& commands = device.AcquireCommandBuffer();
 				const TextureHandle backbuffer = device.GetCurrentSwapchainTexture();

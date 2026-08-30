@@ -21,12 +21,8 @@ namespace ldx12::tests
 		RenderDevice& device = *manager.GetRenderDevice();
 		D3D12Native native = device.GetNative();
 
-		Require(
-			device.SupportsSampleCount( DXGI_FORMAT_R8G8B8A8_UNORM, sampleCount ),
-			"RGBA8 does not support the required MSAA x4 test configuration." );
-		Require(
-			device.SupportsSampleCount( DXGI_FORMAT_D32_FLOAT, sampleCount ),
-			"D32 does not support the required MSAA x4 test configuration." );
+		Require( device.SupportsSampleCount( DXGI_FORMAT_R8G8B8A8_UNORM, sampleCount ), "RGBA8 does not support the required MSAA x4 test configuration." );
+		Require( device.SupportsSampleCount( DXGI_FORMAT_D32_FLOAT, sampleCount ), "D32 does not support the required MSAA x4 test configuration." );
 
 		TextureDesc colorDesc{};
 		colorDesc.debugName = "Ldx12Tests MSAA color";
@@ -53,15 +49,9 @@ namespace ldx12::tests
 		resolveDesc.format = DXGI_FORMAT_R8G8B8A8_UNORM;
 		const TextureHandle resolvedColor = device.CreateTexture( resolveDesc );
 
-		Require(
-			native.GetResource( multisampleColor )->GetDesc().SampleDesc.Count == sampleCount,
-			"The color texture was not created with four samples." );
-		Require(
-			native.GetResource( multisampleDepth )->GetDesc().SampleDesc.Count == sampleCount,
-			"The depth texture was not created with four samples." );
-		Require(
-			native.GetResource( resolvedColor )->GetDesc().SampleDesc.Count == 1,
-			"The resolve texture must contain one sample per pixel." );
+		Require( native.GetResource( multisampleColor )->GetDesc().SampleDesc.Count == sampleCount, "The color texture was not created with four samples." );
+		Require( native.GetResource( multisampleDepth )->GetDesc().SampleDesc.Count == sampleCount, "The depth texture was not created with four samples." );
+		Require( native.GetResource( resolvedColor )->GetDesc().SampleDesc.Count == 1, "The resolve texture must contain one sample per pixel." );
 
 		static constexpr char vertexShader[] = R"(
 float4 VSMain(uint vertexId : SV_VertexID) : SV_Position
@@ -112,19 +102,11 @@ float4 PSMain() : SV_Target0
 
 		constexpr uint32_t rowPitch = width * 4u;
 		std::array<uint8_t, rowPitch * height> pixels{};
-		device.DownloadTexture2D(
-			resolvedColor,
-			pixels.data(),
-			rowPitch,
-			static_cast<uint32_t>( pixels.size() ) );
+		device.DownloadTexture2D( resolvedColor, pixels.data(), rowPitch, static_cast<uint32_t>( pixels.size() ) );
 
 		for( uint32_t offset = 0; offset < pixels.size(); offset += 4u )
 		{
-			Require(
-				pixels[ offset ] == 255u &&
-				pixels[ offset + 1u ] == 0u &&
-				pixels[ offset + 2u ] == 0u &&
-				pixels[ offset + 3u ] == 255u,
+			Require( pixels[ offset ] == 255u && pixels[ offset + 1u ] == 0u && pixels[ offset + 2u ] == 0u && pixels[ offset + 3u ] == 255u,
 				"Resolving the MSAA render target produced unexpected pixels." );
 		}
 

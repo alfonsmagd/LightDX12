@@ -64,16 +64,14 @@ namespace
 		BufferHandle cubeBuffer = {};
 	};
 
-	constexpr std::array<std::array<float, 4>, 8> kCubeColors = {
-		std::array<float, 4>{ 0.12f, 0.55f, 1.00f, 1.0f },
+	constexpr std::array<std::array<float, 4>, 8> kCubeColors = { std::array<float, 4>{ 0.12f, 0.55f, 1.00f, 1.0f },
 		std::array<float, 4>{ 0.10f, 0.95f, 0.55f, 1.0f },
 		std::array<float, 4>{ 0.85f, 0.20f, 1.00f, 1.0f },
 		std::array<float, 4>{ 1.00f, 0.35f, 0.18f, 1.0f },
 		std::array<float, 4>{ 1.00f, 0.80f, 0.15f, 1.0f },
 		std::array<float, 4>{ 0.15f, 0.90f, 1.00f, 1.0f },
 		std::array<float, 4>{ 0.45f, 0.30f, 1.00f, 1.0f },
-		std::array<float, 4>{ 1.00f, 0.25f, 0.65f, 1.0f }
-	};
+		std::array<float, 4>{ 1.00f, 0.25f, 0.65f, 1.0f } };
 
 	Vec3 RotateX( Vec3 value, float angle )
 	{
@@ -161,9 +159,7 @@ namespace
 		}
 
 		SceneConstants scene{};
-		scene.aspectRatio =
-			static_cast<float>( gfx.deviceManager->GetWidth() ) /
-			static_cast<float>( gfx.deviceManager->GetHeight() );
+		scene.aspectRatio = static_cast<float>( gfx.deviceManager->GetWidth() ) / static_cast<float>( gfx.deviceManager->GetHeight() );
 		device.WriteBuffer( gfx.sceneBuffer, 0, &scene, sizeof( scene ) );
 	}
 
@@ -237,8 +233,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 					continue;
 				}
 
-				const float animationTime =
-					std::chrono::duration<float>( std::chrono::steady_clock::now() - animationStart ).count();
+				const float animationTime = std::chrono::duration<float>( std::chrono::steady_clock::now() - animationStart ).count();
 				depthTarget.Resize( gfx.deviceManager->GetWidth(), gfx.deviceManager->GetHeight() );
 				UpdateSceneCbv( gfx );
 				UpdateCubeSrv( gfx, animationTime );

@@ -142,19 +142,15 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		RenderPipelineState opaquePipeline = CreateOpaquePipeline( device, context.swapchainFormat );
 		RenderPipelineState transparentPipeline = CreateTransparentPipeline( device, context.swapchainFormat );
 
-		const std::filesystem::path cubeMapDirectory =
-			std::filesystem::path( LDX12_MEDIA_DIRECTORY ) / "sky_129_cubemap_2k";
+		const std::filesystem::path cubeMapDirectory = std::filesystem::path( LDX12_MEDIA_DIRECTORY ) / "sky_129_cubemap_2k";
 
 		const TextureHandle cubeMap = utils::LoadCubeMap( device, cubeMapDirectory );
 		utils::GeometryBuffers cubeGeometry = utils::CreateCube( device );
 		utils::GeometryBuffers quadGeometry = utils::CreateQuad( device );
 
-		const std::array<TransparentQuad, 3> quads =
-		{
-			TransparentQuad{ { -2.2f, 0.0f,  1.0f }, { 1.0f, 0.0f, 0.0f, 0.25f } },
-			TransparentQuad{ {  0.0f, 0.0f,  0.0f }, { 0.0f, 1.0f, 0.0f, 0.50f } },
-			TransparentQuad{ {  2.2f, 0.0f, -1.0f }, { 0.0f, 0.3f, 1.0f, 0.95f } }
-		};
+		const std::array<TransparentQuad, 3> quads = { TransparentQuad{ { -2.2f, 0.0f, 1.0f }, { 1.0f, 0.0f, 0.0f, 0.25f } },
+			TransparentQuad{ { 0.0f, 0.0f, 0.0f }, { 0.0f, 1.0f, 0.0f, 0.50f } },
+			TransparentQuad{ { 2.2f, 0.0f, -1.0f }, { 0.0f, 0.3f, 1.0f, 0.95f } } };
 
 		{
 			utils::OrbitCamera camera;
@@ -173,30 +169,21 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 				const uint32_t height = manager.GetHeight();
 				depthTarget.Resize( width, height );
 				const float aspect = static_cast<float>( width ) / static_cast<float>( height );
-				const XMMATRIX projection = XMMatrixPerspectiveFovLH(
-					XMConvertToRadians( 60.0f ), aspect, 0.1f, 100.0f );
+				const XMMATRIX projection = XMMatrixPerspectiveFovLH( XMConvertToRadians( 60.0f ), aspect, 0.1f, 100.0f );
 
 				PushConstants constants{};
-		XMStoreFloat4x4(
-					&constants.viewProjection,
-					XMMatrixTranspose( camera.GetViewMatrix() * projection ) );
-				XMStoreFloat4x4(
-					&constants.skyViewProjection,
-					XMMatrixTranspose( camera.GetSkyViewMatrix() * projection ) );
+				XMStoreFloat4x4( &constants.viewProjection, XMMatrixTranspose( camera.GetViewMatrix() * projection ) );
+				XMStoreFloat4x4( &constants.skyViewProjection, XMMatrixTranspose( camera.GetSkyViewMatrix() * projection ) );
 				constants.cubeMapIndex = device.GetBindlessIndex( cubeMap );
 				constants.samplerIndex = ToSamplerIndex( SamplerSlot::LinearClamp );
 
 				std::array<TransparentQuad, 3> sortedQuads = quads;
 				XMFLOAT3 cameraPosition{};
 				XMStoreFloat3( &cameraPosition, camera.GetPosition() );
-				std::sort(
-					sortedQuads.begin(),
+				std::sort( sortedQuads.begin(),
 					sortedQuads.end(),
-					[&cameraPosition]( const TransparentQuad& left, const TransparentQuad& right )
-					{
-						return DistanceSquared( left.position, cameraPosition ) >
-							DistanceSquared( right.position, cameraPosition );
-					} );
+					[ &cameraPosition ]( const TransparentQuad& left, const TransparentQuad& right )
+					{ return DistanceSquared( left.position, cameraPosition ) > DistanceSquared( right.position, cameraPosition ); } );
 
 				const TextureHandle backbuffer = device.GetCurrentSwapchainTexture();
 				RenderPass renderPass{};
@@ -221,9 +208,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 				commands.CmdBindVertexBuffer( cubeGeometry.vertexBuffer );
 				commands.CmdBindIndexBuffer( cubeGeometry.indexBuffer );
 
-				const XMMATRIX cubeModel =
-					XMMatrixScaling( 0.85f, 0.85f, 0.85f ) *
-					XMMatrixTranslation( 0.0f, -2.0f, 0.8f );
+				const XMMATRIX cubeModel = XMMatrixScaling( 0.85f, 0.85f, 0.85f ) * XMMatrixTranslation( 0.0f, -2.0f, 0.8f );
 				XMStoreFloat4x4( &constants.model, XMMatrixTranspose( cubeModel ) );
 
 				constants.color = { 1.0f, 0.55f, 0.05f, 1.0f };
@@ -239,8 +224,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 
 				for( const TransparentQuad& quad : sortedQuads )
 				{
-					const XMMATRIX model = XMMatrixScaling( 1.15f, 1.15f, 1.0f ) *
-						XMMatrixTranslation( quad.position.x, quad.position.y, quad.position.z );
+					const XMMATRIX model = XMMatrixScaling( 1.15f, 1.15f, 1.0f ) * XMMatrixTranslation( quad.position.x, quad.position.y, quad.position.z );
 					XMStoreFloat4x4( &constants.model, XMMatrixTranspose( model ) );
 
 					constants.color = quad.color;

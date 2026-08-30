@@ -2,8 +2,7 @@
 
 namespace ldx12
 {
-	D3D12Native::D3D12Native( RenderDevice& device ) noexcept:
-		device_( &device )
+	D3D12Native::D3D12Native( RenderDevice& device ) noexcept : device_( &device )
 	{
 	}
 

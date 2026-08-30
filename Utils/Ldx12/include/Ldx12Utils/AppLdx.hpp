@@ -6,7 +6,7 @@
 
 namespace ldx12::utils
 {
-	using AppLdxMessageHandler = bool (*)( HWND window, UINT message, WPARAM wParam, LPARAM lParam, void* userData );
+	using AppLdxMessageHandler = bool ( * )( HWND window, UINT message, WPARAM wParam, LPARAM lParam, void* userData );
 
 	struct AppLdxDesc
 	{

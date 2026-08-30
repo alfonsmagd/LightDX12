@@ -47,8 +47,7 @@ namespace
 
 			for( HWND& window : windows_ )
 			{
-				window = CreateWindowExW(
-					0,
+				window = CreateWindowExW( 0,
 					className_,
 					L"Ldx12 Full Capacity Test",
 					WS_OVERLAPPEDWINDOW,
@@ -289,10 +288,8 @@ float4 PSMain() : SV_Target0
 
 	void TestPipelineAndRenderPassCapacities( RenderDevice& device )
 	{
-		Require( ourMaxColorAttachments == ourExpectedColorAttachments,
-			"The public color-attachment capacity is not eight." );
-		Require( ourMaxVertexInputElements == ourExpectedVertexInputElements,
-			"The public vertex-input capacity is not 16." );
+		Require( ourMaxColorAttachments == ourExpectedColorAttachments, "The public color-attachment capacity is not eight." );
+		Require( ourMaxVertexInputElements == ourExpectedVertexInputElements, "The public vertex-input capacity is not 16." );
 
 		RenderPipelineState inputPipeline = CreateSixteenInputPipeline( device );
 		Require( inputPipeline.Valid(), "A pipeline with 16 vertex input elements was not created." );
@@ -332,8 +329,7 @@ float4 PSMain() : SV_Target0
 
 	void TestTextureTrackingCapacity( RenderDevice& device )
 	{
-		Require( ourMaxTrackedTexturesPerCommandBuffer == ourExpectedTrackedTextures,
-			"The public tracked-texture capacity is not 256." );
+		Require( ourMaxTrackedTexturesPerCommandBuffer == ourExpectedTrackedTextures, "The public tracked-texture capacity is not 256." );
 
 		TextureDesc textureDesc{};
 		textureDesc.debugName = "Full-capacity tracked texture";
@@ -375,14 +371,11 @@ float4 PSMain() : SV_Target0
 
 	void TestPushConstantCapacity( RenderDevice& device )
 	{
-		Require( ourMaxPushConstant32BitValues == ourExpectedPushConstantValues,
-			"The public push-constant capacity is not 63 values." );
+		Require( ourMaxPushConstant32BitValues == ourExpectedPushConstantValues, "The public push-constant capacity is not 63 values." );
 
 		std::array<uint32_t, ourExpectedPushConstantValues + 1u> values{};
 		ICommandBuffer& commands = device.AcquireCommandBuffer();
-		commands.CmdPushConstants(
-			values.data(),
-			ourExpectedPushConstantValues * sizeof( uint32_t ) );
+		commands.CmdPushConstants( values.data(), ourExpectedPushConstantValues * sizeof( uint32_t ) );
 
 		bool pushConstantLimitReached = false;
 		try
@@ -401,10 +394,8 @@ float4 PSMain() : SV_Target0
 
 	void TestCommandBufferCapacities( RenderDevice& device )
 	{
-		Require( ourMaxActiveCommandBuffers == ourExpectedActiveCommandBuffers,
-			"The public active-command-buffer capacity is not 64." );
-		Require( ourMaxCommandBufferBatch == ourExpectedCommandBufferBatch,
-			"The public command-buffer batch capacity is not four." );
+		Require( ourMaxActiveCommandBuffers == ourExpectedActiveCommandBuffers, "The public active-command-buffer capacity is not 64." );
+		Require( ourMaxCommandBufferBatch == ourExpectedCommandBufferBatch, "The public command-buffer batch capacity is not four." );
 
 		std::array<ICommandBuffer*, ourExpectedActiveCommandBuffers> commands{};
 		for( ICommandBuffer*& command : commands )
@@ -437,9 +428,7 @@ float4 PSMain() : SV_Target0
 		SubmitHandle submission{};
 		for( uint32_t offset = 0; offset < commands.size(); offset += ourExpectedCommandBufferBatch )
 		{
-			submission = device.SubmitBatch(
-				commands.data() + offset,
-				ourExpectedCommandBufferBatch );
+			submission = device.SubmitBatch( commands.data() + offset, ourExpectedCommandBufferBatch );
 		}
 		device.Wait( submission );
 	}
@@ -556,8 +545,7 @@ int main()
 		TestLiveSwapchainCapacity( windows );
 		std::cout << "[PASS] 16 live swapchains\n";
 
-		const double elapsedSeconds = std::chrono::duration<double>(
-			std::chrono::steady_clock::now() - startTime ).count();
+		const double elapsedSeconds = std::chrono::duration<double>( std::chrono::steady_clock::now() - startTime ).count();
 		std::cout << "Ldx12 full-capacity tests passed in " << elapsedSeconds << " seconds.\n";
 		return 0;
 	}

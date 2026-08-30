@@ -10,8 +10,7 @@
 
 namespace ldx12
 {
-	template<typename ResourceType>
-	class Handle final
+	template <typename ResourceType> class Handle final
 	{
 	public:
 		Handle() = default;
@@ -45,7 +44,7 @@ namespace ldx12
 
 		bool operator!=( const Handle& other ) const noexcept
 		{
-			return !(*this == other);
+			return !( *this == other );
 		}
 
 		explicit operator bool() const noexcept
@@ -59,17 +58,17 @@ namespace ldx12
 		}
 
 	private:
-		Handle( uint32_t index, uint32_t gen ) noexcept: index_( index ), gen_( gen ) {}
+		Handle( uint32_t index, uint32_t gen ) noexcept : index_( index ), gen_( gen )
+		{
+		}
 
-		template<typename T, std::size_t Capacity>
-		friend class SlotMap;
+		template <typename T, std::size_t Capacity> friend class SlotMap;
 
 		uint32_t index_ = 0;
 		uint32_t gen_ = 0;
 	};
 
-	template<typename ObjectType, std::size_t Capacity>
-	class SlotMap final
+	template <typename ObjectType, std::size_t Capacity> class SlotMap final
 	{
 		static_assert( Capacity > 0 );
 		static_assert( Capacity <= std::numeric_limits<uint32_t>::max() );
@@ -226,8 +225,7 @@ namespace ldx12
 			objectCount_ = 0;
 		}
 
-		template<typename Function>
-		void ForEach( Function&& function )
+		template <typename Function> void ForEach( Function&& function )
 		{
 			for( uint32_t i = 0; i < slotCount_; ++i )
 			{
@@ -239,8 +237,7 @@ namespace ldx12
 			}
 		}
 
-		template<typename Function>
-		void ForEach( Function&& function ) const
+		template <typename Function> void ForEach( Function&& function ) const
 		{
 			for( uint32_t i = 0; i < slotCount_; ++i )
 			{
@@ -286,4 +283,3 @@ namespace ldx12
 
 	static_assert( sizeof( Handle<class SlotMapTestTag> ) == sizeof( uint64_t ) );
 }
-

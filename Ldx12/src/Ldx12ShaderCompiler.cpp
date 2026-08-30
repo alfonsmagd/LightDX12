@@ -55,21 +55,21 @@ namespace ldx12
 			{
 				switch( character )
 				{
-					case L'\\':
-					case L'/':
-					case L':':
-					case L'*':
-					case L'?':
-					case L'"':
-					case L'<':
-					case L'>':
-					case L'|':
-					case L' ':
-						character = L'_';
-						break;
+				case L'\\':
+				case L'/':
+				case L':':
+				case L'*':
+				case L'?':
+				case L'"':
+				case L'<':
+				case L'>':
+				case L'|':
+				case L' ':
+					character = L'_';
+					break;
 
-					default:
-						break;
+				default:
+					break;
 				}
 			}
 
@@ -123,10 +123,7 @@ namespace ldx12
 
 		std::wstring ToLowerAscii( std::wstring text )
 		{
-			std::transform( text.begin(), text.end(), text.begin(), []( wchar_t character )
-				{
-					return static_cast<wchar_t>( towlower( character ) );
-				} );
+			std::transform( text.begin(), text.end(), text.begin(), []( wchar_t character ) { return static_cast<wchar_t>( towlower( character ) ); } );
 			return text;
 		}
 
@@ -134,7 +131,7 @@ namespace ldx12
 		{
 			const std::wstring normalized = ToLowerAscii( path.wstring() );
 			return normalized.find( L"\\renderdoc\\plugins\\d3d12\\dxcompiler.dll" ) != std::wstring::npos ||
-				normalized.find( L"\\bravesoftware\\brave-browser\\" ) != std::wstring::npos;
+				   normalized.find( L"\\bravesoftware\\brave-browser\\" ) != std::wstring::npos;
 		}
 
 		bool HasSiblingDxil( const std::filesystem::path& compilerPath )
@@ -230,8 +227,7 @@ namespace ldx12
 					continue;
 				}
 
-				const std::optional<VersionParts> parsedVersion =
-					ParseDottedVersion( entry.path().filename().wstring() );
+				const std::optional<VersionParts> parsedVersion = ParseDottedVersion( entry.path().filename().wstring() );
 				if( !parsedVersion.has_value() )
 				{
 					continue;
@@ -267,8 +263,7 @@ namespace ldx12
 				return nullptr;
 			}
 
-			return LoadLibraryExW(
-				candidate.c_str(),
+			return LoadLibraryExW( candidate.c_str(),
 				nullptr,
 				LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_APPLICATION_DIR | LOAD_LIBRARY_SEARCH_SYSTEM32 );
 		}
@@ -300,8 +295,7 @@ namespace ldx12
 				}
 			}
 
-			HMODULE module = LoadLibraryExW(
-				L"dxcompiler.dll",
+			HMODULE module = LoadLibraryExW( L"dxcompiler.dll",
 				nullptr,
 				LOAD_LIBRARY_SEARCH_APPLICATION_DIR | LOAD_LIBRARY_SEARCH_SYSTEM32 | LOAD_LIBRARY_SEARCH_USER_DIRS );
 			if( module != nullptr )
@@ -328,15 +322,15 @@ namespace ldx12
 		DxcCreateInstanceProc LoadDxcCreateInstance()
 		{
 			static DxcCreateInstanceProc ourCreateInstance = []() -> DxcCreateInstanceProc
+			{
+				HMODULE module = LoadDxCompilerModule();
+				if( module == nullptr )
 				{
-					HMODULE module = LoadDxCompilerModule();
-					if( module == nullptr )
-					{
-						return nullptr;
-					}
+					return nullptr;
+				}
 
-					return reinterpret_cast<DxcCreateInstanceProc>( GetProcAddress( module, "DxcCreateInstance" ) );
-				}();
+				return reinterpret_cast<DxcCreateInstanceProc>( GetProcAddress( module, "DxcCreateInstance" ) );
+			}();
 
 			if( ourCreateInstance == nullptr )
 			{
@@ -360,7 +354,8 @@ namespace ldx12
 		ComPtr<IDxcUtils> utils;
 		ComPtr<IDxcCompiler3> compiler;
 		C_RESULT( createInstance( CLSID_DxcUtils, __uuidof( IDxcUtils ), reinterpret_cast<void**>( utils.GetAddressOf() ) ), "Failed to create IDxcUtils." );
-		C_RESULT( createInstance( CLSID_DxcCompiler, __uuidof( IDxcCompiler3 ), reinterpret_cast<void**>( compiler.GetAddressOf() ) ), "Failed to create IDxcCompiler3." );
+		C_RESULT( createInstance( CLSID_DxcCompiler, __uuidof( IDxcCompiler3 ), reinterpret_cast<void**>( compiler.GetAddressOf() ) ),
+			"Failed to create IDxcCompiler3." );
 
 		ComPtr<IDxcIncludeHandler> includeHandler;
 		C_RESULT( utils->CreateDefaultIncludeHandler( includeHandler.GetAddressOf() ), "Failed to create DXC include handler." );
@@ -370,24 +365,19 @@ namespace ldx12
 		const std::wstring sanitizedEntryPoint = SanitizeFileName( entryPoint );
 		const std::wstring sanitizedProfile = SanitizeFileName( targetProfile );
 		const uint64_t shaderHash = StableHashString( std::string_view( stage.source, std::strlen( stage.source ) ) ) ^
-			StableHashString( std::string_view( stage.entryPoint != nullptr ? stage.entryPoint : "main" ) ) ^
-			StableHashString( std::string_view( profile ) );
+									StableHashString( std::string_view( stage.entryPoint != nullptr ? stage.entryPoint : "main" ) ) ^
+									StableHashString( std::string_view( profile ) );
 		const std::filesystem::path shaderDebugDirectory = GetShaderDebugOutputDirectory();
 		const std::filesystem::path pdbPath =
-			shaderDebugDirectory /
-			( sanitizedEntryPoint + L"_" + sanitizedProfile + L"_" + std::to_wstring( shaderHash ) + L".pdb" );
+			shaderDebugDirectory / ( sanitizedEntryPoint + L"_" + sanitizedProfile + L"_" + std::to_wstring( shaderHash ) + L".pdb" );
 		const std::wstring pdbPathWide = pdbPath.wstring();
 
 		std::array<std::wstring, ourMaxShaderIncludeDirectories> ownedArguments = {};
 		uint32_t ownedArgumentCount = 0;
 		std::array<LPCWSTR, 12u + ourMaxShaderIncludeDirectories * 2u> arguments = {};
 		uint32_t argumentCount = 0;
-		const auto pushArgument = [ &arguments, &argumentCount ]( LPCWSTR argument )
-		{
-			arguments[ argumentCount++ ] = argument;
-		};
-		const auto pushOwnedArgument =
-			[ &ownedArguments, &ownedArgumentCount, &arguments, &argumentCount ]( std::wstring argument )
+		const auto pushArgument = [ &arguments, &argumentCount ]( LPCWSTR argument ) { arguments[ argumentCount++ ] = argument; };
+		const auto pushOwnedArgument = [ &ownedArguments, &ownedArgumentCount, &arguments, &argumentCount ]( std::wstring argument )
 		{
 			ownedArguments[ ownedArgumentCount ] = std::move( argument );
 			arguments[ argumentCount++ ] = ownedArguments[ ownedArgumentCount++ ].c_str();
@@ -422,14 +412,12 @@ namespace ldx12
 		sourceBuffer.Encoding = DXC_CP_UTF8;
 
 		ComPtr<IDxcResult> result;
-		C_RESULT(
-			compiler->Compile(
-				&sourceBuffer,
-				arguments.data(),
-				argumentCount,
-				includeHandler.Get(),
-				__uuidof( IDxcResult ),
-				reinterpret_cast<void**>( result.GetAddressOf() ) ),
+		C_RESULT( compiler->Compile( &sourceBuffer,
+					  arguments.data(),
+					  argumentCount,
+					  includeHandler.Get(),
+					  __uuidof( IDxcResult ),
+					  reinterpret_cast<void**>( result.GetAddressOf() ) ),
 			"Failed to invoke DXC shader compilation." );
 
 		HRESULT status = S_OK;
@@ -437,7 +425,8 @@ namespace ldx12
 		if( FAILED( status ) )
 		{
 			ComPtr<IDxcBlobUtf8> errors;
-			if( SUCCEEDED( result->GetOutput( DXC_OUT_ERRORS, __uuidof( IDxcBlobUtf8 ), reinterpret_cast<void**>( errors.GetAddressOf() ), nullptr ) ) && errors != nullptr && errors->GetStringLength() > 0 )
+			if( SUCCEEDED( result->GetOutput( DXC_OUT_ERRORS, __uuidof( IDxcBlobUtf8 ), reinterpret_cast<void**>( errors.GetAddressOf() ), nullptr ) ) &&
+				errors != nullptr && errors->GetStringLength() > 0 )
 			{
 				throw std::runtime_error( errors->GetStringPointer() );
 			}
@@ -446,12 +435,12 @@ namespace ldx12
 		}
 
 		CompiledShader compiledShader;
-		C_RESULT(
-			result->GetOutput( DXC_OUT_OBJECT, __uuidof( IDxcBlob ), reinterpret_cast<void**>( compiledShader.dxcBlob_.GetAddressOf() ), nullptr ),
+		C_RESULT( result->GetOutput( DXC_OUT_OBJECT, __uuidof( IDxcBlob ), reinterpret_cast<void**>( compiledShader.dxcBlob_.GetAddressOf() ), nullptr ),
 			"Failed to retrieve DXC shader bytecode." );
 
 		ComPtr<IDxcBlob> pdbBlob;
-		if( SUCCEEDED( result->GetOutput( DXC_OUT_PDB, __uuidof( IDxcBlob ), reinterpret_cast<void**>( pdbBlob.GetAddressOf() ), nullptr ) ) && pdbBlob != nullptr )
+		if( SUCCEEDED( result->GetOutput( DXC_OUT_PDB, __uuidof( IDxcBlob ), reinterpret_cast<void**>( pdbBlob.GetAddressOf() ), nullptr ) ) &&
+			pdbBlob != nullptr )
 		{
 			WriteBlobToFile( pdbPath, pdbBlob.Get() );
 		}

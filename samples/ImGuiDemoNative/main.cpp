@@ -58,10 +58,7 @@ namespace
 			}
 		}
 
-		void GetHandles(
-			uint32_t index,
-			D3D12_CPU_DESCRIPTOR_HANDLE& cpu,
-			D3D12_GPU_DESCRIPTOR_HANDLE& gpu ) const noexcept
+		void GetHandles( uint32_t index, D3D12_CPU_DESCRIPTOR_HANDLE& cpu, D3D12_GPU_DESCRIPTOR_HANDLE& gpu ) const noexcept
 		{
 			cpu = heap->GetCPUDescriptorHandleForHeapStart();
 			gpu = heap->GetGPUDescriptorHandleForHeapStart();
@@ -70,20 +67,14 @@ namespace
 		}
 	};
 
-	void AllocateImGuiDescriptor(
-		ImGui_ImplDX12_InitInfo* info,
-		D3D12_CPU_DESCRIPTOR_HANDLE* cpu,
-		D3D12_GPU_DESCRIPTOR_HANDLE* gpu )
+	void AllocateImGuiDescriptor( ImGui_ImplDX12_InitInfo* info, D3D12_CPU_DESCRIPTOR_HANDLE* cpu, D3D12_GPU_DESCRIPTOR_HANDLE* gpu )
 	{
 		NativeDescriptorHeap* descriptors = static_cast<NativeDescriptorHeap*>( info->UserData );
 		const uint32_t index = descriptors->Allocate();
 		descriptors->GetHandles( index, *cpu, *gpu );
 	}
 
-	void FreeImGuiDescriptor(
-		ImGui_ImplDX12_InitInfo* info,
-		D3D12_CPU_DESCRIPTOR_HANDLE cpu,
-		D3D12_GPU_DESCRIPTOR_HANDLE )
+	void FreeImGuiDescriptor( ImGui_ImplDX12_InitInfo* info, D3D12_CPU_DESCRIPTOR_HANDLE cpu, D3D12_GPU_DESCRIPTOR_HANDLE )
 	{
 		NativeDescriptorHeap* descriptors = static_cast<NativeDescriptorHeap*>( info->UserData );
 		const SIZE_T firstDescriptor = descriptors->heap->GetCPUDescriptorHandleForHeapStart().ptr;
@@ -135,7 +126,8 @@ namespace
 		void Initialize( HWND window, uint32_t width, uint32_t height )
 		{
 			CheckResult( CreateDXGIFactory2( 0, IID_PPV_ARGS( factory.GetAddressOf() ) ), "Failed to create the native DXGI factory." );
-			CheckResult( D3D12CreateDevice( nullptr, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS( device.GetAddressOf() ) ), "Failed to create the native D3D12 device." );
+			CheckResult( D3D12CreateDevice( nullptr, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS( device.GetAddressOf() ) ),
+				"Failed to create the native D3D12 device." );
 
 			D3D12_COMMAND_QUEUE_DESC queueDesc{};
 			queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
@@ -151,8 +143,7 @@ namespace
 			swapchainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
 
 			ComPtr<IDXGISwapChain1> initialSwapchain{};
-			CheckResult(
-				factory->CreateSwapChainForHwnd( queue.Get(), window, &swapchainDesc, nullptr, nullptr, initialSwapchain.GetAddressOf() ),
+			CheckResult( factory->CreateSwapChainForHwnd( queue.Get(), window, &swapchainDesc, nullptr, nullptr, initialSwapchain.GetAddressOf() ),
 				"Failed to create the native swapchain." );
 			CheckResult( initialSwapchain.As( &swapchain ), "Failed to query IDXGISwapChain3." );
 			factory->MakeWindowAssociation( window, DXGI_MWA_NO_ALT_ENTER );
@@ -167,24 +158,20 @@ namespace
 			imguiDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 			imguiDesc.NumDescriptors = ourImGuiDescriptorCapacity;
 			imguiDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-			CheckResult(
-				device->CreateDescriptorHeap( &imguiDesc, IID_PPV_ARGS( imguiDescriptors.heap.GetAddressOf() ) ),
+			CheckResult( device->CreateDescriptorHeap( &imguiDesc, IID_PPV_ARGS( imguiDescriptors.heap.GetAddressOf() ) ),
 				"Failed to create the native ImGui SRV heap." );
 			imguiDescriptors.descriptorSize = device->GetDescriptorHandleIncrementSize( D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV );
 
 			for( NativeFrame& frame : frames )
 			{
-				CheckResult(
-					device->CreateCommandAllocator( D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS( frame.allocator.GetAddressOf() ) ),
+				CheckResult( device->CreateCommandAllocator( D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS( frame.allocator.GetAddressOf() ) ),
 					"Failed to create a native command allocator." );
 			}
-			CheckResult(
-				device->CreateCommandList(
-					0,
-					D3D12_COMMAND_LIST_TYPE_DIRECT,
-					frames[ 0 ].allocator.Get(),
-					nullptr,
-					IID_PPV_ARGS( commandList.GetAddressOf() ) ),
+			CheckResult( device->CreateCommandList( 0,
+							 D3D12_COMMAND_LIST_TYPE_DIRECT,
+							 frames[ 0 ].allocator.Get(),
+							 nullptr,
+							 IID_PPV_ARGS( commandList.GetAddressOf() ) ),
 				"Failed to create the native command list." );
 			CheckResult( commandList->Close(), "Failed to close the native command list." );
 
@@ -250,9 +237,7 @@ namespace
 			{
 				backbuffer.Reset();
 			}
-			CheckResult(
-				swapchain->ResizeBuffers( ourFramesInFlight, width, height, ourRenderTargetFormat, 0 ),
-				"Failed to resize the native swapchain." );
+			CheckResult( swapchain->ResizeBuffers( ourFramesInFlight, width, height, ourRenderTargetFormat, 0 ), "Failed to resize the native swapchain." );
 			CreateBackbuffers();
 		}
 
@@ -308,14 +293,12 @@ namespace
 			D3D12_HEAP_PROPERTIES defaultHeap{};
 			defaultHeap.Type = D3D12_HEAP_TYPE_DEFAULT;
 			NativeTexture texture{};
-			CheckResult(
-				device->CreateCommittedResource(
-					&defaultHeap,
-					D3D12_HEAP_FLAG_NONE,
-					&textureDesc,
-					D3D12_RESOURCE_STATE_COPY_DEST,
-					nullptr,
-					IID_PPV_ARGS( texture.resource.GetAddressOf() ) ),
+			CheckResult( device->CreateCommittedResource( &defaultHeap,
+							 D3D12_HEAP_FLAG_NONE,
+							 &textureDesc,
+							 D3D12_RESOURCE_STATE_COPY_DEST,
+							 nullptr,
+							 IID_PPV_ARGS( texture.resource.GetAddressOf() ) ),
 				"Failed to create the native checker texture." );
 
 			D3D12_PLACED_SUBRESOURCE_FOOTPRINT footprint{};
@@ -336,14 +319,12 @@ namespace
 			D3D12_HEAP_PROPERTIES uploadHeap{};
 			uploadHeap.Type = D3D12_HEAP_TYPE_UPLOAD;
 			ComPtr<ID3D12Resource> upload{};
-			CheckResult(
-				device->CreateCommittedResource(
-					&uploadHeap,
-					D3D12_HEAP_FLAG_NONE,
-					&uploadDesc,
-					D3D12_RESOURCE_STATE_GENERIC_READ,
-					nullptr,
-					IID_PPV_ARGS( upload.GetAddressOf() ) ),
+			CheckResult( device->CreateCommittedResource( &uploadHeap,
+							 D3D12_HEAP_FLAG_NONE,
+							 &uploadDesc,
+							 D3D12_RESOURCE_STATE_GENERIC_READ,
+							 nullptr,
+							 IID_PPV_ARGS( upload.GetAddressOf() ) ),
 				"Failed to create the native texture upload buffer." );
 
 			uint8_t* mapped = nullptr;
@@ -351,8 +332,7 @@ namespace
 			const uint8_t* source = reinterpret_cast<const uint8_t*>( pixels.data() );
 			for( uint32_t row = 0; row < rowCount; ++row )
 			{
-				std::memcpy(
-					mapped + footprint.Offset + static_cast<size_t>( row ) * footprint.Footprint.RowPitch,
+				std::memcpy( mapped + footprint.Offset + static_cast<size_t>( row ) * footprint.Footprint.RowPitch,
 					source + static_cast<size_t>( row ) * 64u * sizeof( uint32_t ),
 					static_cast<size_t>( rowSize ) );
 			}
@@ -457,29 +437,29 @@ namespace
 		WindowState* state = reinterpret_cast<WindowState*>( GetWindowLongPtr( window, GWLP_USERDATA ) );
 		switch( message )
 		{
-			case WM_SIZE:
-				if( state != nullptr )
-				{
-					state->resizeWidth = LOWORD( lParam );
-					state->resizeHeight = HIWORD( lParam );
-					state->minimized = wParam == SIZE_MINIMIZED || state->resizeWidth == 0 || state->resizeHeight == 0;
-					state->resizePending = !state->minimized;
-				}
-				return 0;
+		case WM_SIZE:
+			if( state != nullptr )
+			{
+				state->resizeWidth = LOWORD( lParam );
+				state->resizeHeight = HIWORD( lParam );
+				state->minimized = wParam == SIZE_MINIMIZED || state->resizeWidth == 0 || state->resizeHeight == 0;
+				state->resizePending = !state->minimized;
+			}
+			return 0;
 
-			case WM_CLOSE:
-				if( state != nullptr )
-				{
-					state->running = false;
-				}
-				return 0;
+		case WM_CLOSE:
+			if( state != nullptr )
+			{
+				state->running = false;
+			}
+			return 0;
 
-			case WM_DESTROY:
-				PostQuitMessage( 0 );
-				return 0;
+		case WM_DESTROY:
+			PostQuitMessage( 0 );
+			return 0;
 
-			default:
-				return DefWindowProc( window, message, wParam, lParam );
+		default:
+			return DefWindowProc( window, message, wParam, lParam );
 		}
 	}
 }
@@ -508,8 +488,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 
 		constexpr uint32_t initialWidth = 1280;
 		constexpr uint32_t initialHeight = 720;
-		window = CreateWindowExW(
-			0,
+		window = CreateWindowExW( 0,
 			ourWindowClassName,
 			L"Dear ImGui - Native DirectX 12",
 			WS_OVERLAPPEDWINDOW,

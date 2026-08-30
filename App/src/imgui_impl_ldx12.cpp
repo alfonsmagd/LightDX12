@@ -47,10 +47,7 @@ namespace
 		return static_cast<ImGui_ImplLdx12_Data*>( ImGui::GetIO().BackendRendererUserData );
 	}
 
-	ldx12::RenderPipelineState ImGui_ImplLdx12_CreatePipeline(
-		ldx12::RenderDevice& device,
-		DXGI_FORMAT renderTargetFormat,
-		DXGI_FORMAT depthFormat )
+	ldx12::RenderPipelineState ImGui_ImplLdx12_CreatePipeline( ldx12::RenderDevice& device, DXGI_FORMAT renderTargetFormat, DXGI_FORMAT depthFormat )
 	{
 		static constexpr char ourVertexShader[] = R"(
 cbuffer PushConstants : register(b0)
@@ -178,9 +175,7 @@ float4 PSMain(PixelInput input) : SV_Target0
 		return device.CreateTexture( desc );
 	}
 
-	void ImGui_ImplLdx12_DestroyFrameResources(
-		ldx12::RenderDevice& device,
-		ImGui_ImplLdx12_FrameResources& frame )
+	void ImGui_ImplLdx12_DestroyFrameResources( ldx12::RenderDevice& device, ImGui_ImplLdx12_FrameResources& frame )
 	{
 		if( frame.vertexBuffer.Valid() )
 		{
@@ -196,11 +191,7 @@ float4 PSMain(PixelInput input) : SV_Target0
 		frame.indexCapacity = 0;
 	}
 
-	bool ImGui_ImplLdx12_EnsureFrameResources(
-		ImGui_ImplLdx12_Data& data,
-		ImGui_ImplLdx12_FrameResources& frame,
-		uint32_t vertexCount,
-		uint32_t indexCount )
+	bool ImGui_ImplLdx12_EnsureFrameResources( ImGui_ImplLdx12_Data& data, ImGui_ImplLdx12_FrameResources& frame, uint32_t vertexCount, uint32_t indexCount )
 	{
 		if( frame.vertexCapacity < vertexCount )
 		{
@@ -239,10 +230,7 @@ float4 PSMain(PixelInput input) : SV_Target0
 		return frame.vertexBuffer.Valid() && frame.indexBuffer.Valid();
 	}
 
-	void ImGui_ImplLdx12_UploadDrawData(
-		ldx12::RenderDevice& device,
-		const ImDrawData& drawData,
-		const ImGui_ImplLdx12_FrameResources& frame )
+	void ImGui_ImplLdx12_UploadDrawData( ldx12::RenderDevice& device, const ImDrawData& drawData, const ImGui_ImplLdx12_FrameResources& frame )
 	{
 		uint64_t vertexOffset = 0;
 		uint64_t indexOffset = 0;
@@ -258,22 +246,15 @@ float4 PSMain(PixelInput input) : SV_Target0
 		}
 	}
 
-	void ImGui_ImplLdx12_SetupRenderState(
-		const ImDrawData& drawData,
+	void ImGui_ImplLdx12_SetupRenderState( const ImDrawData& drawData,
 		const ImGui_ImplLdx12_Data& data,
 		const ImGui_ImplLdx12_FrameResources& frame,
 		ldx12::ICommandBuffer& commandBuffer )
 	{
-		commandBuffer.CmdSetViewport(
-			0.0f,
-			0.0f,
-			drawData.DisplaySize.x * drawData.FramebufferScale.x,
-			drawData.DisplaySize.y * drawData.FramebufferScale.y );
+		commandBuffer.CmdSetViewport( 0.0f, 0.0f, drawData.DisplaySize.x * drawData.FramebufferScale.x, drawData.DisplaySize.y * drawData.FramebufferScale.y );
 		commandBuffer.CmdBindRenderPipeline( data.pipeline );
 		commandBuffer.CmdBindVertexBuffer( frame.vertexBuffer, sizeof( ImDrawVert ) );
-		commandBuffer.CmdBindIndexBuffer(
-			frame.indexBuffer,
-			sizeof( ImDrawIdx ) == 2 ? DXGI_FORMAT_R16_UINT : DXGI_FORMAT_R32_UINT );
+		commandBuffer.CmdBindIndexBuffer( frame.indexBuffer, sizeof( ImDrawIdx ) == 2 ? DXGI_FORMAT_R16_UINT : DXGI_FORMAT_R32_UINT );
 	}
 }
 
@@ -281,10 +262,7 @@ bool ImGui_ImplLdx12_Init( const ImGui_ImplLdx12_InitInfo& info )
 {
 	ImGuiIO& io = ImGui::GetIO();
 	assert( io.BackendRendererUserData == nullptr );
-	if( info.device == nullptr ||
-		info.renderTargetFormat == DXGI_FORMAT_UNKNOWN ||
-		info.framesInFlight == 0 ||
-		info.framesInFlight > ourMaxFramesInFlight ||
+	if( info.device == nullptr || info.renderTargetFormat == DXGI_FORMAT_UNKNOWN || info.framesInFlight == 0 || info.framesInFlight > ourMaxFramesInFlight ||
 		io.BackendRendererUserData != nullptr )
 	{
 		return false;
@@ -300,10 +278,7 @@ bool ImGui_ImplLdx12_Init( const ImGui_ImplLdx12_InitInfo& info )
 	data->framesInFlight = info.framesInFlight;
 	try
 	{
-		data->pipeline = ImGui_ImplLdx12_CreatePipeline(
-			*data->device,
-			info.renderTargetFormat,
-			info.depthFormat );
+		data->pipeline = ImGui_ImplLdx12_CreatePipeline( *data->device, info.renderTargetFormat, info.depthFormat );
 		data->fontTexture = ImGui_ImplLdx12_CreateFontTexture( *data->device );
 		if( !data->pipeline.Valid() || !data->fontTexture.Valid() )
 		{
@@ -413,16 +388,16 @@ void ImGui_ImplLdx12_RenderDrawData( ImDrawData* drawData, ldx12::ICommandBuffer
 				continue;
 			}
 
-			ImVec2 clipMinimum(
-				( drawCommand.ClipRect.x - clipOffset.x ) * clipScale.x,
-				( drawCommand.ClipRect.y - clipOffset.y ) * clipScale.y );
-			ImVec2 clipMaximum(
-				( drawCommand.ClipRect.z - clipOffset.x ) * clipScale.x,
-				( drawCommand.ClipRect.w - clipOffset.y ) * clipScale.y );
-			if( clipMinimum.x < 0.0f ) clipMinimum.x = 0.0f;
-			if( clipMinimum.y < 0.0f ) clipMinimum.y = 0.0f;
-			if( clipMaximum.x > framebufferWidth ) clipMaximum.x = framebufferWidth;
-			if( clipMaximum.y > framebufferHeight ) clipMaximum.y = framebufferHeight;
+			ImVec2 clipMinimum( ( drawCommand.ClipRect.x - clipOffset.x ) * clipScale.x, ( drawCommand.ClipRect.y - clipOffset.y ) * clipScale.y );
+			ImVec2 clipMaximum( ( drawCommand.ClipRect.z - clipOffset.x ) * clipScale.x, ( drawCommand.ClipRect.w - clipOffset.y ) * clipScale.y );
+			if( clipMinimum.x < 0.0f )
+				clipMinimum.x = 0.0f;
+			if( clipMinimum.y < 0.0f )
+				clipMinimum.y = 0.0f;
+			if( clipMaximum.x > framebufferWidth )
+				clipMaximum.x = framebufferWidth;
+			if( clipMaximum.y > framebufferHeight )
+				clipMaximum.y = framebufferHeight;
 			if( clipMaximum.x <= clipMinimum.x || clipMaximum.y <= clipMinimum.y )
 			{
 				continue;
@@ -443,13 +418,11 @@ void ImGui_ImplLdx12_RenderDrawData( ImDrawData* drawData, ldx12::ICommandBuffer
 			constants.translate[ 1 ] = 1.0f - drawData->DisplayPos.y * positionScaleY;
 			constants.textureIndex = static_cast<uint32_t>( textureId );
 			commandBuffer.CmdPushConstants( &constants, sizeof( constants ) );
-			commandBuffer.CmdSetScissor(
-				static_cast<int32_t>( clipMinimum.x ),
+			commandBuffer.CmdSetScissor( static_cast<int32_t>( clipMinimum.x ),
 				static_cast<int32_t>( clipMinimum.y ),
 				static_cast<int32_t>( clipMaximum.x ),
 				static_cast<int32_t>( clipMaximum.y ) );
-			commandBuffer.CmdDrawIndexed(
-				drawCommand.ElemCount,
+			commandBuffer.CmdDrawIndexed( drawCommand.ElemCount,
 				1,
 				globalIndexOffset + drawCommand.IdxOffset,
 				static_cast<int32_t>( globalVertexOffset + drawCommand.VtxOffset ) );
@@ -471,11 +444,7 @@ ImTextureRef ImGui_ImplLdx12_Texture( ldx12::TextureHandle texture )
 	return ImTextureRef( static_cast<ImTextureID>( data->device->GetBindlessIndex( texture ) ) );
 }
 
-void ImGui::Image(
-	ldx12::TextureHandle texture,
-	const ImVec2& imageSize,
-	const ImVec2& uv0,
-	const ImVec2& uv1 )
+void ImGui::Image( ldx12::TextureHandle texture, const ImVec2& imageSize, const ImVec2& uv0, const ImVec2& uv1 )
 {
 	ImGui::Image( ImGui_ImplLdx12_Texture( texture ), imageSize, uv0, uv1 );
 }

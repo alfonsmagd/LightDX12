@@ -19,5 +19,3 @@ namespace ldx12
 		DeviceManager& manager_;
 	};
 }
-
-

@@ -57,16 +57,33 @@ namespace ldx12::utils
 	public:
 		ObjectHandle() = default;
 
-		[[nodiscard]] bool Valid() const noexcept { return generation_ != 0; }
-		[[nodiscard]] uint32_t Index() const noexcept { return index_; }
-		[[nodiscard]] uint32_t Generation() const noexcept { return generation_; }
-		[[nodiscard]] bool operator==( const ObjectHandle& other ) const noexcept { return index_ == other.index_ && generation_ == other.generation_; }
-		[[nodiscard]] bool operator!=( const ObjectHandle& other ) const noexcept { return !(*this == other); }
+		[[nodiscard]] bool Valid() const noexcept
+		{
+			return generation_ != 0;
+		}
+		[[nodiscard]] uint32_t Index() const noexcept
+		{
+			return index_;
+		}
+		[[nodiscard]] uint32_t Generation() const noexcept
+		{
+			return generation_;
+		}
+		[[nodiscard]] bool operator==( const ObjectHandle& other ) const noexcept
+		{
+			return index_ == other.index_ && generation_ == other.generation_;
+		}
+		[[nodiscard]] bool operator!=( const ObjectHandle& other ) const noexcept
+		{
+			return !( *this == other );
+		}
 
 	private:
 		friend class World;
 
-		ObjectHandle( uint32_t index, uint32_t generation ) noexcept: index_( index ), generation_( generation ) {}
+		ObjectHandle( uint32_t index, uint32_t generation ) noexcept : index_( index ), generation_( generation )
+		{
+		}
 
 		uint32_t index_ = 0;
 		uint32_t generation_ = 0;
@@ -83,7 +100,10 @@ namespace ldx12::utils
 		void Clear();
 
 		[[nodiscard]] bool Contains( ObjectHandle object ) const noexcept;
-		[[nodiscard]] uint32_t NumObjects() const noexcept { return objectCount_; }
+		[[nodiscard]] uint32_t NumObjects() const noexcept
+		{
+			return objectCount_;
+		}
 
 	private:
 		friend class DebugRenderer;
@@ -145,10 +165,22 @@ namespace ldx12::utils
 
 		void Render( ICommandBuffer& commands, const World& world, const Camera& camera );
 
-		[[nodiscard]] uint32_t GetVertexCount() const noexcept { return static_cast<uint32_t>( vertices_.size() ); }
-		[[nodiscard]] uint32_t GetIndexCount() const noexcept { return static_cast<uint32_t>( indices_.size() ); }
-		[[nodiscard]] uint32_t GetDrawCount() const noexcept { return static_cast<uint32_t>( indirectDraws_.size() ); }
-		[[nodiscard]] uint32_t GetInstanceCount() const noexcept { return static_cast<uint32_t>( instances_.size() ); }
+		[[nodiscard]] uint32_t GetVertexCount() const noexcept
+		{
+			return static_cast<uint32_t>( vertices_.size() );
+		}
+		[[nodiscard]] uint32_t GetIndexCount() const noexcept
+		{
+			return static_cast<uint32_t>( indices_.size() );
+		}
+		[[nodiscard]] uint32_t GetDrawCount() const noexcept
+		{
+			return static_cast<uint32_t>( indirectDraws_.size() );
+		}
+		[[nodiscard]] uint32_t GetInstanceCount() const noexcept
+		{
+			return static_cast<uint32_t>( instances_.size() );
+		}
 
 	private:
 		struct Vertex
@@ -198,7 +230,13 @@ namespace ldx12::utils
 		void UploadStaticGeometry();
 		void UploadInstanceBuffer();
 		void UploadIndirectBuffer();
-		void UploadDynamicBuffer( BufferHandle& buffer, uint64_t& capacity, const void* data, uint64_t elementCount, uint32_t stride, BufferType type, const char* debugName );
+		void UploadDynamicBuffer( BufferHandle& buffer,
+			uint64_t& capacity,
+			const void* data,
+			uint64_t elementCount,
+			uint32_t stride,
+			BufferType type,
+			const char* debugName );
 		void RetireBuffer( BufferHandle& buffer );
 		void ReleaseBuffers();
 		static uint64_t GrowCapacity( uint64_t requiredSize );

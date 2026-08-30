@@ -46,11 +46,7 @@ namespace
 	{
 		const XMVECTOR rotationAxis = XMVector3Normalize( XMVectorSet( 1.0f, 1.0f, 1.0f, 0.0f ) );
 		const XMMATRIX model = XMMatrixRotationAxis( rotationAxis, animationTime ) * XMMatrixTranslation( 0.0f, 0.0f, 3.5f );
-		const XMMATRIX projection = XMMatrixPerspectiveFovLH(
-			XMConvertToRadians( 45.0f ),
-			aspectRatio,
-			0.1f,
-			1000.0f );
+		const XMMATRIX projection = XMMatrixPerspectiveFovLH( XMConvertToRadians( 45.0f ), aspectRatio, 0.1f, 1000.0f );
 
 		PushConstants constants{};
 		XMStoreFloat4x4( &constants.mvp, XMMatrixTranspose( model * projection ) );
@@ -101,11 +97,8 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 				continue;
 			}
 
-			const float animationTime =
-				std::chrono::duration<float>( std::chrono::steady_clock::now() - animationStart ).count();
-			const float aspectRatio =
-				static_cast<float>( gfx.deviceManager->GetWidth() ) /
-				static_cast<float>( gfx.deviceManager->GetHeight() );
+			const float animationTime = std::chrono::duration<float>( std::chrono::steady_clock::now() - animationStart ).count();
+			const float aspectRatio = static_cast<float>( gfx.deviceManager->GetWidth() ) / static_cast<float>( gfx.deviceManager->GetHeight() );
 			const PushConstants constants = BuildPushConstants( animationTime, aspectRatio );
 
 			ICommandBuffer& commands = device.AcquireCommandBuffer();

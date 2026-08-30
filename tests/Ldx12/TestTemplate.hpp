@@ -17,8 +17,7 @@ namespace ldx12::tests
 		}
 	}
 
-	template<typename ExceptionType, typename Function>
-	void RequireThrows( Function&& function, const char* message )
+	template <typename ExceptionType, typename Function> void RequireThrows( Function&& function, const char* message )
 	{
 		try
 		{
@@ -46,26 +45,27 @@ namespace ldx12::tests
 		virtual float Property() const noexcept = 0;
 	};
 
-	class DerivedVirtualObject final: public VirtualObject
+	class DerivedVirtualObject final : public VirtualObject
 	{
 	public:
-		DerivedVirtualObject(
-			uint32_t id,
-			float property,
-			uint32_t& destructionCount ) noexcept:
-			id_( id ),
-			property_( property ),
-			destructionCount_( &destructionCount )
+		DerivedVirtualObject( uint32_t id, float property, uint32_t& destructionCount ) noexcept
+			: id_( id ), property_( property ), destructionCount_( &destructionCount )
 		{
 		}
 
 		~DerivedVirtualObject() override
 		{
-			++(*destructionCount_);
+			++( *destructionCount_ );
 		}
 
-		uint32_t Id() const noexcept override { return id_; }
-		float Property() const noexcept override { return property_; }
+		uint32_t Id() const noexcept override
+		{
+			return id_;
+		}
+		float Property() const noexcept override
+		{
+			return property_;
+		}
 
 	private:
 		uint32_t id_ = 0;
@@ -89,7 +89,7 @@ namespace ldx12::tests
 	struct TestCase final
 	{
 		const char* name = nullptr;
-		void (*function)() = nullptr;
+		void ( *function )() = nullptr;
 	};
 
 	void TestSlotMapCreationAndProperties();

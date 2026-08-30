@@ -95,14 +95,11 @@ namespace ldx12
 		ShadowComparison = LDX12_SAMPLER_SLOT_SHADOW_COMPARISON,
 	};
 
-	template<typename SlotType>
+	template <typename SlotType>
 	concept BindingSlot =
-		std::is_same_v<SlotType, ConstantBufferSlot> ||
-		std::is_same_v<SlotType, ShaderResourceSlot> ||
-		std::is_same_v<SlotType, ReadWriteResourceSlot>;
+		std::is_same_v<SlotType, ConstantBufferSlot> || std::is_same_v<SlotType, ShaderResourceSlot> || std::is_same_v<SlotType, ReadWriteResourceSlot>;
 
-	template<BindingSlot SlotType>
-	[[nodiscard]] constexpr uint32_t ToSlotIndex( SlotType slot ) noexcept
+	template <BindingSlot SlotType> [[nodiscard]] constexpr uint32_t ToSlotIndex( SlotType slot ) noexcept
 	{
 		return static_cast<uint32_t>( slot );
 	}
@@ -110,15 +107,13 @@ namespace ldx12
 	[[nodiscard]] constexpr bool IsFreeConstantBufferSlot( ConstantBufferSlot slot ) noexcept
 	{
 		const uint32_t index = ToSlotIndex( slot );
-		return index >= LDX12_FREE_CBV_SLOT_FIRST &&
-			index < LDX12_FREE_CBV_SLOT_FIRST + LDX12_FREE_CBV_SLOT_COUNT;
+		return index >= LDX12_FREE_CBV_SLOT_FIRST && index < LDX12_FREE_CBV_SLOT_FIRST + LDX12_FREE_CBV_SLOT_COUNT;
 	}
 
 	[[nodiscard]] constexpr bool IsEngineConstantBufferSlot( ConstantBufferSlot slot ) noexcept
 	{
 		const uint32_t index = ToSlotIndex( slot );
-		return index >= LDX12_ENGINE_CBV_SLOT_FIRST &&
-			index < LDX12_ENGINE_CBV_SLOT_FIRST + LDX12_ENGINE_CBV_SLOT_COUNT;
+		return index >= LDX12_ENGINE_CBV_SLOT_FIRST && index < LDX12_ENGINE_CBV_SLOT_FIRST + LDX12_ENGINE_CBV_SLOT_COUNT;
 	}
 
 	[[nodiscard]] constexpr bool IsValidConstantBufferSlot( ConstantBufferSlot slot ) noexcept
@@ -129,15 +124,13 @@ namespace ldx12
 	[[nodiscard]] constexpr bool IsFreeShaderResourceSlot( ShaderResourceSlot slot ) noexcept
 	{
 		const uint32_t index = ToSlotIndex( slot );
-		return index >= LDX12_FREE_SRV_SLOT_FIRST &&
-			index < LDX12_FREE_SRV_SLOT_FIRST + LDX12_FREE_SRV_SLOT_COUNT;
+		return index >= LDX12_FREE_SRV_SLOT_FIRST && index < LDX12_FREE_SRV_SLOT_FIRST + LDX12_FREE_SRV_SLOT_COUNT;
 	}
 
 	[[nodiscard]] constexpr bool IsEngineShaderResourceSlot( ShaderResourceSlot slot ) noexcept
 	{
 		const uint32_t index = ToSlotIndex( slot );
-		return index >= LDX12_ENGINE_SRV_SLOT_FIRST &&
-			index < LDX12_ENGINE_SRV_SLOT_FIRST + LDX12_ENGINE_SRV_SLOT_COUNT;
+		return index >= LDX12_ENGINE_SRV_SLOT_FIRST && index < LDX12_ENGINE_SRV_SLOT_FIRST + LDX12_ENGINE_SRV_SLOT_COUNT;
 	}
 
 	[[nodiscard]] constexpr bool IsValidShaderResourceSlot( ShaderResourceSlot slot ) noexcept
@@ -148,15 +141,13 @@ namespace ldx12
 	[[nodiscard]] constexpr bool IsFreeReadWriteResourceSlot( ReadWriteResourceSlot slot ) noexcept
 	{
 		const uint32_t index = ToSlotIndex( slot );
-		return index >= LDX12_FREE_RW_SLOT_FIRST &&
-			index < LDX12_FREE_RW_SLOT_FIRST + LDX12_FREE_RW_SLOT_COUNT;
+		return index >= LDX12_FREE_RW_SLOT_FIRST && index < LDX12_FREE_RW_SLOT_FIRST + LDX12_FREE_RW_SLOT_COUNT;
 	}
 
 	[[nodiscard]] constexpr bool IsEngineReadWriteResourceSlot( ReadWriteResourceSlot slot ) noexcept
 	{
 		const uint32_t index = ToSlotIndex( slot );
-		return index >= LDX12_ENGINE_RW_SLOT_FIRST &&
-			index < LDX12_ENGINE_RW_SLOT_FIRST + LDX12_ENGINE_RW_SLOT_COUNT;
+		return index >= LDX12_ENGINE_RW_SLOT_FIRST && index < LDX12_ENGINE_RW_SLOT_FIRST + LDX12_ENGINE_RW_SLOT_COUNT;
 	}
 
 	[[nodiscard]] constexpr bool IsValidReadWriteResourceSlot( ReadWriteResourceSlot slot ) noexcept

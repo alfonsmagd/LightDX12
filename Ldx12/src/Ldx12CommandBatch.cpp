@@ -8,7 +8,10 @@
 
 namespace ldx12
 {
-	SubmitHandle SubmitCommandBufferBatch( DeviceManager& manager, ICommandBuffer* const* commandBuffers, uint32_t commandBufferCount, TextureHandle presentTexture )
+	SubmitHandle SubmitCommandBufferBatch( DeviceManager& manager,
+		ICommandBuffer* const* commandBuffers,
+		uint32_t commandBufferCount,
+		TextureHandle presentTexture )
 	{
 		DeviceManager::QueueContext& graphicsQueue = manager.GetGraphicsQueueContext();
 		std::array<CommandBufferImpl*, ourMaxCommandBufferBatch> validatedCommandBuffers = {};

@@ -101,15 +101,8 @@ float4 PSMain(float4 position : SV_Position, float2 uv : TEXCOORD0) : SV_Target0
 
 	PushConstants BuildPushConstants( RenderDevice& device, TextureHandle texture, float time, float aspectRatio )
 	{
-		const XMMATRIX model =
-			XMMatrixRotationX( time * 0.55f ) *
-			XMMatrixRotationY( time ) *
-			XMMatrixTranslation( 0.0f, 0.0f, 4.0f );
-		const XMMATRIX projection = XMMatrixPerspectiveFovLH(
-			XMConvertToRadians( 45.0f ),
-			aspectRatio,
-			0.1f,
-			100.0f );
+		const XMMATRIX model = XMMatrixRotationX( time * 0.55f ) * XMMatrixRotationY( time ) * XMMatrixTranslation( 0.0f, 0.0f, 4.0f );
+		const XMMATRIX projection = XMMatrixPerspectiveFovLH( XMConvertToRadians( 45.0f ), aspectRatio, 0.1f, 100.0f );
 
 		PushConstants constants{};
 		XMStoreFloat4x4( &constants.mvp, XMMatrixTranspose( model * projection ) );
@@ -160,11 +153,8 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 				continue;
 			}
 
-			const float time = std::chrono::duration<float>(
-				std::chrono::steady_clock::now() - animationStart ).count();
-			const float aspectRatio =
-				static_cast<float>( gfx.deviceManager->GetWidth() ) /
-				static_cast<float>( gfx.deviceManager->GetHeight() );
+			const float time = std::chrono::duration<float>( std::chrono::steady_clock::now() - animationStart ).count();
+			const float aspectRatio = static_cast<float>( gfx.deviceManager->GetWidth() ) / static_cast<float>( gfx.deviceManager->GetHeight() );
 			const PushConstants constants = BuildPushConstants( device, gfx.texture, time, aspectRatio );
 			const TextureHandle backbuffer = device.GetCurrentSwapchainTexture();
 

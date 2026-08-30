@@ -39,7 +39,8 @@ namespace
 		Require( nativeDevice != nullptr && nativeQueue != nullptr, "Command-stream stress requires a native device and queue." );
 
 		ComPtr<ID3D12Fence> gateFence;
-		Require( SUCCEEDED( nativeDevice->CreateFence( 0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS( gateFence.GetAddressOf() ) ) ), "Failed to create the command-stream gate fence." );
+		Require( SUCCEEDED( nativeDevice->CreateFence( 0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS( gateFence.GetAddressOf() ) ) ),
+			"Failed to create the command-stream gate fence." );
 		Require( SUCCEEDED( nativeQueue->Wait( gateFence.Get(), 1 ) ), "Failed to block the command queue for command-stream saturation." );
 
 		TextureDesc textureDesc{};
@@ -62,7 +63,8 @@ namespace
 		{
 			if( submissionIndex == ourImmediatePoolSize )
 			{
-				Require( !device.IsReady( firstSubmission ) && !device.IsReady( saturatedSubmission ), "The gated GPU unexpectedly completed a command buffer." );
+				Require( !device.IsReady( firstSubmission ) && !device.IsReady( saturatedSubmission ),
+					"The gated GPU unexpectedly completed a command buffer." );
 				for( bool occupied : occupiedPoolSlots )
 				{
 					Require( occupied, "The command stream did not occupy every immediate pool slot." );
@@ -114,12 +116,16 @@ namespace
 		const auto slowestTime = std::chrono::duration_cast<std::chrono::microseconds>( slowestAcquireTime );
 		const auto drainedTime = std::chrono::duration_cast<std::chrono::microseconds>( drainTime );
 		const double averageSubmissionMicroseconds = static_cast<double>( loopTime.count() ) / ourSubmissionCount;
-		const double submissionsPerSecond = loopTime.count() > 0 ? static_cast<double>( ourSubmissionCount ) * 1'000'000.0 / static_cast<double>( loopTime.count() ) : 0.0;
+		const double submissionsPerSecond =
+			loopTime.count() > 0 ? static_cast<double>( ourSubmissionCount ) * 1'000'000.0 / static_cast<double>( loopTime.count() ) : 0.0;
 
 		std::cout << "[COMMAND STREAM] " << ourSubmissionCount << " acquire/record/submit operations completed with no explicit wait inside the loop.\n";
-		std::cout << "[COMMAND STREAM] Saturated " << ourImmediatePoolSize << " immediate slots (" << ourActiveCommandBufferCount << " public + " << ourBatchFixupReserve << " batch-fixup reserve) before releasing the GPU queue.\n";
-		std::cout << "[COMMAND STREAM] Loop " << loopTime.count() / 1000.0 << " ms, average " << averageSubmissionMicroseconds << " us/submission, throughput " << submissionsPerSecond << " submissions/s.\n";
-		std::cout << "[COMMAND STREAM] Total acquire " << acquireTime.count() / 1000.0 << " ms; first recycled acquire " << firstRecycleTime.count() << " us; slowest acquire " << slowestTime.count() << " us; final drain " << drainedTime.count() / 1000.0 << " ms.\n";
+		std::cout << "[COMMAND STREAM] Saturated " << ourImmediatePoolSize << " immediate slots (" << ourActiveCommandBufferCount << " public + "
+				  << ourBatchFixupReserve << " batch-fixup reserve) before releasing the GPU queue.\n";
+		std::cout << "[COMMAND STREAM] Loop " << loopTime.count() / 1000.0 << " ms, average " << averageSubmissionMicroseconds << " us/submission, throughput "
+				  << submissionsPerSecond << " submissions/s.\n";
+		std::cout << "[COMMAND STREAM] Total acquire " << acquireTime.count() / 1000.0 << " ms; first recycled acquire " << firstRecycleTime.count()
+				  << " us; slowest acquire " << slowestTime.count() << " us; final drain " << drainedTime.count() / 1000.0 << " ms.\n";
 	}
 }
 

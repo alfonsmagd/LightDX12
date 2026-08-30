@@ -20,13 +20,7 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler( HWND window, UINT 
 
 namespace
 {
-	constexpr std::array<float, 5> ourDepthOffsets = {
-		0.0f,
-		1e-6f,
-		1e-5f,
-		1e-4f,
-		1e-3f
-	};
+	constexpr std::array<float, 5> ourDepthOffsets = { 0.0f, 1e-6f, 1e-5f, 1e-4f, 1e-3f };
 	constexpr uint32_t ourFramesInFlight = 3;
 	constexpr uint32_t ourSampleCount = 4;
 
@@ -56,8 +50,7 @@ namespace
 
 	bool HandleImGuiMessage( HWND window, UINT message, WPARAM wParam, LPARAM lParam, void* )
 	{
-		return ImGui::GetCurrentContext() != nullptr &&
-			ImGui_ImplWin32_WndProcHandler( window, message, wParam, lParam ) != 0;
+		return ImGui::GetCurrentContext() != nullptr && ImGui_ImplWin32_WndProcHandler( window, message, wParam, lParam ) != 0;
 	}
 
 	RenderPipelineState CreatePipeline( RenderDevice& device, uint32_t sampleCount )
@@ -146,11 +139,8 @@ float4 PSMain(float4 position : SV_Position, float4 color : COLOR0) : SV_Target0
 		RenderDevice& device = *gfx.deviceManager->GetRenderDevice();
 		const uint32_t width = gfx.deviceManager->GetWidth();
 		const uint32_t height = gfx.deviceManager->GetHeight();
-		if( gfx.sceneTargets.multisampleColor.Valid() &&
-			gfx.sceneTargets.multisampleDepth.Valid() &&
-			gfx.sceneTargets.singleSampleDepth.Valid() &&
-			gfx.sceneTargets.width == width &&
-			gfx.sceneTargets.height == height )
+		if( gfx.sceneTargets.multisampleColor.Valid() && gfx.sceneTargets.multisampleDepth.Valid() && gfx.sceneTargets.singleSampleDepth.Valid() &&
+			gfx.sceneTargets.width == width && gfx.sceneTargets.height == height )
 		{
 			return;
 		}
@@ -193,19 +183,11 @@ float4 PSMain(float4 position : SV_Position, float4 color : COLOR0) : SV_Target0
 
 	PushConstants BuildConstants( float cameraTime, float aspectRatio, float nearPlane, float farPlane )
 	{
-		const XMVECTOR eye = XMVectorSet(
-			std::sin( cameraTime ) * 0.8f,
-			0.25f,
-			-6.5f + std::cos( cameraTime ) * 0.35f,
-			1.0f );
+		const XMVECTOR eye = XMVectorSet( std::sin( cameraTime ) * 0.8f, 0.25f, -6.5f + std::cos( cameraTime ) * 0.35f, 1.0f );
 		const XMVECTOR target = XMVectorSet( 0.0f, 0.0f, 0.0f, 1.0f );
 		const XMVECTOR up = XMVectorSet( 0.0f, 1.0f, 0.0f, 0.0f );
 		const XMMATRIX view = XMMatrixLookAtLH( eye, target, up );
-		const XMMATRIX projection = XMMatrixPerspectiveFovLH(
-			XMConvertToRadians( 48.0f ),
-			aspectRatio,
-			nearPlane,
-			farPlane );
+		const XMMATRIX projection = XMMatrixPerspectiveFovLH( XMConvertToRadians( 48.0f ), aspectRatio, nearPlane, farPlane );
 
 		PushConstants constants{};
 		XMStoreFloat4x4( &constants.viewProjection, view * projection );
@@ -245,8 +227,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		app.SetDeviceManager( *gfx.deviceManager );
 
 		RenderDevice& device = *gfx.deviceManager->GetRenderDevice();
-		if( !device.SupportsSampleCount( context.swapchainFormat, ourSampleCount ) ||
-			!device.SupportsSampleCount( DXGI_FORMAT_D32_FLOAT, ourSampleCount ) )
+		if( !device.SupportsSampleCount( context.swapchainFormat, ourSampleCount ) || !device.SupportsSampleCount( DXGI_FORMAT_D32_FLOAT, ourSampleCount ) )
 		{
 			throw std::runtime_error( "This GPU does not support the formats required for MSAA x4." );
 		}
@@ -297,10 +278,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 			const ImVec2 controlPosition( viewport->WorkPos.x + 12.0f, viewport->WorkPos.y + 12.0f );
 			const ImVec2 controlSize( 340.0f, 295.0f );
 			const ImGuiWindowFlags controlFlags =
-				ImGuiWindowFlags_NoMove |
-				ImGuiWindowFlags_NoResize |
-				ImGuiWindowFlags_NoCollapse |
-				ImGuiWindowFlags_NoSavedSettings;
+				ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings;
 			ImGui::SetNextWindowPos( controlPosition, ImGuiCond_Always );
 			ImGui::SetNextWindowSize( controlSize, ImGuiCond_Always );
 			ImGui::Begin( "Depth offsets", nullptr, controlFlags );
@@ -319,16 +297,9 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 			ImGui::Render();
 
 			RecreateSceneTargets( gfx );
-			const float elapsedTime = std::chrono::duration<float>(
-				std::chrono::steady_clock::now() - startTime ).count();
-			const float aspectRatio =
-				static_cast<float>( gfx.deviceManager->GetWidth() ) /
-				static_cast<float>( gfx.deviceManager->GetHeight() );
-			PushConstants constants = BuildConstants(
-				elapsedTime * 0.20f,
-				aspectRatio,
-				nearPlane,
-				farPlane );
+			const float elapsedTime = std::chrono::duration<float>( std::chrono::steady_clock::now() - startTime ).count();
+			const float aspectRatio = static_cast<float>( gfx.deviceManager->GetWidth() ) / static_cast<float>( gfx.deviceManager->GetHeight() );
+			PushConstants constants = BuildConstants( elapsedTime * 0.20f, aspectRatio, nearPlane, farPlane );
 
 			const TextureHandle backbuffer = device.GetCurrentSwapchainTexture();
 			RenderPass renderPass{};

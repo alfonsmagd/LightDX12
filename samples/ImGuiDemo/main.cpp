@@ -21,8 +21,7 @@ namespace
 
 	bool HandleImGuiMessage( HWND window, UINT message, WPARAM wParam, LPARAM lParam, void* )
 	{
-		return ImGui::GetCurrentContext() != nullptr &&
-			ImGui_ImplWin32_WndProcHandler( window, message, wParam, lParam ) != 0;
+		return ImGui::GetCurrentContext() != nullptr && ImGui_ImplWin32_WndProcHandler( window, message, wParam, lParam ) != 0;
 	}
 }
 

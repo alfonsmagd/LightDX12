@@ -115,18 +115,8 @@ float4 PSMain(float4 position : SV_Position, float2 uv : TEXCOORD0) : SV_Target0
 
 	TextureHandle CreateTextureArray( RenderDevice& device )
 	{
-		constexpr uint32_t layerColors[ ourLayerCount ] = {
-			0xff0000ffu,
-			0xff00ff00u,
-			0xffff0000u,
-			0xff00ffffu
-		};
-		constexpr uint32_t layerSecondColors[ ourLayerCount ] = {
-			0xffffffffu,
-			0xff101010u,
-			0xffffffffu,
-			0xff101010u
-		};
+		constexpr uint32_t layerColors[ ourLayerCount ] = { 0xff0000ffu, 0xff00ff00u, 0xffff0000u, 0xff00ffffu };
+		constexpr uint32_t layerSecondColors[ ourLayerCount ] = { 0xffffffffu, 0xff101010u, 0xffffffffu, 0xff101010u };
 
 		std::array<uint32_t, ourTextureSize * ourTextureSize * ourLayerCount> pixels{};
 		for( uint32_t layer = 0; layer < ourLayerCount; ++layer )
@@ -136,8 +126,7 @@ float4 PSMain(float4 position : SV_Position, float2 uv : TEXCOORD0) : SV_Target0
 				for( uint32_t x = 0; x < ourTextureSize; ++x )
 				{
 					const bool firstColor = ( ( x / 8u ) + ( y / 8u ) ) % 2u == 0u;
-					const uint32_t pixelIndex =
-						layer * ourTextureSize * ourTextureSize + y * ourTextureSize + x;
+					const uint32_t pixelIndex = layer * ourTextureSize * ourTextureSize + y * ourTextureSize + x;
 					pixels[ pixelIndex ] = firstColor ? layerColors[ layer ] : layerSecondColors[ layer ];
 				}
 			}
@@ -200,14 +189,8 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		{
 			const float angle = angleDistribution( randomGenerator );
 			const float speed = speedDistribution( randomGenerator );
-			triangles[ layer ].position = {
-				positionDistribution( randomGenerator ),
-				positionDistribution( randomGenerator )
-			};
-			triangles[ layer ].velocity = {
-				std::cos( angle ) * speed,
-				std::sin( angle ) * speed
-			};
+			triangles[ layer ].position = { positionDistribution( randomGenerator ), positionDistribution( randomGenerator ) };
+			triangles[ layer ].velocity = { std::cos( angle ) * speed, std::sin( angle ) * speed };
 			triangles[ layer ].layer = layer;
 		}
 
@@ -273,13 +256,11 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 			commands.CmdBindRenderPipeline( gfx.pipeline );
 			for( const MovingTriangle& triangle : triangles )
 			{
-				const PushConstants constants = {
-					device.GetBindlessIndex( gfx.textureArray ),
+				const PushConstants constants = { device.GetBindlessIndex( gfx.textureArray ),
 					ToSamplerIndex( SamplerSlot::PointClamp ),
 					triangle.layer,
 					0.25f,
-					triangle.position
-				};
+					triangle.position };
 				commands.CmdPushConstants( &constants, sizeof( constants ) );
 				commands.CmdDraw( 3 );
 			}

@@ -11,27 +11,18 @@ namespace ldx12::tests
 
 		objects.Destroy( removed );
 		Require( objects.Size() == 2u, "SlotMap destruction did not update the count." );
-		Require( objects.GetByIndex( removed.Index() ) == nullptr,
-			"Destroyed SlotMap storage remains occupied." );
+		Require( objects.GetByIndex( removed.Index() ) == nullptr, "Destroyed SlotMap storage remains occupied." );
 
-		const Handle<TestObject> replacement =
-			objects.Create( TestObject{ 42u, 4.2f } );
-		Require( replacement.Index() == removed.Index(),
-			"SlotMap did not reuse a released slot." );
-		Require( replacement.Gen() != removed.Gen(),
-			"Reused SlotMap slot did not change generation." );
-		Require( replacement != removed,
-			"A stale handle compares equal to its replacement." );
-		Require( objects.Get( replacement )->id == 42u,
-			"Replacement object properties are incorrect." );
+		const Handle<TestObject> replacement = objects.Create( TestObject{ 42u, 4.2f } );
+		Require( replacement.Index() == removed.Index(), "SlotMap did not reuse a released slot." );
+		Require( replacement.Gen() != removed.Gen(), "Reused SlotMap slot did not change generation." );
+		Require( replacement != removed, "A stale handle compares equal to its replacement." );
+		Require( objects.Get( replacement )->id == 42u, "Replacement object properties are incorrect." );
 
 		objects.Clear();
 		Require( objects.Size() == 0u, "SlotMap Clear did not remove every object." );
-		const Handle<TestObject> afterClear =
-			objects.Create( TestObject{ 99u, 9.9f } );
-		Require( afterClear.Index() == 0u,
-			"SlotMap did not restart at slot zero after Clear." );
-		Require( afterClear != first,
-			"SlotMap Clear did not invalidate old generations." );
+		const Handle<TestObject> afterClear = objects.Create( TestObject{ 99u, 9.9f } );
+		Require( afterClear.Index() == 0u, "SlotMap did not restart at slot zero after Clear." );
+		Require( afterClear != first, "SlotMap Clear did not invalidate old generations." );
 	}
 }

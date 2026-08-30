@@ -16,8 +16,7 @@ namespace ldx12::utils
 	};
 
 	ImageRgba8 LoadImageRgba8( const std::filesystem::path& path );
-	TextureHandle CreateCheckerTexture(
-		RenderDevice& device,
+	TextureHandle CreateCheckerTexture( RenderDevice& device,
 		uint32_t firstColor = 0xffffffffu,
 		uint32_t secondColor = 0xff000000u,
 		uint32_t textureSize = 64,

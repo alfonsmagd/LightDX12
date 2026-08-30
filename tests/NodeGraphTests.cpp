@@ -8,7 +8,8 @@ namespace
 {
 	void Require( bool condition, const char* message )
 	{
-		if( !condition ) throw std::runtime_error( message );
+		if( !condition )
+			throw std::runtime_error( message );
 	}
 }
 
@@ -24,10 +25,8 @@ int main()
 		const App::NodeId multiply = graph.AddNode( App::NodeKind::Multiply );
 		const App::NodeId compose = graph.AddNode( App::NodeKind::ComposeVector3 );
 		const App::NodeId length = graph.AddNode( App::NodeKind::VectorLength );
-		const auto connect = [&graph]( App::NodeId source, App::NodeId destination, size_t input )
-		{
-			return graph.Connect( graph.FindNode( source )->outputs[0].id, graph.FindNode( destination )->inputs[input].id );
-		};
+		const auto connect = [ &graph ]( App::NodeId source, App::NodeId destination, size_t input )
+		{ return graph.Connect( graph.FindNode( source )->outputs[ 0 ].id, graph.FindNode( destination )->inputs[ input ].id ); };
 		Require( connect( three, add, 0 ) && connect( two, add, 1 ), "Cannot connect add node." );
 		Require( connect( three, subtract, 0 ) && connect( two, subtract, 1 ), "Cannot connect subtract node." );
 		Require( connect( add, multiply, 0 ) && connect( subtract, multiply, 1 ), "Cannot connect multiply node." );
@@ -38,9 +37,11 @@ int main()
 		const App::Float3 vector = std::get<App::Float3>( vectorResult.value );
 		Require( vector.x == 5.0f && vector.y == 1.0f && vector.z == 5.0f, "Vector3 evaluation result is incorrect." );
 		const App::EvaluationResult lengthResult = graph.Evaluate( length );
-		Require( lengthResult.valid && std::abs( std::get<float>( lengthResult.value ) - std::sqrt( 51.0f ) ) < 0.001f, "Vector length evaluation is incorrect." );
+		Require( lengthResult.valid && std::abs( std::get<float>( lengthResult.value ) - std::sqrt( 51.0f ) ) < 0.001f,
+			"Vector length evaluation is incorrect." );
 		std::string connectionError;
-		Require( !graph.Connect( graph.FindNode( compose )->outputs[0].id, graph.FindNode( add )->inputs[0].id, &connectionError ), "Incompatible pin types were accepted." );
+		Require( !graph.Connect( graph.FindNode( compose )->outputs[ 0 ].id, graph.FindNode( add )->inputs[ 0 ].id, &connectionError ),
+			"Incompatible pin types were accepted." );
 		const App::NodeId textureSource = graph.AddNode( App::NodeKind::TextureSource );
 		const App::NodeId textureModifier = graph.AddNode( App::NodeKind::TextureCpuModifier );
 		const App::NodeId texturePreview = graph.AddNode( App::NodeKind::TexturePreview );

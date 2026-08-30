@@ -49,12 +49,10 @@ namespace
 		bufferDesc.type = BufferType::Structured;
 		bufferDesc.memory = BufferMemory::CpuToGpu;
 
-		constexpr std::array<D3D12_RESOURCE_STATES, ourBatchSize> batchStates = {
-			D3D12_RESOURCE_STATE_COPY_DEST,
+		constexpr std::array<D3D12_RESOURCE_STATES, ourBatchSize> batchStates = { D3D12_RESOURCE_STATE_COPY_DEST,
 			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
 			D3D12_RESOURCE_STATE_COPY_SOURCE,
-			D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE
-		};
+			D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE };
 
 		std::array<TextureHandle, ourResourceCount> textures{};
 		std::array<BufferHandle, ourResourceCount> buffers{};
@@ -66,7 +64,8 @@ namespace
 				buffers[ index ] = device.CreateBuffer( bufferDesc );
 				Require( textures[ index ].Valid() && buffers[ index ].Valid(), "Stress resource creation returned an invalid handle." );
 				Require( device.GetBindlessIndex( textures[ index ] ) != LDX12_DESCRIPTOR_SLOT_INVALID, "Stress texture did not receive an SRV descriptor." );
-				Require( device.GetUnorderedAccessIndex( textures[ index ] ) != LDX12_DESCRIPTOR_SLOT_INVALID, "Stress texture did not receive a UAV descriptor." );
+				Require( device.GetUnorderedAccessIndex( textures[ index ] ) != LDX12_DESCRIPTOR_SLOT_INVALID,
+					"Stress texture did not receive a UAV descriptor." );
 				Require( device.GetBindlessIndex( buffers[ index ] ) != LDX12_DESCRIPTOR_SLOT_INVALID, "Stress buffer did not receive an SRV descriptor." );
 
 				const std::array<uint32_t, 4> data = { round, index, round ^ index, round + index };
@@ -75,7 +74,8 @@ namespace
 
 			if( round == 0 )
 			{
-				RequireThrows<std::runtime_error>( [&device, &bufferDesc] { device.CreateBuffer( bufferDesc ); }, "Stress test did not exhaust the configured bindless heap." );
+				RequireThrows<std::runtime_error>( [ &device, &bufferDesc ] { device.CreateBuffer( bufferDesc ); },
+					"Stress test did not exhaust the configured bindless heap." );
 			}
 
 			std::array<ICommandBuffer*, ourBatchSize> commandBuffers{};
@@ -109,7 +109,8 @@ namespace
 
 		const TextureHandle recycledTexture = device.CreateTexture( textureDesc );
 		const BufferHandle recycledBuffer = device.CreateBuffer( bufferDesc );
-		Require( device.GetBindlessIndex( recycledTexture ) == LDX12_BINDLESS_DYNAMIC_SLOT_FIRST, "Stress cleanup did not coalesce the bindless descriptor range." );
+		Require( device.GetBindlessIndex( recycledTexture ) == LDX12_BINDLESS_DYNAMIC_SLOT_FIRST,
+			"Stress cleanup did not coalesce the bindless descriptor range." );
 		Require( device.Destroy( recycledTexture ) && device.Destroy( recycledBuffer ), "Final stress cleanup failed." );
 		device.WaitIdle();
 		DeviceManager::ShutdownSingleton();
@@ -119,7 +120,8 @@ namespace
 		constexpr uint32_t createdResourceCount = ourRoundCount * ourResourceCount * 2u + 2u;
 		constexpr uint32_t commandBufferCount = ourRoundCount * ourBatchSize;
 		constexpr uint32_t transitionCount = ourRoundCount * ourResourceCount * ourBatchSize;
-		std::cout << "[STRESS] " << createdResourceCount << " resources, " << commandBufferCount << " command buffers, " << ourRoundCount << " batches and " << transitionCount << " transitions completed in " << elapsed.count() << " ms.\n";
+		std::cout << "[STRESS] " << createdResourceCount << " resources, " << commandBufferCount << " command buffers, " << ourRoundCount << " batches and "
+				  << transitionCount << " transitions completed in " << elapsed.count() << " ms.\n";
 	}
 }
 

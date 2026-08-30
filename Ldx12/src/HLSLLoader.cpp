@@ -46,9 +46,7 @@ namespace ldx12
 			}
 
 			const std::string source( ( std::istreambuf_iterator<char>( file ) ), std::istreambuf_iterator<char>() );
-			if( source.size() >= 3 &&
-				static_cast<unsigned char>( source[ 0 ] ) == 0xef &&
-				static_cast<unsigned char>( source[ 1 ] ) == 0xbb &&
+			if( source.size() >= 3 && static_cast<unsigned char>( source[ 0 ] ) == 0xef && static_cast<unsigned char>( source[ 1 ] ) == 0xbb &&
 				static_cast<unsigned char>( source[ 2 ] ) == 0xbf )
 			{
 				return source.substr( 3 );

@@ -11,12 +11,7 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler( HWND window, UINT 
 
 namespace App
 {
-	ImGuiLayer::ImGuiLayer(
-		HWND window,
-		ldx12::RenderDevice& device,
-		DXGI_FORMAT renderTargetFormat,
-		DXGI_FORMAT depthFormat,
-		uint32_t framesInFlight )
+	ImGuiLayer::ImGuiLayer( HWND window, ldx12::RenderDevice& device, DXGI_FORMAT renderTargetFormat, DXGI_FORMAT depthFormat, uint32_t framesInFlight )
 	{
 		if( window == nullptr )
 		{

@@ -11,8 +11,8 @@
 #include <d3dcompiler.h>
 
 #if defined( _DEBUG )
-#include <d3d12sdklayers.h>
-#include <dxgidebug.h>
+	#include <d3d12sdklayers.h>
+	#include <dxgidebug.h>
 #endif
 
 namespace ldx12::detail
@@ -63,12 +63,12 @@ namespace ldx12::detail
 			throw std::runtime_error( "Ldx12 necesita un HWND valido para crear la swapchain." );
 		}
 
-		return static_cast< HWND >(handle.value);
+		return static_cast<HWND>( handle.value );
 	}
 
 	inline UINT Align256( UINT value )
 	{
-		return (value + 255u) & ~255u;
+		return ( value + 255u ) & ~255u;
 	}
 }
 

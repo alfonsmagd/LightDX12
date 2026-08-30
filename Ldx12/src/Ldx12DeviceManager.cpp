@@ -48,12 +48,18 @@ namespace ldx12
 		{
 			switch( featureLevel )
 			{
-			case D3D_FEATURE_LEVEL_12_2: return "12.2";
-			case D3D_FEATURE_LEVEL_12_1: return "12.1";
-			case D3D_FEATURE_LEVEL_12_0: return "12.0";
-			case D3D_FEATURE_LEVEL_11_1: return "11.1";
-			case D3D_FEATURE_LEVEL_11_0: return "11.0";
-			default: return "unknown";
+			case D3D_FEATURE_LEVEL_12_2:
+				return "12.2";
+			case D3D_FEATURE_LEVEL_12_1:
+				return "12.1";
+			case D3D_FEATURE_LEVEL_12_0:
+				return "12.0";
+			case D3D_FEATURE_LEVEL_11_1:
+				return "11.1";
+			case D3D_FEATURE_LEVEL_11_0:
+				return "11.0";
+			default:
+				return "unknown";
 			}
 		}
 
@@ -66,16 +72,13 @@ namespace ldx12
 		bool ContextDescsAreCompatible( const ContextDesc& existingDesc, const ContextDesc& requestedDesc ) noexcept
 		{
 			return existingDesc.enableDebugLayer == requestedDesc.enableDebugLayer &&
-				existingDesc.preferHighPerformanceAdapter == requestedDesc.preferHighPerformanceAdapter &&
-				existingDesc.allowTearing == requestedDesc.allowTearing &&
-				existingDesc.pixSettings.enableGpuCapture == requestedDesc.pixSettings.enableGpuCapture &&
-				existingDesc.pixSettings.showGpuCaptureHud == requestedDesc.pixSettings.showGpuCaptureHud &&
-				existingDesc.bindlessCapacity == requestedDesc.bindlessCapacity &&
-				existingDesc.rtvCapacity == requestedDesc.rtvCapacity &&
-				existingDesc.dsvCapacity == requestedDesc.dsvCapacity &&
-				existingDesc.swapchainBufferCount == requestedDesc.swapchainBufferCount &&
-				existingDesc.swapchainFormat == requestedDesc.swapchainFormat &&
-				existingDesc.minimumFeatureLevel == requestedDesc.minimumFeatureLevel;
+				   existingDesc.preferHighPerformanceAdapter == requestedDesc.preferHighPerformanceAdapter &&
+				   existingDesc.allowTearing == requestedDesc.allowTearing &&
+				   existingDesc.pixSettings.enableGpuCapture == requestedDesc.pixSettings.enableGpuCapture &&
+				   existingDesc.pixSettings.showGpuCaptureHud == requestedDesc.pixSettings.showGpuCaptureHud &&
+				   existingDesc.bindlessCapacity == requestedDesc.bindlessCapacity && existingDesc.rtvCapacity == requestedDesc.rtvCapacity &&
+				   existingDesc.dsvCapacity == requestedDesc.dsvCapacity && existingDesc.swapchainBufferCount == requestedDesc.swapchainBufferCount &&
+				   existingDesc.swapchainFormat == requestedDesc.swapchainFormat && existingDesc.minimumFeatureLevel == requestedDesc.minimumFeatureLevel;
 		}
 
 		void ReleaseDeviceManagerSingleton() noexcept
@@ -107,9 +110,7 @@ namespace ldx12
 			{
 				const size_t end = versionText.find( L'.', start );
 				const std::wstring token = versionText.substr( start, end == std::wstring::npos ? std::wstring::npos : end - start );
-				components[ componentIndex++ ] = token.empty()
-					? 0u
-					: static_cast<uint32_t>( std::wcstoul( token.c_str(), nullptr, 10 ) );
+				components[ componentIndex++ ] = token.empty() ? 0u : static_cast<uint32_t>( std::wcstoul( token.c_str(), nullptr, 10 ) );
 
 				if( end == std::wstring::npos )
 				{
@@ -216,8 +217,7 @@ namespace ldx12
 			}
 
 			using SetHudOptionsFn = HRESULT( WINAPI* )( uint32_t );
-			SetHudOptionsFn setHudOptions = reinterpret_cast<SetHudOptionsFn>(
-				::GetProcAddress( capturerModule, "SetHUDOptions" ) );
+			SetHudOptionsFn setHudOptions = reinterpret_cast<SetHudOptionsFn>( ::GetProcAddress( capturerModule, "SetHUDOptions" ) );
 			if( setHudOptions == nullptr )
 			{
 				return false;
@@ -292,17 +292,16 @@ namespace ldx12
 
 	void DeviceManager::InitializeDevice()
 	{
-		auto tryAdapter = [ this ]( IDXGIAdapter1* candidate )->bool
-			{
-				return SUCCEEDED( D3D12CreateDevice( candidate, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS( device_.GetAddressOf() ) ) );
-			};
+		auto tryAdapter = [ this ]( IDXGIAdapter1* candidate ) -> bool
+		{ return SUCCEEDED( D3D12CreateDevice( candidate, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS( device_.GetAddressOf() ) ) ); };
 
 		if( desc_.preferHighPerformanceAdapter )
 		{
 			for( UINT adapterIndex = 0;; ++adapterIndex )
 			{
 				ComPtr<IDXGIAdapter1> candidate;
-				if( factory_->EnumAdapterByGpuPreference( adapterIndex, DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE, IID_PPV_ARGS( candidate.GetAddressOf() ) ) == DXGI_ERROR_NOT_FOUND )
+				if( factory_->EnumAdapterByGpuPreference( adapterIndex, DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE, IID_PPV_ARGS( candidate.GetAddressOf() ) ) ==
+					DXGI_ERROR_NOT_FOUND )
 				{
 					break;
 				}
@@ -351,7 +350,8 @@ namespace ldx12
 		{
 			ComPtr<IDXGIAdapter1> warpAdapter;
 			C_RESULT( factory_->EnumWarpAdapter( IID_PPV_ARGS( warpAdapter.GetAddressOf() ) ), "Failed to enumerate WARP adapter." );
-			C_RESULT( D3D12CreateDevice( warpAdapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS( device_.GetAddressOf() ) ), "Failed to create D3D12 device." );
+			C_RESULT( D3D12CreateDevice( warpAdapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS( device_.GetAddressOf() ) ),
+				"Failed to create D3D12 device." );
 			adapter_ = warpAdapter;
 		}
 	}
@@ -372,20 +372,15 @@ namespace ldx12
 		deviceProperties_.sharedSystemMemoryBytes = static_cast<uint64_t>( adapterDesc.SharedSystemMemory );
 		const std::string adapterPrefix = "Ldx12 cannot initialize adapter \"" + deviceProperties_.adapterName + "\": ";
 
-		const D3D_FEATURE_LEVEL featureLevels[] = {
-			D3D_FEATURE_LEVEL_12_2,
+		const D3D_FEATURE_LEVEL featureLevels[] = { D3D_FEATURE_LEVEL_12_2,
 			D3D_FEATURE_LEVEL_12_1,
 			D3D_FEATURE_LEVEL_12_0,
 			D3D_FEATURE_LEVEL_11_1,
-			D3D_FEATURE_LEVEL_11_0
-		};
+			D3D_FEATURE_LEVEL_11_0 };
 		D3D12_FEATURE_DATA_FEATURE_LEVELS featureLevelData{};
 		featureLevelData.NumFeatureLevels = static_cast<UINT>( std::size( featureLevels ) );
 		featureLevelData.pFeatureLevelsRequested = featureLevels;
-		const HRESULT featureLevelResult = device_->CheckFeatureSupport(
-			D3D12_FEATURE_FEATURE_LEVELS,
-			&featureLevelData,
-			sizeof( featureLevelData ) );
+		const HRESULT featureLevelResult = device_->CheckFeatureSupport( D3D12_FEATURE_FEATURE_LEVELS, &featureLevelData, sizeof( featureLevelData ) );
 		if( FAILED( featureLevelResult ) )
 		{
 			failureReason = adapterPrefix + "the feature-level query failed (HRESULT " + HResultText( featureLevelResult ) + ").";
@@ -395,30 +390,25 @@ namespace ldx12
 		deviceProperties_.featureLevel = featureLevelData.MaxSupportedFeatureLevel;
 		if( deviceProperties_.featureLevel < desc_.minimumFeatureLevel )
 		{
-			failureReason = adapterPrefix + "feature level " + FeatureLevelText( desc_.minimumFeatureLevel ) +
-				" is required, but the adapter supports " + FeatureLevelText( deviceProperties_.featureLevel ) + ".";
+			failureReason = adapterPrefix + "feature level " + FeatureLevelText( desc_.minimumFeatureLevel ) + " is required, but the adapter supports " +
+							FeatureLevelText( deviceProperties_.featureLevel ) + ".";
 			return false;
 		}
 
-		const D3D_SHADER_MODEL shaderModels[] = {
-			D3D_SHADER_MODEL_6_6,
+		const D3D_SHADER_MODEL shaderModels[] = { D3D_SHADER_MODEL_6_6,
 			D3D_SHADER_MODEL_6_5,
 			D3D_SHADER_MODEL_6_4,
 			D3D_SHADER_MODEL_6_3,
 			D3D_SHADER_MODEL_6_2,
 			D3D_SHADER_MODEL_6_1,
 			D3D_SHADER_MODEL_6_0,
-			D3D_SHADER_MODEL_5_1
-		};
+			D3D_SHADER_MODEL_5_1 };
 		HRESULT shaderModelResult = E_INVALIDARG;
 		for( D3D_SHADER_MODEL shaderModel : shaderModels )
 		{
 			D3D12_FEATURE_DATA_SHADER_MODEL shaderModelData{};
 			shaderModelData.HighestShaderModel = shaderModel;
-			shaderModelResult = device_->CheckFeatureSupport(
-				D3D12_FEATURE_SHADER_MODEL,
-				&shaderModelData,
-				sizeof( shaderModelData ) );
+			shaderModelResult = device_->CheckFeatureSupport( D3D12_FEATURE_SHADER_MODEL, &shaderModelData, sizeof( shaderModelData ) );
 			if( SUCCEEDED( shaderModelResult ) )
 			{
 				deviceProperties_.shaderModel = shaderModelData.HighestShaderModel;
@@ -433,16 +423,13 @@ namespace ldx12
 		}
 		if( deviceProperties_.shaderModel < ourRequiredShaderModel )
 		{
-			failureReason = adapterPrefix + "Shader Model " + ShaderModelText( ourRequiredShaderModel ) +
-				" is required, but the adapter supports " + ShaderModelText( deviceProperties_.shaderModel ) + ".";
+			failureReason = adapterPrefix + "Shader Model " + ShaderModelText( ourRequiredShaderModel ) + " is required, but the adapter supports " +
+							ShaderModelText( deviceProperties_.shaderModel ) + ".";
 			return false;
 		}
 
 		D3D12_FEATURE_DATA_D3D12_OPTIONS options{};
-		const HRESULT optionsResult = device_->CheckFeatureSupport(
-			D3D12_FEATURE_D3D12_OPTIONS,
-			&options,
-			sizeof( options ) );
+		const HRESULT optionsResult = device_->CheckFeatureSupport( D3D12_FEATURE_D3D12_OPTIONS, &options, sizeof( options ) );
 		if( FAILED( optionsResult ) )
 		{
 			failureReason = adapterPrefix + "the Resource Binding Tier query failed (HRESULT " + HResultText( optionsResult ) + ").";
@@ -452,10 +439,9 @@ namespace ldx12
 		deviceProperties_.resourceBindingTier = options.ResourceBindingTier;
 		if( deviceProperties_.resourceBindingTier < ourRequiredResourceBindingTier )
 		{
-			failureReason = adapterPrefix + "Resource Binding Tier " +
-				std::to_string( static_cast<uint32_t>( ourRequiredResourceBindingTier ) ) +
-				" is required, but the adapter supports Tier " +
-				std::to_string( static_cast<uint32_t>( deviceProperties_.resourceBindingTier ) ) + ".";
+			failureReason = adapterPrefix + "Resource Binding Tier " + std::to_string( static_cast<uint32_t>( ourRequiredResourceBindingTier ) ) +
+							" is required, but the adapter supports Tier " + std::to_string( static_cast<uint32_t>( deviceProperties_.resourceBindingTier ) ) +
+							".";
 			return false;
 		}
 
@@ -473,17 +459,15 @@ namespace ldx12
 		D3D12_COMMAND_QUEUE_DESC queueDesc{};
 		queueDesc.Type = type;
 		C_RESULT( device_->CreateCommandQueue( &queueDesc, IID_PPV_ARGS( context.commandQueue_.GetAddressOf() ) ), "Failed to create command queue." );
-		C_RESULT( device_->CreateFence( 0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS( context.queueIdleFence_.GetAddressOf() ) ), "Failed to create queue idle fence." );
+		C_RESULT( device_->CreateFence( 0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS( context.queueIdleFence_.GetAddressOf() ) ),
+			"Failed to create queue idle fence." );
 		context.queueIdleEvent_ = CreateEvent( nullptr, FALSE, FALSE, nullptr );
 		if( context.queueIdleEvent_ == nullptr )
 		{
 			throw std::runtime_error( "Failed to create queue idle event." );
 		}
 
-		context.immediateCommands_ = std::make_unique<ImmediateCommands>(
-			device_.Get(),
-			context.commandQueue_.Get(),
-			ourMaxImmediateCommandBuffers );
+		context.immediateCommands_ = std::make_unique<ImmediateCommands>( device_.Get(), context.commandQueue_.Get(), ourMaxImmediateCommandBuffers );
 	}
 
 	DeviceManager::QueueContext& DeviceManager::GetGraphicsQueueContext() noexcept
@@ -502,12 +486,9 @@ namespace ldx12
 		{
 			throw std::runtime_error( "Bindless descriptor capacity must include Ldx12 fixed binding slots." );
 		}
-		if( desc_.bindlessCapacity > ourMaxBindlessDescriptors ||
-			desc_.rtvCapacity > ourMaxRtvDescriptors ||
-			desc_.dsvCapacity > ourMaxDsvDescriptors )
+		if( desc_.bindlessCapacity > ourMaxBindlessDescriptors || desc_.rtvCapacity > ourMaxRtvDescriptors || desc_.dsvCapacity > ourMaxDsvDescriptors )
 		{
-			throw std::length_error(
-				"Descriptor capacities exceed the fixed Ldx12 array limits." );
+			throw std::length_error( "Descriptor capacities exceed the fixed Ldx12 array limits." );
 		}
 
 		D3D12_DESCRIPTOR_HEAP_DESC bindlessDesc{};
@@ -557,12 +538,10 @@ namespace ldx12
 		}
 
 		freeBindlessRangeCount_ = 0;
-		const uint32_t dynamicDescriptorCount =
-			desc_.bindlessCapacity - LDX12_BINDLESS_DYNAMIC_SLOT_FIRST;
+		const uint32_t dynamicDescriptorCount = desc_.bindlessCapacity - LDX12_BINDLESS_DYNAMIC_SLOT_FIRST;
 		if( dynamicDescriptorCount > 0 )
 		{
-			freeBindlessRanges_[ freeBindlessRangeCount_++ ] =
-				DescriptorRange{ .start_ = LDX12_BINDLESS_DYNAMIC_SLOT_FIRST, .count_ = dynamicDescriptorCount };
+			freeBindlessRanges_[ freeBindlessRangeCount_++ ] = DescriptorRange{ .start_ = LDX12_BINDLESS_DYNAMIC_SLOT_FIRST, .count_ = dynamicDescriptorCount };
 		}
 		fixedBindlessDescriptorUsed_.fill( 0u );
 
@@ -596,16 +575,13 @@ namespace ldx12
 		rootDesc.Version = D3D_ROOT_SIGNATURE_VERSION_1_1;
 		rootDesc.Desc_1_1.NumParameters = 2;
 		rootDesc.Desc_1_1.pParameters = parameters;
-		rootDesc.Desc_1_1.Flags =
-			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
-			D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED |
-			D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED;
+		rootDesc.Desc_1_1.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT | D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED |
+								  D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED;
 
 		ComPtr<ID3DBlob> serialized;
 		ComPtr<ID3DBlob> errors;
 		C_RESULT( D3D12SerializeVersionedRootSignature( &rootDesc, serialized.GetAddressOf(), errors.GetAddressOf() ), "Failed to serialize root signature." );
-		C_RESULT(
-			device_->CreateRootSignature( 0, serialized->GetBufferPointer(), serialized->GetBufferSize(), IID_PPV_ARGS( rootSignature_.GetAddressOf() ) ),
+		C_RESULT( device_->CreateRootSignature( 0, serialized->GetBufferPointer(), serialized->GetBufferSize(), IID_PPV_ARGS( rootSignature_.GetAddressOf() ) ),
 			"Failed to create root signature." );
 	}
 
@@ -622,8 +598,7 @@ namespace ldx12
 		signatureDesc.NumArgumentDescs = 2;
 		signatureDesc.pArgumentDescs = arguments;
 
-		C_RESULT(
-			device_->CreateCommandSignature( &signatureDesc, rootSignature_.Get(), IID_PPV_ARGS( commandSignature_.GetAddressOf() ) ),
+		C_RESULT( device_->CreateCommandSignature( &signatureDesc, rootSignature_.Get(), IID_PPV_ARGS( commandSignature_.GetAddressOf() ) ),
 			"Failed to create command signature." );
 	}
 
@@ -663,9 +638,7 @@ namespace ldx12
 
 	uint32_t DeviceManager::AllocateFixedBindlessDescriptor( uint32_t index )
 	{
-		if( index < LDX12_BINDLESS_FIXED_SLOT_FIRST ||
-			index > LDX12_BINDLESS_FIXED_SLOT_LAST ||
-			index >= fixedBindlessDescriptorUsed_.size() )
+		if( index < LDX12_BINDLESS_FIXED_SLOT_FIRST || index > LDX12_BINDLESS_FIXED_SLOT_LAST || index >= fixedBindlessDescriptorUsed_.size() )
 		{
 			throw std::runtime_error( "Invalid fixed bindless descriptor slot." );
 		}
@@ -711,10 +684,7 @@ namespace ldx12
 			return;
 		}
 
-		if( count == 1u &&
-			index >= LDX12_BINDLESS_FIXED_SLOT_FIRST &&
-			index <= LDX12_BINDLESS_FIXED_SLOT_LAST &&
-			index < fixedBindlessDescriptorUsed_.size() )
+		if( count == 1u && index >= LDX12_BINDLESS_FIXED_SLOT_FIRST && index <= LDX12_BINDLESS_FIXED_SLOT_LAST && index < fixedBindlessDescriptorUsed_.size() )
 		{
 			fixedBindlessDescriptorUsed_[ index ] = 0u;
 			return;
@@ -727,8 +697,7 @@ namespace ldx12
 
 		DescriptorRange mergedRange{ .start_ = index, .count_ = count };
 		uint32_t insertIndex = 0;
-		while( insertIndex < freeBindlessRangeCount_ &&
-			freeBindlessRanges_[ insertIndex ].start_ < mergedRange.start_ )
+		while( insertIndex < freeBindlessRangeCount_ && freeBindlessRanges_[ insertIndex ].start_ < mergedRange.start_ )
 		{
 			++insertIndex;
 		}
@@ -786,8 +755,7 @@ namespace ldx12
 	void DeviceManager::EraseFreeBindlessRange( uint32_t rangeIndex ) noexcept
 	{
 		assert( rangeIndex < freeBindlessRangeCount_ );
-		for( uint32_t moveIndex = rangeIndex + 1u;
-			moveIndex < freeBindlessRangeCount_; ++moveIndex )
+		for( uint32_t moveIndex = rangeIndex + 1u; moveIndex < freeBindlessRangeCount_; ++moveIndex )
 		{
 			freeBindlessRanges_[ moveIndex - 1u ] = freeBindlessRanges_[ moveIndex ];
 		}
@@ -893,7 +861,8 @@ namespace ldx12
 		C_RESULT( context.commandQueue_->Signal( context.queueIdleFence_.Get(), context.queueIdleFenceValue_ ), "Failed to signal queue idle fence." );
 		if( context.queueIdleFence_->GetCompletedValue() < context.queueIdleFenceValue_ )
 		{
-			C_RESULT( context.queueIdleFence_->SetEventOnCompletion( context.queueIdleFenceValue_, context.queueIdleEvent_ ), "Failed to wait for queue idle fence." );
+			C_RESULT( context.queueIdleFence_->SetEventOnCompletion( context.queueIdleFenceValue_, context.queueIdleEvent_ ),
+				"Failed to wait for queue idle fence." );
 			WaitForSingleObject( context.queueIdleEvent_, INFINITE );
 		}
 	}
@@ -938,37 +907,39 @@ namespace ldx12
 		graphicsQueue_.immediateCommands_.reset();
 		baseMips_.reset();
 
-		slotMapBuffers_.ForEach( []( BufferResource& buffer )
+		slotMapBuffers_.ForEach(
+			[]( BufferResource& buffer )
 			{
-			if( buffer.mappedPtr_ != nullptr && buffer.resource_ != nullptr )
-			{
-				buffer.resource_->Unmap( 0, nullptr );
-				buffer.mappedPtr_ = nullptr;
-			}
+				if( buffer.mappedPtr_ != nullptr && buffer.resource_ != nullptr )
+				{
+					buffer.resource_->Unmap( 0, nullptr );
+					buffer.mappedPtr_ = nullptr;
+				}
 			} );
 
-		slotMapSwapchains_.ForEach( [this]( SwapchainResource& swapchainResource )
+		slotMapSwapchains_.ForEach(
+			[ this ]( SwapchainResource& swapchainResource )
 			{
-			if( swapchainResource.swapchain_ == nullptr )
-			{
-				return;
-			}
-
-			const HWND hwnd = detail::GetHwnd( swapchainResource.desc_.window );
-			const bool hasLiveWindow = hwnd != nullptr && IsWindow( hwnd ) != FALSE;
-			IDXGISwapChain4* nativeSwapchain = swapchainResource.swapchain_->GetSwapchain();
-			if( factory_ != nullptr && hasLiveWindow )
-			{
-				factory_->MakeWindowAssociation( hwnd, 0 );
-			}
-			if( nativeSwapchain != nullptr && hasLiveWindow )
-			{
-				BOOL isFullscreen = FALSE;
-				if( SUCCEEDED( nativeSwapchain->GetFullscreenState( &isFullscreen, nullptr ) ) && isFullscreen )
+				if( swapchainResource.swapchain_ == nullptr )
 				{
-					nativeSwapchain->SetFullscreenState( FALSE, nullptr );
+					return;
 				}
-			}
+
+				const HWND hwnd = detail::GetHwnd( swapchainResource.desc_.window );
+				const bool hasLiveWindow = hwnd != nullptr && IsWindow( hwnd ) != FALSE;
+				IDXGISwapChain4* nativeSwapchain = swapchainResource.swapchain_->GetSwapchain();
+				if( factory_ != nullptr && hasLiveWindow )
+				{
+					factory_->MakeWindowAssociation( hwnd, 0 );
+				}
+				if( nativeSwapchain != nullptr && hasLiveWindow )
+				{
+					BOOL isFullscreen = FALSE;
+					if( SUCCEEDED( nativeSwapchain->GetFullscreenState( &isFullscreen, nullptr ) ) && isFullscreen )
+					{
+						nativeSwapchain->SetFullscreenState( FALSE, nullptr );
+					}
+				}
 			} );
 		slotMapSwapchains_.Clear();
 
@@ -1033,12 +1004,7 @@ namespace ldx12
 
 		try
 		{
-			resource->swapchain_ = std::make_unique<Swapchain>(
-				*this,
-				handle,
-				detail::GetHwnd( desc.window ),
-				desc.width,
-				desc.height );
+			resource->swapchain_ = std::make_unique<Swapchain>( *this, handle, detail::GetHwnd( desc.window ), desc.width, desc.height );
 		}
 		catch( ... )
 		{
@@ -1096,9 +1062,7 @@ namespace ldx12
 		return GetSwapchain( resource->swapchain_ );
 	}
 
-	DeviceManager::DeviceManager( const ContextDesc& desc ):
-		desc_( desc ),
-		renderDevice_( *this )
+	DeviceManager::DeviceManager( const ContextDesc& desc ) : desc_( desc ), renderDevice_( *this )
 	{
 		try
 		{
@@ -1146,10 +1110,9 @@ namespace ldx12
 		return manager;
 	}
 
-
 	DeviceManager& DeviceManager::Get()
 	{
-          DeviceManager* manager = gDeviceManagerSingleton.get();
+		DeviceManager* manager = gDeviceManagerSingleton.get();
 		if( manager == nullptr )
 		{
 			throw std::runtime_error( "DeviceManager singleton is not initialized." );
@@ -1286,5 +1249,3 @@ namespace ldx12
 		}
 	}
 }
-
-

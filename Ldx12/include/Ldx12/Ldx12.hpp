@@ -10,11 +10,11 @@
 #include <string_view>
 
 #ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
+	#define WIN32_LEAN_AND_MEAN
 #endif
 
 #ifndef NOMINMAX
-#define NOMINMAX
+	#define NOMINMAX
 #endif
 
 #include <windows.h>
@@ -120,9 +120,8 @@ namespace ldx12
 
 		SubmitHandle() = default;
 
-		explicit SubmitHandle( uint64_t handle ) noexcept:
-			bufferIndex_( static_cast< uint32_t >( handle & 0xffffffffu ) ),
-			submitId_( static_cast< uint32_t >( handle >> 32u ) )
+		explicit SubmitHandle( uint64_t handle ) noexcept
+			: bufferIndex_( static_cast<uint32_t>( handle & 0xffffffffu ) ), submitId_( static_cast<uint32_t>( handle >> 32u ) )
 		{
 		}
 
@@ -133,7 +132,7 @@ namespace ldx12
 
 		constexpr uint64_t Handle() const noexcept
 		{
-			return ( static_cast< uint64_t >( submitId_ ) << 32u ) + bufferIndex_;
+			return ( static_cast<uint64_t>( submitId_ ) << 32u ) + bufferIndex_;
 		}
 	};
 
@@ -358,7 +357,6 @@ namespace ldx12
 		std::array<float, 4> borderColor = { 0.0f, 0.0f, 0.0f, 0.0f };
 		float minLod = 0.0f;
 		float maxLod = D3D12_FLOAT32_MAX;
-
 	};
 
 	struct ContextDesc
@@ -555,7 +553,11 @@ namespace ldx12
 		virtual void CmdPushDebugGroupLabel( const char* label, uint32_t color ) = 0;
 		virtual void CmdPopDebugGroupLabel() = 0;
 		virtual void CmdDraw( uint32_t vertexCount, uint32_t instanceCount = 1, uint32_t firstVertex = 0, uint32_t firstInstance = 0 ) = 0;
-		virtual void CmdDrawIndexed( uint32_t indexCount, uint32_t instanceCount = 1, uint32_t firstIndex = 0, int32_t vertexOffset = 0, uint32_t firstInstance = 0 ) = 0;
+		virtual void CmdDrawIndexed( uint32_t indexCount,
+			uint32_t instanceCount = 1,
+			uint32_t firstIndex = 0,
+			int32_t vertexOffset = 0,
+			uint32_t firstInstance = 0 ) = 0;
 		virtual void CmdDrawIndexedIndirect( BufferHandle indirectBuffer, uint32_t drawCount, uint64_t byteOffset = 0 ) = 0;
 		virtual void CmdDispatch( uint32_t groupCountX, uint32_t groupCountY = 1, uint32_t groupCountZ = 1 ) = 0;
 
@@ -568,10 +570,8 @@ namespace ldx12
 	class ScopedCommandDebugGroup final
 	{
 	public:
-		ScopedCommandDebugGroup( ICommandBuffer& commandBuffer, std::string label, uint32_t color = 0xff4cc9f0u ):
-			commandBuffer_( &commandBuffer ),
-			label_( std::move( label ) ),
-			active_( !label_.empty() )
+		ScopedCommandDebugGroup( ICommandBuffer& commandBuffer, std::string label, uint32_t color = 0xff4cc9f0u )
+			: commandBuffer_( &commandBuffer ), label_( std::move( label ) ), active_( !label_.empty() )
 		{
 			if( active_ )
 			{
@@ -579,8 +579,8 @@ namespace ldx12
 			}
 		}
 
-		ScopedCommandDebugGroup( ICommandBuffer& commandBuffer, const char* label, uint32_t color = 0xff4cc9f0u ):
-			ScopedCommandDebugGroup( commandBuffer, label != nullptr ? std::string( label ) : std::string{}, color )
+		ScopedCommandDebugGroup( ICommandBuffer& commandBuffer, const char* label, uint32_t color = 0xff4cc9f0u )
+			: ScopedCommandDebugGroup( commandBuffer, label != nullptr ? std::string( label ) : std::string{}, color )
 		{
 		}
 
@@ -786,7 +786,10 @@ namespace ldx12
 		friend class CommandBufferImpl;
 		friend class StagingDevice;
 		friend class Swapchain;
-		friend SubmitHandle SubmitCommandBufferBatch( DeviceManager& manager, ICommandBuffer* const* commandBuffers, uint32_t commandBufferCount, TextureHandle presentTexture );
+		friend SubmitHandle SubmitCommandBufferBatch( DeviceManager& manager,
+			ICommandBuffer* const* commandBuffers,
+			uint32_t commandBufferCount,
+			TextureHandle presentTexture );
 
 		ContextDesc desc_;
 		DeviceProperties deviceProperties_;
@@ -832,6 +835,8 @@ namespace ldx12
 #else
 	#define LDX12_DETAIL_FUNCTION_SIGNATURE __FUNCTION__
 #endif
-#define LDX12_CMD_SCOPE( commandBuffer ) ::ldx12::ScopedCommandDebugGroup LDX12_DETAIL_CONCAT( ldx12CmdScope_, __LINE__ )( commandBuffer, ::ldx12::BuildScopedCommandLabel( LDX12_DETAIL_FUNCTION_SIGNATURE ) )
-#define LDX12_CMD_SCOPE_NAMED( commandBuffer, label, color ) ::ldx12::ScopedCommandDebugGroup LDX12_DETAIL_CONCAT( ldx12CmdScope_, __LINE__ )( commandBuffer, label, color )
-
+#define LDX12_CMD_SCOPE( commandBuffer )                                                                                                                       \
+	::ldx12::ScopedCommandDebugGroup LDX12_DETAIL_CONCAT( ldx12CmdScope_, __LINE__ )( commandBuffer,                                                           \
+		::ldx12::BuildScopedCommandLabel( LDX12_DETAIL_FUNCTION_SIGNATURE ) )
+#define LDX12_CMD_SCOPE_NAMED( commandBuffer, label, color )                                                                                                   \
+	::ldx12::ScopedCommandDebugGroup LDX12_DETAIL_CONCAT( ldx12CmdScope_, __LINE__ )( commandBuffer, label, color )

@@ -5,11 +5,8 @@
 
 namespace ldx12
 {
-	ImmediateCommands::ImmediateCommands( ID3D12Device* device, ID3D12CommandQueue* queue, uint32_t numContexts ):
-		device_( device ),
-		queue_( queue ),
-		bufferCount_( numContexts ),
-		numAvailableCommandBuffers_( numContexts )
+	ImmediateCommands::ImmediateCommands( ID3D12Device* device, ID3D12CommandQueue* queue, uint32_t numContexts )
+		: device_( device ), queue_( queue ), bufferCount_( numContexts ), numAvailableCommandBuffers_( numContexts )
 	{
 		if( device_ == nullptr || queue_ == nullptr )
 		{
@@ -24,23 +21,19 @@ namespace ldx12
 		{
 			CommandListWrapper& buffer = buffers_[ i ];
 
-			C_RESULT(
-				device_->CreateCommandAllocator( D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS( buffer.allocator_.GetAddressOf() ) ),
+			C_RESULT( device_->CreateCommandAllocator( D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS( buffer.allocator_.GetAddressOf() ) ),
 				"Failed to create command allocator." );
 
-			C_RESULT(
-				device_->CreateCommandList(
-					0,
-					D3D12_COMMAND_LIST_TYPE_DIRECT,
-					buffer.allocator_.Get(),
-					nullptr,
-					IID_PPV_ARGS( buffer.commandList_.GetAddressOf() ) ),
+			C_RESULT( device_->CreateCommandList( 0,
+						  D3D12_COMMAND_LIST_TYPE_DIRECT,
+						  buffer.allocator_.Get(),
+						  nullptr,
+						  IID_PPV_ARGS( buffer.commandList_.GetAddressOf() ) ),
 				"Failed to create command list." );
 
 			buffer.commandList_->Close();
 
-			C_RESULT(
-				device_->CreateFence( 0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS( buffer.fence_.GetAddressOf() ) ),
+			C_RESULT( device_->CreateFence( 0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS( buffer.fence_.GetAddressOf() ) ),
 				"Failed to create fence for immediate command buffer." );
 
 			buffer.fenceEvent_ = CreateEvent( nullptr, FALSE, FALSE, nullptr );
@@ -103,10 +96,7 @@ namespace ldx12
 			return commandBuffer;
 		}
 
-		throw std::length_error(
-			"A maximum of " +
-			std::to_string( ourMaxActiveCommandBuffers ) +
-			" active command buffers are allowed per render device." );
+		throw std::length_error( "A maximum of " + std::to_string( ourMaxActiveCommandBuffers ) + " active command buffers are allowed per render device." );
 	}
 
 	CommandBufferImpl* ImmediateCommands::FindActiveCommandBuffer( ICommandBuffer* commandBuffer ) noexcept
@@ -321,7 +311,7 @@ namespace ldx12
 
 	void ImmediateCommands::WaitForFirstAvailable()
 	{
-        Purge();
+		Purge();
 		if( numAvailableCommandBuffers_ > 0 )
 		{
 			return;
@@ -369,5 +359,3 @@ namespace ldx12
 		}
 	}
 }
-
-

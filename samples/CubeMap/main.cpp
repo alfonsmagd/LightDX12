@@ -68,8 +68,7 @@ namespace
 		return device.CreateRenderPipeline( desc );
 	}
 
-	PushConstants BuildPushConstants(
-		RenderDevice& device,
+	PushConstants BuildPushConstants( RenderDevice& device,
 		const utils::OrbitCamera& camera,
 		TextureHandle cubeMap,
 		uint32_t width,
@@ -77,19 +76,13 @@ namespace
 		float time )
 	{
 		const float aspect = static_cast<float>( width ) / static_cast<float>( height );
-		const XMMATRIX projection = XMMatrixPerspectiveFovLH(
-			XMConvertToRadians( 60.0f ), aspect, 0.1f, 100.0f );
-		const XMVECTOR rotationAxis = XMVector3Normalize(
-			XMVectorSet( 1.0f, 1.0f, 1.0f, 0.0f ) );
+		const XMMATRIX projection = XMMatrixPerspectiveFovLH( XMConvertToRadians( 60.0f ), aspect, 0.1f, 100.0f );
+		const XMVECTOR rotationAxis = XMVector3Normalize( XMVectorSet( 1.0f, 1.0f, 1.0f, 0.0f ) );
 		const XMMATRIX model = XMMatrixRotationAxis( rotationAxis, time * 0.12f );
 
 		PushConstants constants{};
-		XMStoreFloat4x4(
-			&constants.viewProjection,
-			XMMatrixTranspose( camera.GetViewMatrix() * projection ) );
-		XMStoreFloat4x4(
-			&constants.skyViewProjection,
-			XMMatrixTranspose( camera.GetSkyViewMatrix() * projection ) );
+		XMStoreFloat4x4( &constants.viewProjection, XMMatrixTranspose( camera.GetViewMatrix() * projection ) );
+		XMStoreFloat4x4( &constants.skyViewProjection, XMMatrixTranspose( camera.GetSkyViewMatrix() * projection ) );
 		XMStoreFloat4x4( &constants.model, XMMatrixTranspose( model ) );
 		XMStoreFloat4( &constants.cameraPosition, camera.GetPosition() );
 		constants.cubeMapIndex = device.GetBindlessIndex( cubeMap );
@@ -132,8 +125,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 
 		RenderPipelineState objectPipeline = CreateObjectPipeline( device, context.swapchainFormat );
 		RenderPipelineState skyboxPipeline = CreateSkyboxPipeline( device, context.swapchainFormat );
-		const std::filesystem::path cubeMapDirectory =
-			std::filesystem::path( LDX12_MEDIA_DIRECTORY ) / "sky_129_cubemap_2k";
+		const std::filesystem::path cubeMapDirectory = std::filesystem::path( LDX12_MEDIA_DIRECTORY ) / "sky_129_cubemap_2k";
 		const TextureHandle cubeMap = utils::LoadCubeMap( device, cubeMapDirectory );
 		utils::GeometryBuffers cube = utils::CreateCube( device );
 		utils::GeometryBuffers sphere = utils::CreateSphere( device );
@@ -156,16 +148,14 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 				if( app.WasKeyPressed( VK_SPACE ) )
 				{
 					showSphere = !showSphere;
-					SetWindowTextW(
-						app.GetWindow(),
-						showSphere ? L"Ldx12 - Cube Map - Sphere" : L"Ldx12 - Cube Map - Cube" );
+					SetWindowTextW( app.GetWindow(), showSphere ? L"Ldx12 - Cube Map - Sphere" : L"Ldx12 - Cube Map - Cube" );
 				}
 
 				const uint32_t width = manager.GetWidth();
 				const uint32_t height = manager.GetHeight();
 				depthTarget.Resize( width, height );
 
-				const float time = std::chrono::duration<float>(std::chrono::steady_clock::now() - animationStart ).count();
+				const float time = std::chrono::duration<float>( std::chrono::steady_clock::now() - animationStart ).count();
 				const PushConstants constants = BuildPushConstants( device, camera, cubeMap, width, height, time );
 
 				const TextureHandle backbuffer = device.GetCurrentSwapchainTexture();

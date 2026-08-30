@@ -24,8 +24,7 @@ namespace ldx12
 			uint32_t writeSrgb = 0;
 		};
 
-		static void TransitionSubresource(
-			ID3D12GraphicsCommandList* commandList,
+		static void TransitionSubresource( ID3D12GraphicsCommandList* commandList,
 			ID3D12Resource* resource,
 			uint32_t subresource,
 			D3D12_RESOURCE_STATES before,

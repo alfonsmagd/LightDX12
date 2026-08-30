@@ -82,12 +82,10 @@ namespace
 
 			RenderPass renderPass{};
 			renderPass.color[ 0 ].loadOp = LoadOp::Clear;
-			renderPass.color[ 0 ].clearColor = {
-				static_cast<float>( frameIndex & 1u ),
+			renderPass.color[ 0 ].clearColor = { static_cast<float>( frameIndex & 1u ),
 				static_cast<float>( ( frameIndex >> 1u ) & 1u ),
 				static_cast<float>( ( frameIndex >> 2u ) & 1u ),
-				1.0f
-			};
+				1.0f };
 
 			Framebuffer framebuffer{};
 			framebuffer.color[ 0 ].texture = frameTargets[ frameSlot ];
@@ -123,11 +121,15 @@ namespace
 		const auto waitedTime = std::chrono::duration_cast<std::chrono::microseconds>( throttleWaitTime );
 		const auto drainedTime = std::chrono::duration_cast<std::chrono::microseconds>( drainTime );
 		const double averageFrameMicroseconds = static_cast<double>( loopTime.count() ) / ourFrameCount;
-		const double framesPerSecond = loopTime.count() > 0 ? static_cast<double>( ourFrameCount ) * 1'000'000.0 / static_cast<double>( loopTime.count() ) : 0.0;
+		const double framesPerSecond =
+			loopTime.count() > 0 ? static_cast<double>( ourFrameCount ) * 1'000'000.0 / static_cast<double>( loopTime.count() ) : 0.0;
 
-		std::cout << "[FRAME STRESS] " << ourFrameCount << " frames with " << ourFramesInFlight << " frames in flight completed in " << loopTime.count() / 1000.0 << " ms.\n";
+		std::cout << "[FRAME STRESS] " << ourFrameCount << " frames with " << ourFramesInFlight << " frames in flight completed in "
+				  << loopTime.count() / 1000.0 << " ms.\n";
 		std::cout << "[FRAME STRESS] Average " << averageFrameMicroseconds << " us/frame, throughput " << framesPerSecond << " frames/s.\n";
-		std::cout << "[FRAME STRESS] Record/create/submit/destroy " << recordedTime.count() / 1000.0 << " ms; slot waits " << throttleWaitCount << " (" << waitedTime.count() / 1000.0 << " ms); already-ready reuses " << readyReuseCount << "; final drain " << drainedTime.count() / 1000.0 << " ms.\n";
+		std::cout << "[FRAME STRESS] Record/create/submit/destroy " << recordedTime.count() / 1000.0 << " ms; slot waits " << throttleWaitCount << " ("
+				  << waitedTime.count() / 1000.0 << " ms); already-ready reuses " << readyReuseCount << "; final drain " << drainedTime.count() / 1000.0
+				  << " ms.\n";
 	}
 }
 

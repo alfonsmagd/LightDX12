@@ -144,8 +144,3 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		return 1;
 	}
 }
-
-
-
-
-

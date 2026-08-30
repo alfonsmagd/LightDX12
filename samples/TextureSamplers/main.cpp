@@ -113,14 +113,12 @@ float4 PSMain(PixelInput input) : SV_Target0
 		const TextureHandle backBuffer = device.GetCurrentSwapchainTexture();
 
 		// The same texture is deliberately paired with six different sampler slots.
-		const TextureSample samples[ ourDrawCount ] = {
-			TextureSample{ gfx.checkerTexture, ToSamplerIndex( SamplerSlot::LinearClamp ) },
+		const TextureSample samples[ ourDrawCount ] = { TextureSample{ gfx.checkerTexture, ToSamplerIndex( SamplerSlot::LinearClamp ) },
 			TextureSample{ gfx.checkerTexture, ToSamplerIndex( SamplerSlot::LinearWrap ) },
 			TextureSample{ gfx.checkerTexture, ToSamplerIndex( SamplerSlot::PointClamp ) },
 			TextureSample{ gfx.checkerTexture, ToSamplerIndex( SamplerSlot::ShadowComparison ) },
 			TextureSample{ gfx.checkerTexture, device.GetSamplerIndex( gfx.pointMirrorOnceSampler ) },
-			TextureSample{ gfx.checkerTexture, device.GetSamplerIndex( gfx.redBorderSampler ) }
-		};
+			TextureSample{ gfx.checkerTexture, device.GetSamplerIndex( gfx.redBorderSampler ) } };
 
 		RenderPass renderPass{};
 		renderPass.color[ 0 ].loadOp = LoadOp::Clear;
@@ -150,12 +148,8 @@ float4 PSMain(PixelInput input) : SV_Target0
 				const int32_t right = left + panelWidth;
 				const int32_t bottom = top + panelHeight;
 
-				const DrawConstants constants = {
-					device.GetBindlessIndex( samples[ index ].texture ),
-					samples[ index ].samplerIndex
-				};
-				commands.CmdSetViewport(
-					static_cast<float>( left ),
+				const DrawConstants constants = { device.GetBindlessIndex( samples[ index ].texture ), samples[ index ].samplerIndex };
+				commands.CmdSetViewport( static_cast<float>( left ),
 					static_cast<float>( top ),
 					static_cast<float>( panelWidth ),
 					static_cast<float>( panelHeight ) );

@@ -7,10 +7,8 @@ namespace ldx12::tests
 		SlotMap<TestObject, 2> objects;
 		Require( objects.Empty(), "A new SlotMap is not empty." );
 		Require( objects.MaxSize() == 2u, "SlotMap does not expose its fixed capacity." );
-		Require( !objects.Contains( Handle<TestObject>{} ),
-			"SlotMap accepted an empty handle." );
-		Require( !objects.Destroy( Handle<TestObject>{} ),
-			"Destroy reported success for an empty handle." );
+		Require( !objects.Contains( Handle<TestObject>{} ), "SlotMap accepted an empty handle." );
+		Require( !objects.Destroy( Handle<TestObject>{} ), "Destroy reported success for an empty handle." );
 
 		const Handle<TestObject> removed = objects.Create( TestObject{ 7u, 1.0f } );
 		Require( objects.Contains( removed ), "SlotMap does not contain a newly created handle." );

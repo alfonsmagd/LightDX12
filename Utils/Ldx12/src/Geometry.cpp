@@ -8,55 +8,42 @@ namespace ldx12::utils
 {
 	namespace
 	{
-		static constexpr std::array<GeometryVertex, 4> ourQuadVertices = {
-			GeometryVertex{ { -1.0f, -1.0f, 0.0f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 1.0f } },
-			GeometryVertex{ { -1.0f,  1.0f, 0.0f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 0.0f } },
-			GeometryVertex{ {  1.0f,  1.0f, 0.0f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 0.0f } },
-			GeometryVertex{ {  1.0f, -1.0f, 0.0f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 1.0f } }
-		};
+		static constexpr std::array<GeometryVertex, 4> ourQuadVertices = { GeometryVertex{ { -1.0f, -1.0f, 0.0f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 1.0f } },
+			GeometryVertex{ { -1.0f, 1.0f, 0.0f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 0.0f } },
+			GeometryVertex{ { 1.0f, 1.0f, 0.0f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 0.0f } },
+			GeometryVertex{ { 1.0f, -1.0f, 0.0f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 1.0f } } };
 
-		static constexpr std::array<uint32_t, 6> ourQuadIndices = {
-			0, 1, 2, 0, 2, 3
-		};
+		static constexpr std::array<uint32_t, 6> ourQuadIndices = { 0, 1, 2, 0, 2, 3 };
 
-		static constexpr std::array<GeometryVertex, 24> ourCubeVertices = {
-			GeometryVertex{ { -1.0f, -1.0f, -1.0f }, {  0.0f,  0.0f, -1.0f }, { 0.0f, 1.0f } },
-			GeometryVertex{ { -1.0f,  1.0f, -1.0f }, {  0.0f,  0.0f, -1.0f }, { 0.0f, 0.0f } },
-			GeometryVertex{ {  1.0f,  1.0f, -1.0f }, {  0.0f,  0.0f, -1.0f }, { 1.0f, 0.0f } },
-			GeometryVertex{ {  1.0f, -1.0f, -1.0f }, {  0.0f,  0.0f, -1.0f }, { 1.0f, 1.0f } },
-			GeometryVertex{ {  1.0f, -1.0f,  1.0f }, {  0.0f,  0.0f,  1.0f }, { 0.0f, 1.0f } },
-			GeometryVertex{ {  1.0f,  1.0f,  1.0f }, {  0.0f,  0.0f,  1.0f }, { 0.0f, 0.0f } },
-			GeometryVertex{ { -1.0f,  1.0f,  1.0f }, {  0.0f,  0.0f,  1.0f }, { 1.0f, 0.0f } },
-			GeometryVertex{ { -1.0f, -1.0f,  1.0f }, {  0.0f,  0.0f,  1.0f }, { 1.0f, 1.0f } },
-			GeometryVertex{ { -1.0f, -1.0f,  1.0f }, { -1.0f,  0.0f,  0.0f }, { 0.0f, 1.0f } },
-			GeometryVertex{ { -1.0f,  1.0f,  1.0f }, { -1.0f,  0.0f,  0.0f }, { 0.0f, 0.0f } },
-			GeometryVertex{ { -1.0f,  1.0f, -1.0f }, { -1.0f,  0.0f,  0.0f }, { 1.0f, 0.0f } },
-			GeometryVertex{ { -1.0f, -1.0f, -1.0f }, { -1.0f,  0.0f,  0.0f }, { 1.0f, 1.0f } },
-			GeometryVertex{ {  1.0f, -1.0f, -1.0f }, {  1.0f,  0.0f,  0.0f }, { 0.0f, 1.0f } },
-			GeometryVertex{ {  1.0f,  1.0f, -1.0f }, {  1.0f,  0.0f,  0.0f }, { 0.0f, 0.0f } },
-			GeometryVertex{ {  1.0f,  1.0f,  1.0f }, {  1.0f,  0.0f,  0.0f }, { 1.0f, 0.0f } },
-			GeometryVertex{ {  1.0f, -1.0f,  1.0f }, {  1.0f,  0.0f,  0.0f }, { 1.0f, 1.0f } },
-			GeometryVertex{ { -1.0f,  1.0f, -1.0f }, {  0.0f,  1.0f,  0.0f }, { 0.0f, 1.0f } },
-			GeometryVertex{ { -1.0f,  1.0f,  1.0f }, {  0.0f,  1.0f,  0.0f }, { 0.0f, 0.0f } },
-			GeometryVertex{ {  1.0f,  1.0f,  1.0f }, {  0.0f,  1.0f,  0.0f }, { 1.0f, 0.0f } },
-			GeometryVertex{ {  1.0f,  1.0f, -1.0f }, {  0.0f,  1.0f,  0.0f }, { 1.0f, 1.0f } },
-			GeometryVertex{ { -1.0f, -1.0f,  1.0f }, {  0.0f, -1.0f,  0.0f }, { 0.0f, 1.0f } },
-			GeometryVertex{ { -1.0f, -1.0f, -1.0f }, {  0.0f, -1.0f,  0.0f }, { 0.0f, 0.0f } },
-			GeometryVertex{ {  1.0f, -1.0f, -1.0f }, {  0.0f, -1.0f,  0.0f }, { 1.0f, 0.0f } },
-			GeometryVertex{ {  1.0f, -1.0f,  1.0f }, {  0.0f, -1.0f,  0.0f }, { 1.0f, 1.0f } }
-		};
+		static constexpr std::array<GeometryVertex, 24> ourCubeVertices = { GeometryVertex{ { -1.0f, -1.0f, -1.0f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 1.0f } },
+			GeometryVertex{ { -1.0f, 1.0f, -1.0f }, { 0.0f, 0.0f, -1.0f }, { 0.0f, 0.0f } },
+			GeometryVertex{ { 1.0f, 1.0f, -1.0f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 0.0f } },
+			GeometryVertex{ { 1.0f, -1.0f, -1.0f }, { 0.0f, 0.0f, -1.0f }, { 1.0f, 1.0f } },
+			GeometryVertex{ { 1.0f, -1.0f, 1.0f }, { 0.0f, 0.0f, 1.0f }, { 0.0f, 1.0f } },
+			GeometryVertex{ { 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 1.0f }, { 0.0f, 0.0f } },
+			GeometryVertex{ { -1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 1.0f }, { 1.0f, 0.0f } },
+			GeometryVertex{ { -1.0f, -1.0f, 1.0f }, { 0.0f, 0.0f, 1.0f }, { 1.0f, 1.0f } },
+			GeometryVertex{ { -1.0f, -1.0f, 1.0f }, { -1.0f, 0.0f, 0.0f }, { 0.0f, 1.0f } },
+			GeometryVertex{ { -1.0f, 1.0f, 1.0f }, { -1.0f, 0.0f, 0.0f }, { 0.0f, 0.0f } },
+			GeometryVertex{ { -1.0f, 1.0f, -1.0f }, { -1.0f, 0.0f, 0.0f }, { 1.0f, 0.0f } },
+			GeometryVertex{ { -1.0f, -1.0f, -1.0f }, { -1.0f, 0.0f, 0.0f }, { 1.0f, 1.0f } },
+			GeometryVertex{ { 1.0f, -1.0f, -1.0f }, { 1.0f, 0.0f, 0.0f }, { 0.0f, 1.0f } },
+			GeometryVertex{ { 1.0f, 1.0f, -1.0f }, { 1.0f, 0.0f, 0.0f }, { 0.0f, 0.0f } },
+			GeometryVertex{ { 1.0f, 1.0f, 1.0f }, { 1.0f, 0.0f, 0.0f }, { 1.0f, 0.0f } },
+			GeometryVertex{ { 1.0f, -1.0f, 1.0f }, { 1.0f, 0.0f, 0.0f }, { 1.0f, 1.0f } },
+			GeometryVertex{ { -1.0f, 1.0f, -1.0f }, { 0.0f, 1.0f, 0.0f }, { 0.0f, 1.0f } },
+			GeometryVertex{ { -1.0f, 1.0f, 1.0f }, { 0.0f, 1.0f, 0.0f }, { 0.0f, 0.0f } },
+			GeometryVertex{ { 1.0f, 1.0f, 1.0f }, { 0.0f, 1.0f, 0.0f }, { 1.0f, 0.0f } },
+			GeometryVertex{ { 1.0f, 1.0f, -1.0f }, { 0.0f, 1.0f, 0.0f }, { 1.0f, 1.0f } },
+			GeometryVertex{ { -1.0f, -1.0f, 1.0f }, { 0.0f, -1.0f, 0.0f }, { 0.0f, 1.0f } },
+			GeometryVertex{ { -1.0f, -1.0f, -1.0f }, { 0.0f, -1.0f, 0.0f }, { 0.0f, 0.0f } },
+			GeometryVertex{ { 1.0f, -1.0f, -1.0f }, { 0.0f, -1.0f, 0.0f }, { 1.0f, 0.0f } },
+			GeometryVertex{ { 1.0f, -1.0f, 1.0f }, { 0.0f, -1.0f, 0.0f }, { 1.0f, 1.0f } } };
 
-		static constexpr std::array<uint32_t, 36> ourCubeIndices = {
-			0, 1, 2, 0, 2, 3,
-			4, 5, 6, 4, 6, 7,
-			8, 9, 10, 8, 10, 11,
-			12, 13, 14, 12, 14, 15,
-			16, 17, 18, 16, 18, 19,
-			20, 21, 22, 20, 22, 23
-		};
+		static constexpr std::array<uint32_t, 36> ourCubeIndices =
+			{ 0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7, 8, 9, 10, 8, 10, 11, 12, 13, 14, 12, 14, 15, 16, 17, 18, 16, 18, 19, 20, 21, 22, 20, 22, 23 };
 
-		static GeometryBuffers CreateGeometryBuffers(
-			RenderDevice& device,
+		static GeometryBuffers CreateGeometryBuffers( RenderDevice& device,
 			const GeometryVertex* vertices,
 			uint64_t vertexCount,
 			const uint32_t* indices,
@@ -88,8 +75,7 @@ namespace ldx12::utils
 
 	GeometryBuffers CreateQuad( RenderDevice& device )
 	{
-		return CreateGeometryBuffers(
-			device,
+		return CreateGeometryBuffers( device,
 			ourQuadVertices.data(),
 			ourQuadVertices.size(),
 			ourQuadIndices.data(),
@@ -100,8 +86,7 @@ namespace ldx12::utils
 
 	GeometryBuffers CreateCube( RenderDevice& device )
 	{
-		return CreateGeometryBuffers(
-			device,
+		return CreateGeometryBuffers( device,
 			ourCubeVertices.data(),
 			ourCubeVertices.size(),
 			ourCubeIndices.data(),
@@ -110,11 +95,11 @@ namespace ldx12::utils
 			"Cube indices" );
 	}
 
-	 GeometryBuffers CreateSphere( RenderDevice& device, uint32_t rings, uint32_t segments )
+	GeometryBuffers CreateSphere( RenderDevice& device, uint32_t rings, uint32_t segments )
 	{
 		std::vector<GeometryVertex> vertices;
 		std::vector<uint32_t> indices;
-		vertices.reserve( static_cast<size_t>( rings + 1u ) * (segments + 1u) );
+		vertices.reserve( static_cast<size_t>( rings + 1u ) * ( segments + 1u ) );
 		indices.reserve( static_cast<size_t>( rings ) * segments * 6u );
 
 		for( uint32_t ring = 0; ring <= rings; ++ring )
@@ -125,15 +110,9 @@ namespace ldx12::utils
 			for( uint32_t segment = 0; segment <= segments; ++segment )
 			{
 				const float longitude = DirectX::XM_2PI * static_cast<float>( segment ) / static_cast<float>( segments );
-				const DirectX::XMFLOAT3 normal = {
-					ringRadius * std::cos( longitude ),
-					y,
-					ringRadius * std::sin( longitude )
-				};
-				const DirectX::XMFLOAT2 texCoord = {
-					static_cast<float>( segment ) / static_cast<float>( segments ),
-					static_cast<float>( ring ) / static_cast<float>( rings )
-				};
+				const DirectX::XMFLOAT3 normal = { ringRadius * std::cos( longitude ), y, ringRadius * std::sin( longitude ) };
+				const DirectX::XMFLOAT2 texCoord = { static_cast<float>( segment ) / static_cast<float>( segments ),
+					static_cast<float>( ring ) / static_cast<float>( rings ) };
 				vertices.push_back( { normal, normal, texCoord } );
 			}
 		}
@@ -142,7 +121,7 @@ namespace ldx12::utils
 		{
 			for( uint32_t segment = 0; segment < segments; ++segment )
 			{
-				const uint32_t current = ring * (segments + 1u) + segment;
+				const uint32_t current = ring * ( segments + 1u ) + segment;
 				const uint32_t nextRing = current + segments + 1u;
 				indices.push_back( current );
 				indices.push_back( nextRing );
@@ -153,14 +132,7 @@ namespace ldx12::utils
 			}
 		}
 
-		return CreateGeometryBuffers(
-			device,
-			vertices.data(),
-			vertices.size(),
-			indices.data(),
-			indices.size(),
-			"Sphere vertices",
-			"Sphere indices" );
+		return CreateGeometryBuffers( device, vertices.data(), vertices.size(), indices.data(), indices.size(), "Sphere vertices", "Sphere indices" );
 	}
 
 	void DestroyGeometry( RenderDevice& device, GeometryBuffers& geometry )

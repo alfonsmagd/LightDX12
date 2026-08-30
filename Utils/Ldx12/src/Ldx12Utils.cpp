@@ -76,8 +76,7 @@ float4 main(PSInput input) : SV_Target0
 }
 )";
 
-		RenderPipelineState CreateWorldPipeline(
-			RenderDevice& device,
+		RenderPipelineState CreateWorldPipeline( RenderDevice& device,
 			const DebugRendererDesc& worldDesc,
 			D3D12_FILL_MODE fillMode,
 			D3D12_PRIMITIVE_TOPOLOGY_TYPE primitiveType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
@@ -283,16 +282,10 @@ float4 main(PSInput input) : SV_Target0
 		}
 	}
 
-	DebugRenderer::DebugRenderer( RenderDevice& device, const DebugRendererDesc& desc ):
-		device_( &device ),
-		solidPipeline_( CreateWorldPipeline( device, desc, D3D12_FILL_MODE_SOLID ) ),
-		wireframePipeline_( CreateWorldPipeline( device, desc, D3D12_FILL_MODE_WIREFRAME ) ),
-		linePipeline_( CreateWorldPipeline(
-			device,
-			desc,
-			D3D12_FILL_MODE_SOLID,
-			D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE,
-			D3D_PRIMITIVE_TOPOLOGY_LINELIST ) )
+	DebugRenderer::DebugRenderer( RenderDevice& device, const DebugRendererDesc& desc )
+		: device_( &device ), solidPipeline_( CreateWorldPipeline( device, desc, D3D12_FILL_MODE_SOLID ) ),
+		  wireframePipeline_( CreateWorldPipeline( device, desc, D3D12_FILL_MODE_WIREFRAME ) ),
+		  linePipeline_( CreateWorldPipeline( device, desc, D3D12_FILL_MODE_SOLID, D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE, D3D_PRIMITIVE_TOPOLOGY_LINELIST ) )
 	{
 		BuildPrimitiveGeometry();
 		UploadStaticGeometry();
@@ -326,19 +319,14 @@ float4 main(PSInput input) : SV_Target0
 		if( wireframeDrawCount_ > 0 )
 		{
 			commands.CmdBindRenderPipeline( wireframePipeline_ );
-			commands.CmdDrawIndexedIndirect(
-				indirectBuffer_,
-				wireframeDrawCount_,
-				static_cast<uint64_t>( solidDrawCount_ ) * sizeof( IndirectDraw ) );
+			commands.CmdDrawIndexedIndirect( indirectBuffer_, wireframeDrawCount_, static_cast<uint64_t>( solidDrawCount_ ) * sizeof( IndirectDraw ) );
 		}
 
-		const uint32_t lineDrawCount = static_cast<uint32_t>( indirectDraws_.size() ) -
-			solidDrawCount_ - wireframeDrawCount_;
+		const uint32_t lineDrawCount = static_cast<uint32_t>( indirectDraws_.size() ) - solidDrawCount_ - wireframeDrawCount_;
 		if( lineDrawCount > 0 )
 		{
 			commands.CmdBindRenderPipeline( linePipeline_ );
-			commands.CmdDrawIndexedIndirect(
-				indirectBuffer_,
+			commands.CmdDrawIndexedIndirect( indirectBuffer_,
 				lineDrawCount,
 				static_cast<uint64_t>( solidDrawCount_ + wireframeDrawCount_ ) * sizeof( IndirectDraw ) );
 		}
@@ -484,12 +472,21 @@ float4 main(PSInput input) : SV_Target0
 		constexpr float halfY = 0.5f;
 		constexpr float halfZ = 0.5f;
 		const std::array<Face, 6> faces = {
-			Face{ { XMFLOAT3{ -halfX, -halfY, -halfZ }, XMFLOAT3{ -halfX, halfY, -halfZ }, XMFLOAT3{ halfX, halfY, -halfZ }, XMFLOAT3{ halfX, -halfY, -halfZ } } },
+			Face{ { XMFLOAT3{ -halfX, -halfY, -halfZ },
+				XMFLOAT3{ -halfX, halfY, -halfZ },
+				XMFLOAT3{ halfX, halfY, -halfZ },
+				XMFLOAT3{ halfX, -halfY, -halfZ } } },
 			Face{ { XMFLOAT3{ halfX, -halfY, halfZ }, XMFLOAT3{ halfX, halfY, halfZ }, XMFLOAT3{ -halfX, halfY, halfZ }, XMFLOAT3{ -halfX, -halfY, halfZ } } },
-			Face{ { XMFLOAT3{ -halfX, -halfY, halfZ }, XMFLOAT3{ -halfX, halfY, halfZ }, XMFLOAT3{ -halfX, halfY, -halfZ }, XMFLOAT3{ -halfX, -halfY, -halfZ } } },
+			Face{ { XMFLOAT3{ -halfX, -halfY, halfZ },
+				XMFLOAT3{ -halfX, halfY, halfZ },
+				XMFLOAT3{ -halfX, halfY, -halfZ },
+				XMFLOAT3{ -halfX, -halfY, -halfZ } } },
 			Face{ { XMFLOAT3{ halfX, -halfY, -halfZ }, XMFLOAT3{ halfX, halfY, -halfZ }, XMFLOAT3{ halfX, halfY, halfZ }, XMFLOAT3{ halfX, -halfY, halfZ } } },
 			Face{ { XMFLOAT3{ -halfX, halfY, -halfZ }, XMFLOAT3{ -halfX, halfY, halfZ }, XMFLOAT3{ halfX, halfY, halfZ }, XMFLOAT3{ halfX, halfY, -halfZ } } },
-			Face{ { XMFLOAT3{ -halfX, -halfY, halfZ }, XMFLOAT3{ -halfX, -halfY, -halfZ }, XMFLOAT3{ halfX, -halfY, -halfZ }, XMFLOAT3{ halfX, -halfY, halfZ } } },
+			Face{ { XMFLOAT3{ -halfX, -halfY, halfZ },
+				XMFLOAT3{ -halfX, -halfY, -halfZ },
+				XMFLOAT3{ halfX, -halfY, -halfZ },
+				XMFLOAT3{ halfX, -halfY, halfZ } } },
 		};
 
 		uint32_t faceIndex = 0;
@@ -524,10 +521,7 @@ float4 main(PSInput input) : SV_Target0
 			{
 				const float longitudeRatio = static_cast<float>( longitude ) / static_cast<float>( ourSphereLongitudeSegments );
 				const float theta = longitudeRatio * std::numbers::pi_v<float> * 2.0f;
-				const XMFLOAT3 position = {
-					ringRadius * std::cos( theta ),
-					y,
-					ringRadius * std::sin( theta ) };
+				const XMFLOAT3 position = { ringRadius * std::cos( theta ), y, ringRadius * std::sin( theta ) };
 				vertices_.push_back( { position } );
 			}
 		}
@@ -584,8 +578,7 @@ float4 main(PSInput input) : SV_Target0
 
 	void DebugRenderer::UploadInstanceBuffer()
 	{
-		UploadDynamicBuffer(
-			instanceBuffer_,
+		UploadDynamicBuffer( instanceBuffer_,
 			instanceBufferCapacity_,
 			instances_.data(),
 			static_cast<uint64_t>( instances_.size() ),
@@ -596,8 +589,7 @@ float4 main(PSInput input) : SV_Target0
 
 	void DebugRenderer::UploadIndirectBuffer()
 	{
-		UploadDynamicBuffer(
-			indirectBuffer_,
+		UploadDynamicBuffer( indirectBuffer_,
 			indirectBufferCapacity_,
 			indirectDraws_.data(),
 			static_cast<uint64_t>( indirectDraws_.size() ),
@@ -606,8 +598,7 @@ float4 main(PSInput input) : SV_Target0
 			"Ldx12 Utils World Indirect Draws" );
 	}
 
-	void DebugRenderer::UploadDynamicBuffer(
-		BufferHandle& buffer,
+	void DebugRenderer::UploadDynamicBuffer( BufferHandle& buffer,
 		uint64_t& capacity,
 		const void* data,
 		uint64_t elementCount,
@@ -709,29 +700,18 @@ float4 main(PSInput input) : SV_Target0
 			const XMVECTOR direction = end - start;
 			const float length = XMVectorGetX( XMVector3Length( direction ) );
 			const XMVECTOR forward = XMVectorScale( direction, 1.0f / length );
-			const XMVECTOR referenceUp = std::abs( XMVectorGetY( forward ) ) > 0.999f
-				? XMVectorSet( 1.0f, 0.0f, 0.0f, 0.0f )
-				: XMVectorSet( 0.0f, 1.0f, 0.0f, 0.0f );
+			const XMVECTOR referenceUp =
+				std::abs( XMVectorGetY( forward ) ) > 0.999f ? XMVectorSet( 1.0f, 0.0f, 0.0f, 0.0f ) : XMVectorSet( 0.0f, 1.0f, 0.0f, 0.0f );
 			const XMVECTOR unitRight = XMVector3Normalize( XMVector3Cross( referenceUp, forward ) );
 			const XMVECTOR unitUp = XMVector3Cross( forward, unitRight );
-			const XMMATRIX arrowModel(
-				XMVectorScale( unitRight, length ),
+			const XMMATRIX arrowModel( XMVectorScale( unitRight, length ),
 				XMVectorScale( unitUp, length ),
 				XMVectorScale( forward, length ),
 				XMVectorSet( object.arrowStart.x, object.arrowStart.y, object.arrowStart.z, 1.0f ) );
 
-			const XMMATRIX scale = XMMatrixScaling(
-				object.transform.scale.x,
-				object.transform.scale.y,
-				object.transform.scale.z );
-			const XMMATRIX rotation = XMMatrixRotationRollPitchYaw(
-				object.transform.rotation.x,
-				object.transform.rotation.y,
-				object.transform.rotation.z );
-			const XMMATRIX translation = XMMatrixTranslation(
-				object.transform.position.x,
-				object.transform.position.y,
-				object.transform.position.z );
+			const XMMATRIX scale = XMMatrixScaling( object.transform.scale.x, object.transform.scale.y, object.transform.scale.z );
+			const XMMATRIX rotation = XMMatrixRotationRollPitchYaw( object.transform.rotation.x, object.transform.rotation.y, object.transform.rotation.z );
+			const XMMATRIX translation = XMMatrixTranslation( object.transform.position.x, object.transform.position.y, object.transform.position.z );
 
 			GpuInstance result{};
 			StoreMatrix( result.model, arrowModel * scale * rotation * translation );
@@ -745,18 +725,11 @@ float4 main(PSInput input) : SV_Target0
 			geometryScale = { object.sphereRadius, object.sphereRadius, object.sphereRadius };
 		}
 
-		const XMMATRIX scale = XMMatrixScaling(
-			object.transform.scale.x * geometryScale.x,
+		const XMMATRIX scale = XMMatrixScaling( object.transform.scale.x * geometryScale.x,
 			object.transform.scale.y * geometryScale.y,
 			object.transform.scale.z * geometryScale.z );
-		const XMMATRIX rotation = XMMatrixRotationRollPitchYaw(
-			object.transform.rotation.x,
-			object.transform.rotation.y,
-			object.transform.rotation.z );
-		const XMMATRIX translation = XMMatrixTranslation(
-			object.transform.position.x,
-			object.transform.position.y,
-			object.transform.position.z );
+		const XMMATRIX rotation = XMMatrixRotationRollPitchYaw( object.transform.rotation.x, object.transform.rotation.y, object.transform.rotation.z );
+		const XMMATRIX translation = XMMatrixTranslation( object.transform.position.x, object.transform.position.y, object.transform.position.z );
 		const XMMATRIX model = scale * rotation * translation;
 
 		GpuInstance result{};
@@ -767,10 +740,7 @@ float4 main(PSInput input) : SV_Target0
 
 	DebugRenderer::PushConstants DebugRenderer::BuildPushConstants( RenderDevice& device, BufferHandle instanceBuffer, const Camera& camera )
 	{
-		if( camera.aspectRatio <= 0.0f ||
-			camera.nearPlane <= 0.0f ||
-			camera.farPlane <= camera.nearPlane ||
-			camera.verticalFieldOfViewRadians <= 0.0f ||
+		if( camera.aspectRatio <= 0.0f || camera.nearPlane <= 0.0f || camera.farPlane <= camera.nearPlane || camera.verticalFieldOfViewRadians <= 0.0f ||
 			camera.verticalFieldOfViewRadians >= std::numbers::pi_v<float> )
 		{
 			throw std::invalid_argument( "Camera projection values are invalid." );
@@ -780,8 +750,7 @@ float4 main(PSInput input) : SV_Target0
 		const XMVECTOR target = XMVectorSet( camera.target.x, camera.target.y, camera.target.z, 1.0f );
 		const XMVECTOR up = XMVectorSet( camera.up.x, camera.up.y, camera.up.z, 0.0f );
 		const XMMATRIX view = XMMatrixLookAtLH( eye, target, up );
-		const XMMATRIX projection = XMMatrixPerspectiveFovLH(
-			camera.verticalFieldOfViewRadians, camera.aspectRatio, camera.nearPlane, camera.farPlane );
+		const XMMATRIX projection = XMMatrixPerspectiveFovLH( camera.verticalFieldOfViewRadians, camera.aspectRatio, camera.nearPlane, camera.farPlane );
 
 		PushConstants constants{};
 		StoreMatrix( constants.viewProjection, view * projection );

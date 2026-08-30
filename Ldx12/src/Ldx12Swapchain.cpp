@@ -1,13 +1,11 @@
 #include "Ldx12Swapchain.hpp"
 
-
 #include <stdexcept>
 
 namespace ldx12
 {
-	Swapchain::Swapchain( DeviceManager& ctx, SwapchainHandle swapchainHandle, HWND hwnd, uint32_t width, uint32_t height ):
-		ctx_( ctx ),
-		swapchainHandle_( swapchainHandle )
+	Swapchain::Swapchain( DeviceManager& ctx, SwapchainHandle swapchainHandle, HWND hwnd, uint32_t width, uint32_t height )
+		: ctx_( ctx ), swapchainHandle_( swapchainHandle )
 	{
 		if( ctx_.desc_.swapchainBufferCount < 2 || ctx_.desc_.swapchainBufferCount > ourMaxSwapchainBuffers )
 		{
@@ -28,14 +26,12 @@ namespace ldx12
 		swapchainDesc.Flags = ctx_.desc_.allowTearing ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0u;
 
 		ComPtr<IDXGISwapChain1> tempSwapchain;
-		C_RESULT(
-			ctx_.factory_->CreateSwapChainForHwnd(
-				ctx_.GetGraphicsQueueContext().commandQueue_.Get(),
-				hwnd,
-				&swapchainDesc,
-				nullptr,
-				nullptr,
-				tempSwapchain.GetAddressOf() ),
+		C_RESULT( ctx_.factory_->CreateSwapChainForHwnd( ctx_.GetGraphicsQueueContext().commandQueue_.Get(),
+					  hwnd,
+					  &swapchainDesc,
+					  nullptr,
+					  nullptr,
+					  tempSwapchain.GetAddressOf() ),
 			"Failed to create swapchain." );
 
 		C_RESULT( tempSwapchain.As( &swapchain_ ), "Failed to query IDXGISwapChain4." );
@@ -74,13 +70,11 @@ namespace ldx12
 
 		properties_.width_ = width;
 		properties_.height_ = height;
-		C_RESULT(
-			swapchain_->ResizeBuffers(
-				ctx_.desc_.swapchainBufferCount,
-				properties_.width_,
-				properties_.height_,
-				properties_.surfaceFormat_,
-				ctx_.desc_.allowTearing ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0u ),
+		C_RESULT( swapchain_->ResizeBuffers( ctx_.desc_.swapchainBufferCount,
+					  properties_.width_,
+					  properties_.height_,
+					  properties_.surfaceFormat_,
+					  ctx_.desc_.allowTearing ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0u ),
 			"Failed to Resize swapchain." );
 
 		properties_.numSwapchainImages_ = ctx_.desc_.swapchainBufferCount;
@@ -191,5 +185,3 @@ namespace ldx12
 		return swapchainDesc != nullptr ? swapchainDesc->vsync : true;
 	}
 }
-
-

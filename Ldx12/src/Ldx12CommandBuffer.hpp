@@ -17,7 +17,7 @@ namespace ldx12
 		bool isEncoding_ = false;
 	};
 
-	class CommandBufferImpl final: public ICommandBuffer
+	class CommandBufferImpl final : public ICommandBuffer
 	{
 	public:
 		CommandBufferImpl() = default;
@@ -38,7 +38,11 @@ namespace ldx12
 		void CmdPushDebugGroupLabel( const char* label, uint32_t color ) override;
 		void CmdPopDebugGroupLabel() override;
 		void CmdDraw( uint32_t vertexCount, uint32_t instanceCount = 1, uint32_t firstVertex = 0, uint32_t firstInstance = 0 ) override;
-		void CmdDrawIndexed( uint32_t indexCount, uint32_t instanceCount = 1, uint32_t firstIndex = 0, int32_t vertexOffset = 0, uint32_t firstInstance = 0 ) override;
+		void CmdDrawIndexed( uint32_t indexCount,
+			uint32_t instanceCount = 1,
+			uint32_t firstIndex = 0,
+			int32_t vertexOffset = 0,
+			uint32_t firstInstance = 0 ) override;
 		void CmdDrawIndexedIndirect( BufferHandle indirectBuffer, uint32_t drawCount, uint64_t byteOffset = 0 ) override;
 		void CmdDispatch( uint32_t groupCountX, uint32_t groupCountY = 1, uint32_t groupCountZ = 1 ) override;
 
@@ -91,5 +95,3 @@ namespace ldx12
 		uint32_t trackedTextureCount_ = 0;
 	};
 }
-
-

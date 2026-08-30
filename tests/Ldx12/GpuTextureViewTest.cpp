@@ -15,10 +15,7 @@ namespace ldx12::tests
 		guard.active = true;
 		RenderDevice& device = *manager.GetRenderDevice();
 
-		const std::array<uint32_t, 2> arrayPixels = {
-			0xff0000ffu,
-			0xff00ff00u
-		};
+		const std::array<uint32_t, 2> arrayPixels = { 0xff0000ffu, 0xff00ff00u };
 		TextureDesc arrayDesc{};
 		arrayDesc.debugName = "Ldx12Tests shader Texture2DArray";
 		arrayDesc.width = 1;
@@ -30,14 +27,7 @@ namespace ldx12::tests
 		arrayDesc.slicePitch = sizeof( uint32_t );
 		const TextureHandle arrayTexture = device.CreateTexture( arrayDesc );
 
-		const std::array<uint32_t, ourCubeMapFaceCount> cubePixels = {
-			0xff0000ffu,
-			0xff00ffffu,
-			0xffff00ffu,
-			0xffffff00u,
-			0xffff0000u,
-			0xff00ff00u
-		};
+		const std::array<uint32_t, ourCubeMapFaceCount> cubePixels = { 0xff0000ffu, 0xff00ffffu, 0xffff00ffu, 0xffffff00u, 0xffff0000u, 0xff00ff00u };
 		TextureDesc cubeDesc{};
 		cubeDesc.debugName = "Ldx12Tests shader TextureCube";
 		cubeDesc.width = 1;
@@ -102,11 +92,9 @@ float4 PSMain(float4 position : SV_Position) : SV_Target0
 		pipelineDesc.depthStencilState.StencilEnable = FALSE;
 		RenderPipelineState pipeline = device.CreateRenderPipeline( pipelineDesc );
 
-		const std::array<uint32_t, 3> constants = {
-			device.GetBindlessIndex( arrayTexture ),
+		const std::array<uint32_t, 3> constants = { device.GetBindlessIndex( arrayTexture ),
 			device.GetBindlessIndex( cubeTexture ),
-			ToSamplerIndex( SamplerSlot::PointClamp )
-		};
+			ToSamplerIndex( SamplerSlot::PointClamp ) };
 		RenderPass renderPass{};
 		renderPass.color[ 0 ].loadOp = LoadOp::Clear;
 		Framebuffer framebuffer{};
@@ -123,14 +111,9 @@ float4 PSMain(float4 position : SV_Position) : SV_Target0
 
 		std::array<uint8_t, 8> result{};
 		device.DownloadTexture2D( target, result.data(), 8, 8 );
-		Require(
-			result[ 0 ] == 0u && result[ 1 ] == 255u &&
-			result[ 2 ] == 0u && result[ 3 ] == 255u,
+		Require( result[ 0 ] == 0u && result[ 1 ] == 255u && result[ 2 ] == 0u && result[ 3 ] == 255u,
 			"Texture2DArray SRV did not sample the requested array slice." );
-		Require(
-			result[ 4 ] == 255u && result[ 5 ] == 0u &&
-			result[ 6 ] == 0u && result[ 7 ] == 255u,
-			"TextureCube SRV did not sample the +X face." );
+		Require( result[ 4 ] == 255u && result[ 5 ] == 0u && result[ 6 ] == 0u && result[ 7 ] == 255u, "TextureCube SRV did not sample the +X face." );
 
 		device.Destroy( target );
 		device.Destroy( cubeTexture );

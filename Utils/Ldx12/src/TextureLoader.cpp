@@ -51,12 +51,7 @@ namespace ldx12::utils
 		Microsoft::WRL::ComPtr<IWICImagingFactory> CreateWicFactory()
 		{
 			Microsoft::WRL::ComPtr<IWICImagingFactory> factory;
-			ThrowIfFailed(
-				CoCreateInstance(
-					CLSID_WICImagingFactory,
-					nullptr,
-					CLSCTX_INPROC_SERVER,
-					IID_PPV_ARGS( factory.GetAddressOf() ) ),
+			ThrowIfFailed( CoCreateInstance( CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS( factory.GetAddressOf() ) ),
 				"Failed to create the WIC imaging factory." );
 			return factory;
 		}
@@ -64,13 +59,7 @@ namespace ldx12::utils
 		ImageRgba8 LoadImageRgba8( IWICImagingFactory& factory, const std::filesystem::path& path )
 		{
 			Microsoft::WRL::ComPtr<IWICBitmapDecoder> decoder;
-			ThrowIfFailed(
-				factory.CreateDecoderFromFilename(
-					path.c_str(),
-					nullptr,
-					GENERIC_READ,
-					WICDecodeMetadataCacheOnLoad,
-					decoder.GetAddressOf() ),
+			ThrowIfFailed( factory.CreateDecoderFromFilename( path.c_str(), nullptr, GENERIC_READ, WICDecodeMetadataCacheOnLoad, decoder.GetAddressOf() ),
 				"Failed to open an image." );
 
 			Microsoft::WRL::ComPtr<IWICBitmapFrameDecode> frame;
@@ -80,25 +69,15 @@ namespace ldx12::utils
 			ThrowIfFailed( frame->GetSize( &image.width, &image.height ), "Failed to read image dimensions." );
 
 			Microsoft::WRL::ComPtr<IWICFormatConverter> converter;
-			ThrowIfFailed(
-				factory.CreateFormatConverter( converter.GetAddressOf() ),
-				"Failed to create a WIC format converter." );
-			ThrowIfFailed(
-				converter->Initialize(
-					frame.Get(),
-					GUID_WICPixelFormat32bppRGBA,
-					WICBitmapDitherTypeNone,
-					nullptr,
-					0.0,
-					WICBitmapPaletteTypeCustom ),
+			ThrowIfFailed( factory.CreateFormatConverter( converter.GetAddressOf() ), "Failed to create a WIC format converter." );
+			ThrowIfFailed( converter
+							   ->Initialize( frame.Get(), GUID_WICPixelFormat32bppRGBA, WICBitmapDitherTypeNone, nullptr, 0.0, WICBitmapPaletteTypeCustom ),
 				"Failed to convert an image to RGBA8." );
 
 			const uint32_t rowPitch = image.width * 4u;
 			const uint32_t imageSize = rowPitch * image.height;
 			image.pixels.resize( imageSize );
-			ThrowIfFailed(
-				converter->CopyPixels( nullptr, rowPitch, imageSize, image.pixels.data() ),
-				"Failed to copy image pixels." );
+			ThrowIfFailed( converter->CopyPixels( nullptr, rowPitch, imageSize, image.pixels.data() ), "Failed to copy image pixels." );
 			return image;
 		}
 	}
@@ -110,19 +89,14 @@ namespace ldx12::utils
 		return LoadImageRgba8( *factory.Get(), path );
 	}
 
-	TextureHandle CreateCheckerTexture(
-		RenderDevice& device,
-		uint32_t firstColor,
-		uint32_t secondColor,
-		uint32_t textureSize,
-		uint32_t checkerSize )
+	TextureHandle CreateCheckerTexture( RenderDevice& device, uint32_t firstColor, uint32_t secondColor, uint32_t textureSize, uint32_t checkerSize )
 	{
 		std::vector<uint32_t> pixels( static_cast<size_t>( textureSize ) * textureSize );
 		for( uint32_t y = 0; y < textureSize; ++y )
 		{
 			for( uint32_t x = 0; x < textureSize; ++x )
 			{
-				const bool first = ( (x / checkerSize) + (y / checkerSize) ) % 2u == 0u;
+				const bool first = ( ( x / checkerSize ) + ( y / checkerSize ) ) % 2u == 0u;
 				pixels[ static_cast<size_t>( y ) * textureSize + x ] = first ? firstColor : secondColor;
 			}
 		}
@@ -143,9 +117,7 @@ namespace ldx12::utils
 	{
 		ComInitialization com;
 		Microsoft::WRL::ComPtr<IWICImagingFactory> factory = CreateWicFactory();
-		const std::array<std::filesystem::path, ourCubeMapFaceCount> faceNames = {
-			"px.png", "nx.png", "py.png", "ny.png", "pz.png", "nz.png"
-		};
+		const std::array<std::filesystem::path, ourCubeMapFaceCount> faceNames = { "px.png", "nx.png", "py.png", "ny.png", "pz.png", "nz.png" };
 
 		uint32_t width = 0;
 		uint32_t height = 0;
@@ -168,10 +140,7 @@ namespace ldx12::utils
 				throw std::runtime_error( "All cubemap faces must have identical dimensions." );
 			}
 
-			std::memcpy(
-				pixels.data() + static_cast<size_t>( face ) * slicePitch,
-				image.pixels.data(),
-				slicePitch );
+			std::memcpy( pixels.data() + static_cast<size_t>( face ) * slicePitch, image.pixels.data(), slicePitch );
 		}
 
 		TextureDesc desc{};

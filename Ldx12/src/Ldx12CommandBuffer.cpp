@@ -27,9 +27,7 @@ namespace ldx12
 			{
 				const size_t end = versionText.find( L'.', start );
 				const std::wstring token = versionText.substr( start, end == std::wstring::npos ? std::wstring::npos : end - start );
-				components[ componentIndex++ ] = token.empty()
-					? 0u
-					: static_cast<uint32_t>( std::wcstoul( token.c_str(), nullptr, 10 ) );
+				components[ componentIndex++ ] = token.empty() ? 0u : static_cast<uint32_t>( std::wcstoul( token.c_str(), nullptr, 10 ) );
 
 				if( end == std::wstring::npos )
 				{
@@ -68,12 +66,9 @@ namespace ldx12
 			// Then try the standard NuGet cache location, which is where the PIX event runtime is commonly installed.
 			wchar_t* userProfileValue = nullptr;
 			size_t userProfileLength = 0;
-			if( _wdupenv_s( &userProfileValue, &userProfileLength, L"USERPROFILE" ) == 0 &&
-				userProfileValue != nullptr &&
-				userProfileValue[ 0 ] != L'\0' )
+			if( _wdupenv_s( &userProfileValue, &userProfileLength, L"USERPROFILE" ) == 0 && userProfileValue != nullptr && userProfileValue[ 0 ] != L'\0' )
 			{
-				const std::filesystem::path runtimeRoot =
-					std::filesystem::path( userProfileValue ) / ".nuget" / "packages" / "winpixeventruntime";
+				const std::filesystem::path runtimeRoot = std::filesystem::path( userProfileValue ) / ".nuget" / "packages" / "winpixeventruntime";
 				free( userProfileValue );
 				if( std::filesystem::exists( runtimeRoot ) )
 				{
@@ -129,7 +124,8 @@ namespace ldx12
 
 			bool Available()
 			{
-				std::call_once( initFlag_, [this]()
+				std::call_once( initFlag_,
+					[ this ]()
 					{
 						const std::filesystem::path runtimePath = FindPixEventRuntimePath();
 						if( runtimePath.empty() )
@@ -197,19 +193,19 @@ namespace ldx12
 
 			switch( loadOp )
 			{
-				case LoadOp::Load:
-					beginningAccess.Type = D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_PRESERVE;
-					break;
+			case LoadOp::Load:
+				beginningAccess.Type = D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_PRESERVE;
+				break;
 
-				case LoadOp::Clear:
-					beginningAccess.Type = D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_CLEAR;
-					beginningAccess.Clear.ClearValue.Format = format;
-					std::memcpy( beginningAccess.Clear.ClearValue.Color, clearColor.data(), sizeof( float ) * clearColor.size() );
-					break;
+			case LoadOp::Clear:
+				beginningAccess.Type = D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_CLEAR;
+				beginningAccess.Clear.ClearValue.Format = format;
+				std::memcpy( beginningAccess.Clear.ClearValue.Color, clearColor.data(), sizeof( float ) * clearColor.size() );
+				break;
 
-				case LoadOp::DontCare:
-					beginningAccess.Type = D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_DISCARD;
-					break;
+			case LoadOp::DontCare:
+				beginningAccess.Type = D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_DISCARD;
+				break;
 			}
 
 			return beginningAccess;
@@ -221,19 +217,19 @@ namespace ldx12
 
 			switch( loadOp )
 			{
-				case LoadOp::Load:
-					beginningAccess.Type = D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_PRESERVE;
-					break;
+			case LoadOp::Load:
+				beginningAccess.Type = D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_PRESERVE;
+				break;
 
-				case LoadOp::Clear:
-					beginningAccess.Type = D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_CLEAR;
-					beginningAccess.Clear.ClearValue.DepthStencil.Depth = clearDepth;
-					beginningAccess.Clear.ClearValue.Format = format;
-					break;
+			case LoadOp::Clear:
+				beginningAccess.Type = D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_CLEAR;
+				beginningAccess.Clear.ClearValue.DepthStencil.Depth = clearDepth;
+				beginningAccess.Clear.ClearValue.Format = format;
+				break;
 
-				case LoadOp::DontCare:
-					beginningAccess.Type = D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_DISCARD;
-					break;
+			case LoadOp::DontCare:
+				beginningAccess.Type = D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_DISCARD;
+				break;
 			}
 
 			return beginningAccess;
@@ -245,19 +241,19 @@ namespace ldx12
 
 			switch( loadOp )
 			{
-				case LoadOp::Load:
-					beginningAccess.Type = D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_PRESERVE;
-					break;
+			case LoadOp::Load:
+				beginningAccess.Type = D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_PRESERVE;
+				break;
 
-				case LoadOp::Clear:
-					beginningAccess.Type = D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_CLEAR;
-					beginningAccess.Clear.ClearValue.DepthStencil.Stencil = clearStencil;
-					beginningAccess.Clear.ClearValue.Format = format;
-					break;
+			case LoadOp::Clear:
+				beginningAccess.Type = D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_CLEAR;
+				beginningAccess.Clear.ClearValue.DepthStencil.Stencil = clearStencil;
+				beginningAccess.Clear.ClearValue.Format = format;
+				break;
 
-				case LoadOp::DontCare:
-					beginningAccess.Type = D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_DISCARD;
-					break;
+			case LoadOp::DontCare:
+				beginningAccess.Type = D3D12_RENDER_PASS_BEGINNING_ACCESS_TYPE_DISCARD;
+				break;
 			}
 
 			return beginningAccess;
@@ -295,10 +291,7 @@ namespace ldx12
 		debugGroupDepth_ = 0;
 		trackedTextureCount_ = 0;
 
-		ID3D12DescriptorHeap* heaps[] = {
-			manager_->bindlessHeap_.Get(),
-			manager_->samplerHeap_.Get()
-		};
+		ID3D12DescriptorHeap* heaps[] = { manager_->bindlessHeap_.Get(), manager_->samplerHeap_.Get() };
 		wrapper_->commandList_->SetDescriptorHeaps( static_cast<UINT>( std::size( heaps ) ), heaps );
 
 		ID3D12RootSignature* rootSignature = manager_->rootSignature_.Get();
@@ -335,8 +328,7 @@ namespace ldx12
 		trackedTexture.currentState_ = resource.currentState_;
 		if( trackedTextureCount_ == trackedTextures_.size() )
 		{
-			throw std::length_error(
-				"A command buffer cannot track more than 256 textures." );
+			throw std::length_error( "A command buffer cannot track more than 256 textures." );
 		}
 
 		trackedTextures_[ trackedTextureCount_ ] = trackedTexture;
@@ -351,35 +343,32 @@ namespace ldx12
 			return;
 		}
 
-		const D3D12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-			resource.resource_.Get(),
-			trackedTexture.currentState_,
-			newState );
+		const D3D12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition( resource.resource_.Get(), trackedTexture.currentState_, newState );
 		wrapper_->commandList_->ResourceBarrier( 1, &barrier );
 		trackedTexture.currentState_ = newState;
 	}
 
 	CommandListWrapper* CommandBufferImpl::BuildSubmitFixup( CommandBufferImpl* const* previousCommandBuffers, uint32_t previousCommandBufferCount )
 	{
-		const auto getCurrentState = [this, previousCommandBuffers, previousCommandBufferCount]( TextureHandle texture )
+		const auto getCurrentState = [ this, previousCommandBuffers, previousCommandBufferCount ]( TextureHandle texture )
+		{
+			for( uint32_t commandBufferIndex = previousCommandBufferCount; commandBufferIndex > 0; --commandBufferIndex )
 			{
-				for( uint32_t commandBufferIndex = previousCommandBufferCount; commandBufferIndex > 0; --commandBufferIndex )
+				assert( previousCommandBuffers != nullptr );
+				const CommandBufferImpl* previousCommandBuffer = previousCommandBuffers[ commandBufferIndex - 1 ];
+				assert( previousCommandBuffer != nullptr );
+				const TrackedTextureState* trackedTextures = previousCommandBuffer->GetTrackedTextures();
+				for( uint32_t textureIndex = 0; textureIndex < previousCommandBuffer->GetTrackedTextureCount(); ++textureIndex )
 				{
-					assert( previousCommandBuffers != nullptr );
-					const CommandBufferImpl* previousCommandBuffer = previousCommandBuffers[ commandBufferIndex - 1 ];
-					assert( previousCommandBuffer != nullptr );
-					const TrackedTextureState* trackedTextures = previousCommandBuffer->GetTrackedTextures();
-					for( uint32_t textureIndex = 0; textureIndex < previousCommandBuffer->GetTrackedTextureCount(); ++textureIndex )
+					if( trackedTextures[ textureIndex ].handle_ == texture )
 					{
-						if( trackedTextures[ textureIndex ].handle_ == texture )
-						{
-							return trackedTextures[ textureIndex ].currentState_;
-						}
+						return trackedTextures[ textureIndex ].currentState_;
 					}
 				}
+			}
 
-				return manager_->GetTextureResource( texture ).currentState_;
-			};
+			return manager_->GetTextureResource( texture ).currentState_;
+		};
 
 		bool requiresFixup = false;
 		for( uint32_t index = 0; index < trackedTextureCount_; ++index )
@@ -409,10 +398,7 @@ namespace ldx12
 				continue;
 			}
 
-			const D3D12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-				resource.resource_.Get(),
-				currentState,
-				trackedTexture.initialState_ );
+			const D3D12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition( resource.resource_.Get(), currentState, trackedTexture.initialState_ );
 			fixup.commandList_->ResourceBarrier( 1, &barrier );
 		}
 
@@ -460,15 +446,13 @@ namespace ldx12
 			}
 			else if( framebufferSampleCount != colorTexture.desc_.SampleDesc.Count )
 			{
-				throw std::runtime_error(
-					"All framebuffer attachments must use the same sample count." );
+				throw std::runtime_error( "All framebuffer attachments must use the same sample count." );
 			}
 
 			TransitionTexture( framebuffer.color[ index ].texture, colorTexture, D3D12_RESOURCE_STATE_RENDER_TARGET );
 
 			renderTargetDescs[ numRenderTargets ].cpuDescriptor = colorTexture.rtvHandle_;
-			renderTargetDescs[ numRenderTargets ].BeginningAccess = CreateBeginningAccess(
-				renderPass.color[ index ].loadOp,
+			renderTargetDescs[ numRenderTargets ].BeginningAccess = CreateBeginningAccess( renderPass.color[ index ].loadOp,
 				colorTexture.formats_.rtv_ != DXGI_FORMAT_UNKNOWN ? colorTexture.formats_.rtv_ : colorTexture.format_,
 				renderPass.color[ index ].clearColor );
 			renderTargetDescs[ numRenderTargets ].EndingAccess = CreateEndingAccess( renderPass.color[ index ].storeOp );
@@ -496,31 +480,26 @@ namespace ldx12
 			}
 			else if( framebufferSampleCount != depthTexture.desc_.SampleDesc.Count )
 			{
-				throw std::runtime_error(
-					"All framebuffer attachments must use the same sample count." );
+				throw std::runtime_error( "All framebuffer attachments must use the same sample count." );
 			}
 
 			TransitionTexture( framebuffer.depthStencil.texture, depthTexture, D3D12_RESOURCE_STATE_DEPTH_WRITE );
 
 			depthStencilDesc.cpuDescriptor = depthTexture.dsvHandle_;
-			depthStencilDesc.DepthBeginningAccess = depthTexture.isDepthFormat_
-				? CreateDepthBeginningAccess(
-					renderPass.depthStencil.depthLoadOp,
-					depthTexture.formats_.dsv_ != DXGI_FORMAT_UNKNOWN ? depthTexture.formats_.dsv_ : depthTexture.format_,
-					renderPass.depthStencil.clearDepth )
-				: CreateNoAccessBeginningAccess();
-			depthStencilDesc.DepthEndingAccess = depthTexture.isDepthFormat_
-				? CreateEndingAccess( renderPass.depthStencil.depthStoreOp )
-				: CreateNoAccessEndingAccess();
-			depthStencilDesc.StencilBeginningAccess = depthTexture.isStencilFormat_
-				? CreateStencilBeginningAccess(
-					renderPass.depthStencil.stencilLoadOp,
-					depthTexture.formats_.dsv_ != DXGI_FORMAT_UNKNOWN ? depthTexture.formats_.dsv_ : depthTexture.format_,
-					renderPass.depthStencil.clearStencil )
-				: CreateNoAccessBeginningAccess();
-			depthStencilDesc.StencilEndingAccess = depthTexture.isStencilFormat_
-				? CreateEndingAccess( renderPass.depthStencil.stencilStoreOp )
-				: CreateNoAccessEndingAccess();
+			depthStencilDesc.DepthBeginningAccess =
+				depthTexture.isDepthFormat_ ? CreateDepthBeginningAccess( renderPass.depthStencil.depthLoadOp,
+												  depthTexture.formats_.dsv_ != DXGI_FORMAT_UNKNOWN ? depthTexture.formats_.dsv_ : depthTexture.format_,
+												  renderPass.depthStencil.clearDepth )
+											: CreateNoAccessBeginningAccess();
+			depthStencilDesc.DepthEndingAccess =
+				depthTexture.isDepthFormat_ ? CreateEndingAccess( renderPass.depthStencil.depthStoreOp ) : CreateNoAccessEndingAccess();
+			depthStencilDesc.StencilBeginningAccess =
+				depthTexture.isStencilFormat_ ? CreateStencilBeginningAccess( renderPass.depthStencil.stencilLoadOp,
+													depthTexture.formats_.dsv_ != DXGI_FORMAT_UNKNOWN ? depthTexture.formats_.dsv_ : depthTexture.format_,
+													renderPass.depthStencil.clearStencil )
+											  : CreateNoAccessBeginningAccess();
+			depthStencilDesc.StencilEndingAccess =
+				depthTexture.isStencilFormat_ ? CreateEndingAccess( renderPass.depthStencil.stencilStoreOp ) : CreateNoAccessEndingAccess();
 			depthStencilDescPtr = &depthStencilDesc;
 
 			if( viewportTexture == nullptr )
@@ -534,8 +513,7 @@ namespace ldx12
 			throw std::runtime_error( "Framebuffer does not contain any attachments." );
 		}
 
-		wrapper_->commandList_->BeginRenderPass(
-			numRenderTargets,
+		wrapper_->commandList_->BeginRenderPass( numRenderTargets,
 			numRenderTargets > 0 ? renderTargetDescs.data() : nullptr,
 			depthStencilDescPtr,
 			D3D12_RENDER_PASS_FLAG_NONE );
@@ -579,54 +557,39 @@ namespace ldx12
 		TransitionTexture( texture, resource, newState );
 	}
 
-	void CommandBufferImpl::CmdResolveTexture(
-		TextureHandle source,
-		TextureHandle destination )
+	void CommandBufferImpl::CmdResolveTexture( TextureHandle source, TextureHandle destination )
 	{
 		if( isRendering_ )
 		{
-			throw std::runtime_error(
-				"CmdResolveTexture must be called outside a render pass." );
+			throw std::runtime_error( "CmdResolveTexture must be called outside a render pass." );
 		}
 		if( source == destination )
 		{
-			throw std::invalid_argument(
-				"CmdResolveTexture requires different source and destination textures." );
+			throw std::invalid_argument( "CmdResolveTexture requires different source and destination textures." );
 		}
 
 		TextureResource& sourceResource = manager_->GetTextureResource( source );
 		TextureResource& destinationResource = manager_->GetTextureResource( destination );
-		if( sourceResource.desc_.SampleDesc.Count <= 1 ||
-			destinationResource.desc_.SampleDesc.Count != 1 )
+		if( sourceResource.desc_.SampleDesc.Count <= 1 || destinationResource.desc_.SampleDesc.Count != 1 )
 		{
-			throw std::runtime_error(
-				"CmdResolveTexture requires a multisampled source and a single-sampled destination." );
+			throw std::runtime_error( "CmdResolveTexture requires a multisampled source and a single-sampled destination." );
 		}
-		if( sourceResource.width_ != destinationResource.width_ ||
-			sourceResource.height_ != destinationResource.height_ )
+		if( sourceResource.width_ != destinationResource.width_ || sourceResource.height_ != destinationResource.height_ )
 		{
-			throw std::runtime_error(
-				"CmdResolveTexture requires matching source and destination dimensions." );
+			throw std::runtime_error( "CmdResolveTexture requires matching source and destination dimensions." );
 		}
 		if( sourceResource.format_ != destinationResource.format_ )
 		{
-			throw std::runtime_error(
-				"CmdResolveTexture requires matching source and destination formats." );
+			throw std::runtime_error( "CmdResolveTexture requires matching source and destination formats." );
 		}
 		if( sourceResource.isDepthFormat_ || destinationResource.isDepthFormat_ )
 		{
-			throw std::runtime_error(
-				"CmdResolveTexture supports color textures only." );
+			throw std::runtime_error( "CmdResolveTexture supports color textures only." );
 		}
 
 		TransitionTexture( source, sourceResource, D3D12_RESOURCE_STATE_RESOLVE_SOURCE );
 		TransitionTexture( destination, destinationResource, D3D12_RESOURCE_STATE_RESOLVE_DEST );
-		wrapper_->commandList_->ResolveSubresource(
-			destinationResource.resource_.Get(),
-			0,
-			sourceResource.resource_.Get(),
-			0,
-			sourceResource.format_ );
+		wrapper_->commandList_->ResolveSubresource( destinationResource.resource_.Get(), 0, sourceResource.resource_.Get(), 0, sourceResource.format_ );
 	}
 
 	void CommandBufferImpl::CmdBindRenderPipeline( const RenderPipelineState& pipeline )
@@ -690,8 +653,7 @@ namespace ldx12
 		}
 
 		const uint32_t valueCount = sizeBytes / sizeof( uint32_t );
-		if( offset32BitValues > ourMaxPushConstant32BitValues ||
-			valueCount > ourMaxPushConstant32BitValues - offset32BitValues )
+		if( offset32BitValues > ourMaxPushConstant32BitValues || valueCount > ourMaxPushConstant32BitValues - offset32BitValues )
 		{
 			throw std::length_error( "CmdPushConstants cannot exceed 63 32-bit values." );
 		}
@@ -704,11 +666,11 @@ namespace ldx12
 	{
 		if( label != nullptr && label[ 0 ] != '\0' )
 		{
-			#if LDX12_INTERNAL_PIX_ENABLED
-				GetPixRuntime().BeginEvent( wrapper_->commandList_.Get(), static_cast<uint64_t>( color ), label );
-			#else
-				(void)color;
-			#endif
+#if LDX12_INTERNAL_PIX_ENABLED
+			GetPixRuntime().BeginEvent( wrapper_->commandList_.Get(), static_cast<uint64_t>( color ), label );
+#else
+			(void)color;
+#endif
 			debugGroupDepth_++;
 		}
 	}
@@ -717,9 +679,9 @@ namespace ldx12
 	{
 		if( debugGroupDepth_ > 0 )
 		{
-			#if LDX12_INTERNAL_PIX_ENABLED
-				GetPixRuntime().EndEvent( wrapper_->commandList_.Get() );
-			#endif
+#if LDX12_INTERNAL_PIX_ENABLED
+			GetPixRuntime().EndEvent( wrapper_->commandList_.Get() );
+#endif
 			debugGroupDepth_--;
 		}
 	}
@@ -742,19 +704,12 @@ namespace ldx12
 			throw std::runtime_error( "This buffer was not created as an indirect buffer." );
 		}
 		constexpr uint64_t indirectCommandSize = sizeof( uint32_t ) + sizeof( D3D12_DRAW_INDEXED_ARGUMENTS );
-		if( byteOffset % sizeof( uint32_t ) != 0 ||
-			byteOffset > resource.bufferSize_ ||
-			drawCount > (resource.bufferSize_ - byteOffset) / indirectCommandSize )
+		if( byteOffset % sizeof( uint32_t ) != 0 || byteOffset > resource.bufferSize_ ||
+			drawCount > ( resource.bufferSize_ - byteOffset ) / indirectCommandSize )
 		{
 			throw std::runtime_error( "Indirect draw range exceeds the buffer." );
 		}
-		wrapper_->commandList_->ExecuteIndirect(
-			manager_->commandSignature_.Get(),
-			drawCount,
-			resource.resource_.Get(),
-			byteOffset,
-			nullptr,
-			0 );
+		wrapper_->commandList_->ExecuteIndirect( manager_->commandSignature_.Get(), drawCount, resource.resource_.Get(), byteOffset, nullptr, 0 );
 	}
 
 	void CommandBufferImpl::CmdDispatch( uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ )
@@ -767,5 +722,3 @@ namespace ldx12
 		return wrapper_->commandList_.Get();
 	}
 }
-
-
