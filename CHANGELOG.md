@@ -11,6 +11,7 @@ This file lists the main user-visible changes in each Ldx12 version.
 ### Fixed
 
 - Replaced the `ICommandBuffer`/`CommandBufferImpl` split with one concrete `CommandBuffer`, removing virtual command dispatch and interface-to-implementation conversion during submission.
+- Default-heap buffers now start in their real D3D12 `COMMON` state and use implicit read-state promotion, removing ignored-initial-state validation warnings. Pipelines driven entirely by `SV_VertexID` now pass a null input layout instead of an empty descriptor array.
 
 ## 0.2.0 - 2026-08-30
 

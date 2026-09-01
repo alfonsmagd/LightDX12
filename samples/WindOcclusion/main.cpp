@@ -126,6 +126,7 @@ namespace
 	{
 		ComputePipelineDesc desc{};
 		desc.computeShader = HLSLLoader::LoadStage( "shaders/WakeGenerate.hlsl", "cs_6_6", "CSMain" );
+
 		return device.CreateComputePipeline( desc );
 	}
 
@@ -133,6 +134,7 @@ namespace
 	{
 		ComputePipelineDesc desc{};
 		desc.computeShader = HLSLLoader::LoadStage( "shaders/WakeAverage.hlsl", "cs_6_6", "CSMain" );
+
 		return device.CreateComputePipeline( desc );
 	}
 
@@ -146,6 +148,7 @@ namespace
 		desc.rasterizerState.CullMode = D3D12_CULL_MODE_NONE;
 		desc.depthStencilState.DepthEnable = FALSE;
 		desc.depthStencilState.StencilEnable = FALSE;
+
 		return device.CreateRenderPipeline( desc );
 	}
 
@@ -162,6 +165,7 @@ namespace
 		desc.depthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
 		desc.depthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
 		desc.depthStencilState.StencilEnable = FALSE;
+
 		return device.CreateRenderPipeline( desc );
 	}
 
@@ -175,6 +179,7 @@ namespace
 		desc.rasterizerState.CullMode = D3D12_CULL_MODE_NONE;
 		desc.depthStencilState.DepthEnable = FALSE;
 		desc.depthStencilState.StencilEnable = FALSE;
+
 		return device.CreateRenderPipeline( desc );
 	}
 
@@ -188,6 +193,7 @@ namespace
 		desc.rasterizerState.CullMode = D3D12_CULL_MODE_NONE;
 		desc.depthStencilState.DepthEnable = FALSE;
 		desc.depthStencilState.StencilEnable = FALSE;
+
 		return device.CreateRenderPipeline( desc );
 	}
 
@@ -210,6 +216,7 @@ namespace
 		desc.depthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
 		desc.depthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
 		desc.depthStencilState.StencilEnable = FALSE;
+
 		return device.CreateRenderPipeline( desc );
 	}
 
@@ -274,6 +281,7 @@ namespace
 		desc.data = wind.data();
 		desc.rowPitch = ourWindTextureSize * sizeof( WindTexel );
 		desc.slicePitch = desc.rowPitch * ourWindTextureSize;
+
 		return device.CreateTexture( desc );
 	}
 
@@ -291,6 +299,7 @@ namespace
 		desc.clearValue.Color[ 1 ] = 1.0f;
 		desc.clearValue.Color[ 2 ] = 1.0f;
 		desc.clearValue.Color[ 3 ] = 1.0f;
+
 		return device.CreateTexture( desc );
 	}
 
@@ -317,6 +326,7 @@ namespace
 		desc.height = ourWindTextureSize;
 		desc.format = DXGI_FORMAT_R8G8B8A8_UNORM;
 		desc.usage = TextureUsage::RenderTarget | TextureUsage::Sampled;
+
 		return device.CreateTexture( desc );
 	}
 
@@ -333,6 +343,7 @@ namespace
 		obstacle.shape = shape( random ) == 0 ? ObstacleShape::Cube : ObstacleShape::Sphere;
 		obstacle.position.x = position( random );
 		obstacle.position.z = position( random );
+
 		if( obstacle.shape == ObstacleShape::Sphere )
 		{
 			const float radius = horizontalScale( random );
@@ -346,13 +357,14 @@ namespace
 			obstacle.rotationY = rotationDirection( random ) == 0 ? XM_PIDIV4 : -XM_PIDIV4;
 		}
 		obstacle.color = { color( random ), color( random ), color( random ), 1.0f };
+
 		return obstacle;
 	}
 
 	XMMATRIX GetObstacleModel( const Obstacle& obstacle )
 	{
 		return XMMatrixScaling( obstacle.scale.x, obstacle.scale.y, obstacle.scale.z ) * XMMatrixRotationY( obstacle.rotationY ) *
-			XMMatrixTranslation( obstacle.position.x, obstacle.position.y, obstacle.position.z );
+			   XMMatrixTranslation( obstacle.position.x, obstacle.position.y, obstacle.position.z );
 	}
 
 	void SetTransforms( PushConstants& constants, const XMMATRIX& model, const XMMATRIX& viewProjection )
@@ -417,27 +429,34 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 
 		DeviceManager& manager = DeviceManager::Initialize( contextDesc, swapchainDesc );
 		app.SetDeviceManager( manager );
+
 		RenderDevice& device = *manager.GetRenderDevice();
 
 		RenderPipelineState maskPipeline = CreateMaskPipeline( device );
+
 		ComputePipelineState windPipeline = CreateWindPipeline( device );
 		ComputePipelineState wakeAveragePipeline = CreateWakeAveragePipeline( device );
+
 		RenderPipelineState wakeClearPipeline = CreateWakeClearPipeline( device );
 		RenderPipelineState groundPipeline = CreateGroundPipeline( device, contextDesc.swapchainFormat );
 		RenderPipelineState windPreviewPipeline = CreateWindPreviewPipeline( device );
 		RenderPipelineState wakePreviewPipeline = CreateWakePreviewPipeline( device );
 		RenderPipelineState sceneObstaclePipeline = CreateSceneObstaclePipeline( device, contextDesc.swapchainFormat );
+
 		std::array<TextureHandle, static_cast<uint32_t>( WindFieldTest::Count )> inputWindTextures{};
+
 		inputWindTextures[ static_cast<uint32_t>( WindFieldTest::PositiveX ) ] = CreateInputWindTexture( device, WindFieldTest::PositiveX );
 		inputWindTextures[ static_cast<uint32_t>( WindFieldTest::NegativeX ) ] = CreateInputWindTexture( device, WindFieldTest::NegativeX );
 		inputWindTextures[ static_cast<uint32_t>( WindFieldTest::PositiveZ ) ] = CreateInputWindTexture( device, WindFieldTest::PositiveZ );
 		inputWindTextures[ static_cast<uint32_t>( WindFieldTest::NegativeZ ) ] = CreateInputWindTexture( device, WindFieldTest::NegativeZ );
 		inputWindTextures[ static_cast<uint32_t>( WindFieldTest::Vortices ) ] = CreateInputWindTexture( device, WindFieldTest::Vortices );
+
 		TextureHandle obstacleMask = CreateObstacleMask( device );
 		TextureHandle rawWakeTexture = CreateWakeTexture( device, "Raw wind wake factor", true );
 		TextureHandle filteredWakeTexture = CreateWakeTexture( device, "Averaged wind wake factor", false );
 		TextureHandle inputWindPreview = CreateWindPreviewTexture( device, "Input wind preview" );
 		TextureHandle generatedWindPreview = CreateWindPreviewTexture( device, "Generated wind preview" );
+
 		utils::GeometryBuffers cube = utils::CreateCube( device );
 		utils::GeometryBuffers sphere = utils::CreateSphere( device, 12, 20 );
 
@@ -463,9 +482,9 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		PushConstants sharedConstants{};
 		XMStoreFloat4x4( &sharedConstants.modelViewProjection, XMMatrixIdentity() );
 		XMStoreFloat4x4( &sharedConstants.model, XMMatrixIdentity() );
+
 		WindFieldTest activeWindTest = WindFieldTest::Vortices;
-		sharedConstants.inputWindIndex = device.GetBindlessIndex(
-			inputWindTextures[ static_cast<uint32_t>( activeWindTest ) ] );
+		sharedConstants.inputWindIndex = device.GetBindlessIndex( inputWindTextures[ static_cast<uint32_t>( activeWindTest ) ] );
 		sharedConstants.obstacleMaskIndex = device.GetBindlessIndex( obstacleMask );
 		sharedConstants.rawWakeIndex = device.GetBindlessIndex( rawWakeTexture );
 		sharedConstants.rawWakeUavIndex = device.GetUnorderedAccessIndex( rawWakeTexture );
@@ -497,9 +516,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 			std::array<SubmitHandle, ourFramesInFlight> frameSubmissions{};
 			uint32_t frameIndex = 0;
 
-			const XMMATRIX maskView = XMMatrixLookAtLH( XMVectorSet( 0.0f, 20.0f, 0.0f, 1.0f ),
-				XMVectorZero(),
-				XMVectorSet( 0.0f, 0.0f, 1.0f, 0.0f ) );
+			const XMMATRIX maskView = XMMatrixLookAtLH( XMVectorSet( 0.0f, 20.0f, 0.0f, 1.0f ), XMVectorZero(), XMVectorSet( 0.0f, 0.0f, 1.0f, 0.0f ) );
 			const XMMATRIX maskProjection = XMMatrixOrthographicLH( ourFieldWorldSize, ourFieldWorldSize, 0.1f, 40.0f );
 			const XMMATRIX maskViewProjection = maskView * maskProjection;
 
@@ -518,7 +535,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 					const Obstacle obstacle = CreateRandomObstacle( random );
 					obstacles.push_back( obstacle );
 					const std::wstring title = L"Ldx12 - Wind occlusion - " + std::to_wstring( obstacles.size() ) +
-						( obstacle.shape == ObstacleShape::Cube ? L" obstacles - added cube" : L" obstacles - added sphere" );
+											   ( obstacle.shape == ObstacleShape::Cube ? L" obstacles - added cube" : L" obstacles - added sphere" );
 					SetWindowTextW( app.GetWindow(), title.c_str() );
 				}
 
@@ -530,46 +547,57 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 				ImGui_ImplLdx12_NewFrame();
 				ImGui_ImplWin32_NewFrame();
 				ImGui::NewFrame();
-				ImGui::SetNextWindowPos( ImVec2( 10.0f, 10.0f ), ImGuiCond_Always );
-				ImGui::SetNextWindowSize( ImVec2( 600.0f, 500.0f ), ImGuiCond_Always );
-				ImGui::Begin( "Wind wake", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse );
-				ImGui::Text( "%u x %u", ourWindTextureSize, ourWindTextureSize );
-				ImGui::BeginGroup();
-				ImGui::TextUnformatted( "Input: original wind" );
-				ImGui::Image( inputWindPreview, ImVec2( 264.0f, 264.0f ) );
-				ImGui::EndGroup();
-				ImGui::SameLine();
-				ImGui::BeginGroup();
-				ImGui::TextUnformatted( "Wake: dark=low, white=full, red=solid" );
-				ImGui::Image( generatedWindPreview, ImVec2( 264.0f, 264.0f ) );
-				ImGui::EndGroup();
+				ImGui::SetNextWindowPos( ImVec2( 12.0f, 12.0f ), ImGuiCond_FirstUseEver );
+				ImGui::SetNextWindowSize( ImVec2( 470.0f, 520.0f ), ImGuiCond_FirstUseEver );
+				ImGui::Begin( "Wind wake", nullptr, ImGuiWindowFlags_NoCollapse );
+				ImGui::Text( "Field %u x %u  |  Obstacles %zu", ourWindTextureSize, ourWindTextureSize, obstacles.size() );
+				ImGui::TextDisabled( "Space adds a random cube or sphere" );
 				ImGui::Separator();
-				ImGui::TextUnformatted( "Test 1 - input wind" );
-				if( ImGui::Button( "+X" ) ) activeWindTest = WindFieldTest::PositiveX;
-				ImGui::SameLine();
-				if( ImGui::Button( "-X" ) ) activeWindTest = WindFieldTest::NegativeX;
-				ImGui::SameLine();
-				if( ImGui::Button( "+Z" ) ) activeWindTest = WindFieldTest::PositiveZ;
-				ImGui::SameLine();
-				if( ImGui::Button( "-Z" ) ) activeWindTest = WindFieldTest::NegativeZ;
-				ImGui::SameLine();
-				if( ImGui::Button( "Vortices" ) ) activeWindTest = WindFieldTest::Vortices;
-				ImGui::SliderFloat( "Edge step", &sharedConstants.edgeStep, 0.5f, 2.0f );
-				ImGui::SliderFloat( "Propagation step", &sharedConstants.propagationStep, 0.5f, 2.0f );
-				ImGui::SliderFloat( "Wake length", &sharedConstants.wakeLength, 1.0f, 256.0f );
-				ImGui::SliderFloat( "Wake factor", &sharedConstants.wakeEffect, 0.0f, 1.0f );
-				int maxWakeSteps = static_cast<int>( sharedConstants.maxWakeSteps );
-				if( ImGui::SliderInt( "Max wake steps", &maxWakeSteps, 24, 512 ) )
+
+				const float previewSize = ( ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x ) * 0.5f;
+				if( ImGui::BeginTable( "Wind previews", 2, ImGuiTableFlags_SizingStretchSame ) )
 				{
-					sharedConstants.maxWakeSteps = static_cast<uint32_t>( maxWakeSteps );
+					ImGui::TableNextColumn();
+					ImGui::TextUnformatted( "Input wind" );
+					ImGui::Image( inputWindPreview, ImVec2( previewSize, previewSize ) );
+					ImGui::TableNextColumn();
+					ImGui::TextUnformatted( "Wake factor" );
+					ImGui::Image( generatedWindPreview, ImVec2( previewSize, previewSize ) );
+					ImGui::TextDisabled( "Dark: wake  White: wind  Red: solid" );
+					ImGui::EndTable();
 				}
-				const uint32_t requiredWakeSteps = static_cast<uint32_t>(
-					std::ceil( sharedConstants.wakeLength / sharedConstants.propagationStep ) );
-				if( sharedConstants.maxWakeSteps < requiredWakeSteps )
+
+				ImGui::Separator();
+				ImGui::TextUnformatted( "Wind preset" );
+				const auto selectWindTest = [ &activeWindTest ]( const char* label, WindFieldTest test )
 				{
-					sharedConstants.maxWakeSteps = requiredWakeSteps;
-				}
-				ImGui::TextUnformatted( "Space: add a random cube or sphere" );
+					if( ImGui::RadioButton( label, activeWindTest == test ) )
+					{
+						activeWindTest = test;
+					}
+				};
+				selectWindTest( "+X", WindFieldTest::PositiveX );
+				ImGui::SameLine();
+				selectWindTest( "-X", WindFieldTest::NegativeX );
+				ImGui::SameLine();
+				selectWindTest( "+Z", WindFieldTest::PositiveZ );
+				ImGui::SameLine();
+				selectWindTest( "-Z", WindFieldTest::NegativeZ );
+				ImGui::SameLine();
+				selectWindTest( "Vortices", WindFieldTest::Vortices );
+
+				ImGui::Separator();
+				ImGui::TextUnformatted( "Wake controls" );
+				ImGui::SetNextItemWidth( -1.0f );
+				ImGui::SliderFloat( "##EdgeStep", &sharedConstants.edgeStep, 0.5f, 2.0f, "Edge step %.2f" );
+				ImGui::SetNextItemWidth( -1.0f );
+				ImGui::SliderFloat( "##PropagationStep", &sharedConstants.propagationStep, 0.5f, 2.0f, "Propagation step %.2f" );
+				ImGui::SetNextItemWidth( -1.0f );
+				ImGui::SliderFloat( "##WakeLength", &sharedConstants.wakeLength, 1.0f, 256.0f, "Wake length %.1f" );
+				ImGui::SetNextItemWidth( -1.0f );
+				ImGui::SliderFloat( "##WakeFactor", &sharedConstants.wakeEffect, 0.0f, 1.0f, "Wake factor %.2f" );
+				sharedConstants.maxWakeSteps = static_cast<uint32_t>( std::ceil( sharedConstants.wakeLength / sharedConstants.propagationStep ) );
+				ImGui::TextDisabled( "Calculated steps: %u", sharedConstants.maxWakeSteps );
 				ImGui::End();
 				if( !ImGui::GetIO().WantCaptureMouse )
 				{
@@ -577,51 +605,58 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 				}
 				ImGui::Render();
 				const TextureHandle selectedInputWind = inputWindTextures[ static_cast<uint32_t>( activeWindTest ) ];
-				sharedConstants.inputWindIndex = device.GetBindlessIndex(
-					selectedInputWind );
+				sharedConstants.inputWindIndex = device.GetBindlessIndex( selectedInputWind );
 				const XMMATRIX viewProjection = camera.GetViewMatrix() * projection;
 
 				CommandBuffer& commands = device.AcquireCommandBuffer();
 
-				// 1. Rasterize the dynamic solids into an SDF-like obstacle mask.
+				// 1.Rasterize the dynamic solids into an obstacle mask.
 				RenderPass maskPass{};
 				maskPass.color[ 0 ].loadOp = LoadOp::Clear;
 				maskPass.color[ 0 ].clearColor = { 1.0f, 1.0f, 1.0f, 1.0f };
+
 				Framebuffer maskFramebuffer{};
 				maskFramebuffer.color[ 0 ].texture = obstacleMask;
-				commands.CmdBeginRendering( maskPass, maskFramebuffer );
-				DrawObstacles( commands, maskPipeline, cube, sphere, obstacles, maskViewProjection, sharedConstants );
-				commands.CmdEndRendering();
+				{
+					commands.CmdBeginRendering( maskPass, maskFramebuffer );
+					DrawObstacles( commands, maskPipeline, cube, sphere, obstacles, maskViewProjection, sharedConstants );
+					commands.CmdEndRendering();
+				}
 
-				// 2. Clear the raw factor to full wind before the compute propagation.
+				// 2.Clear the raw factor to full wind before the compute propagation.
 				RenderPass wakeClearPass{};
 				wakeClearPass.color[ 0 ].loadOp = LoadOp::DontCare;
 				Framebuffer wakeClearFramebuffer{};
 				wakeClearFramebuffer.color[ 0 ].texture = rawWakeTexture;
-				commands.CmdBeginRendering( wakeClearPass, wakeClearFramebuffer );
-				commands.CmdBindRenderPipeline( wakeClearPipeline );
-				commands.CmdDraw( 3 );
-				commands.CmdEndRendering();
+				{
+					commands.CmdBeginRendering( wakeClearPass, wakeClearFramebuffer );
+					commands.CmdBindRenderPipeline( wakeClearPipeline );
+					commands.CmdDraw( 3 );
+					commands.CmdEndRendering();
+				}
+				// Only downwind edge seeds propagate through the original local wind field.
+				{
+					commands.CmdTransitionTexture( selectedInputWind, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE );
+					commands.CmdTransitionTexture( obstacleMask, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE );
+					commands.CmdTransitionTexture( rawWakeTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS );
+					commands.CmdBindComputePipeline( windPipeline );
+					commands.CmdPushConstants( &sharedConstants, sizeof( sharedConstants ) );
+					commands.CmdDispatch( ourWindTextureSize / ourThreadGroupSize, ourWindTextureSize / ourThreadGroupSize );
+				}
 
-				// 3. Only downwind edge seeds propagate through the original local wind field.
-				commands.CmdTransitionTexture( selectedInputWind, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE );
-				commands.CmdTransitionTexture( obstacleMask, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE );
-				commands.CmdTransitionTexture( rawWakeTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS );
-				commands.CmdBindComputePipeline( windPipeline );
-				commands.CmdPushConstants( &sharedConstants, sizeof( sharedConstants ) );
-				commands.CmdDispatch( ourWindTextureSize / ourThreadGroupSize, ourWindTextureSize / ourThreadGroupSize );
+				// Average the calculated occlusion neighbourhood.
+				{
+					commands.CmdTransitionTexture( rawWakeTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE );
+					commands.CmdTransitionTexture( filteredWakeTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS );
+					commands.CmdBindComputePipeline( wakeAveragePipeline );
+					commands.CmdPushConstants( &sharedConstants, sizeof( sharedConstants ) );
+					commands.CmdDispatch( ourWindTextureSize / ourThreadGroupSize, ourWindTextureSize / ourThreadGroupSize );
+					commands.CmdTransitionTexture( selectedInputWind, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE );
+					commands.CmdTransitionTexture( obstacleMask, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE );
+					commands.CmdTransitionTexture( filteredWakeTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE );
+				}
 
-				// 4. Average the calculated occlusion in an 8 x 8 neighbourhood.
-				commands.CmdTransitionTexture( rawWakeTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE );
-				commands.CmdTransitionTexture( filteredWakeTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS );
-				commands.CmdBindComputePipeline( wakeAveragePipeline );
-				commands.CmdPushConstants( &sharedConstants, sizeof( sharedConstants ) );
-				commands.CmdDispatch( ourWindTextureSize / ourThreadGroupSize, ourWindTextureSize / ourThreadGroupSize );
-				commands.CmdTransitionTexture( selectedInputWind, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE );
-				commands.CmdTransitionTexture( obstacleMask, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE );
-				commands.CmdTransitionTexture( filteredWakeTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE );
-
-				// 5. Render both states as readable 2D maps for the ImGui panel.
+				//  Render both states as readable 2D maps for the ImGui panel.
 				PushConstants previewConstants = sharedConstants;
 				SetTransforms( previewConstants, XMMatrixIdentity(), maskViewProjection );
 				RenderPass previewPass{};
@@ -629,6 +664,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 				Framebuffer inputPreviewFramebuffer{};
 				inputPreviewFramebuffer.color[ 0 ].texture = inputWindPreview;
 				previewConstants.visualizeInputWind = 1;
+
 				commands.CmdBeginRendering( previewPass, inputPreviewFramebuffer );
 				commands.CmdBindRenderPipeline( windPreviewPipeline );
 				commands.CmdPushConstants( &previewConstants, sizeof( previewConstants ) );

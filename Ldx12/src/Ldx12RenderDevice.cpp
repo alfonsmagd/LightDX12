@@ -679,7 +679,7 @@ namespace ldx12
 			nativeInputElement.InstanceDataStepRate = inputElement.instanceDataStepRate;
 			nativeInputElements[ nativeInputElementCount++ ] = nativeInputElement;
 		}
-		psoDesc.InputLayout.pInputElementDescs = nativeInputElements.data();
+		psoDesc.InputLayout.pInputElementDescs = nativeInputElementCount > 0 ? nativeInputElements.data() : nullptr;
 		psoDesc.InputLayout.NumElements = nativeInputElementCount;
 
 		uint32_t numRenderTargets = 0;
@@ -840,33 +840,8 @@ namespace ldx12
 		resource.memory_ = desc.memory;
 		resource.desc_ = BufferResource::CreateNativeDesc( resourceSize );
 
-		if( desc.memory == BufferMemory::CpuToGpu )
-		{
-			resource.currentState_ = D3D12_RESOURCE_STATE_GENERIC_READ;
-		}
-		else
-		{
-			switch( desc.type )
-			{
-			case BufferType::Vertex:
-			case BufferType::Constant:
-				resource.currentState_ = D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
-				break;
-			case BufferType::Index:
-				resource.currentState_ = D3D12_RESOURCE_STATE_INDEX_BUFFER;
-				break;
-			case BufferType::Structured:
-			case BufferType::Raw:
-				resource.currentState_ = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-				break;
-			case BufferType::Indirect:
-				resource.currentState_ = D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT;
-				break;
-			case BufferType::Generic:
-				resource.currentState_ = D3D12_RESOURCE_STATE_COMMON;
-				break;
-			}
-		}
+		resource.currentState_ =
+			desc.memory == BufferMemory::CpuToGpu ? D3D12_RESOURCE_STATE_GENERIC_READ : D3D12_RESOURCE_STATE_COMMON;
 
 		const D3D12_HEAP_TYPE heapType = desc.memory == BufferMemory::CpuToGpu ? D3D12_HEAP_TYPE_UPLOAD : D3D12_HEAP_TYPE_DEFAULT;
 		const CD3DX12_HEAP_PROPERTIES heapProps( heapType );
