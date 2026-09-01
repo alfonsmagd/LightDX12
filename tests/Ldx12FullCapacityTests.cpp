@@ -313,7 +313,7 @@ float4 PSMain() : SV_Target0
 			framebuffer.color[ index ].texture = targets[ index ];
 		}
 
-		ICommandBuffer& commands = device.AcquireCommandBuffer();
+		CommandBuffer& commands = device.AcquireCommandBuffer();
 		commands.CmdBeginRendering( renderPass, framebuffer );
 		commands.CmdBindRenderPipeline( attachmentPipeline );
 		commands.CmdDraw( 3 );
@@ -344,7 +344,7 @@ float4 PSMain() : SV_Target0
 			texture = device.CreateTexture( textureDesc );
 		}
 
-		ICommandBuffer& commands = device.AcquireCommandBuffer();
+		CommandBuffer& commands = device.AcquireCommandBuffer();
 		for( uint32_t index = 0; index < ourExpectedTrackedTextures; ++index )
 		{
 			commands.CmdTransitionTexture( textures[ index ], D3D12_RESOURCE_STATE_COPY_DEST );
@@ -374,7 +374,7 @@ float4 PSMain() : SV_Target0
 		Require( ourMaxPushConstant32BitValues == ourExpectedPushConstantValues, "The public push-constant capacity is not 63 values." );
 
 		std::array<uint32_t, ourExpectedPushConstantValues + 1u> values{};
-		ICommandBuffer& commands = device.AcquireCommandBuffer();
+		CommandBuffer& commands = device.AcquireCommandBuffer();
 		commands.CmdPushConstants( values.data(), ourExpectedPushConstantValues * sizeof( uint32_t ) );
 
 		bool pushConstantLimitReached = false;
@@ -397,8 +397,8 @@ float4 PSMain() : SV_Target0
 		Require( ourMaxActiveCommandBuffers == ourExpectedActiveCommandBuffers, "The public active-command-buffer capacity is not 64." );
 		Require( ourMaxCommandBufferBatch == ourExpectedCommandBufferBatch, "The public command-buffer batch capacity is not four." );
 
-		std::array<ICommandBuffer*, ourExpectedActiveCommandBuffers> commands{};
-		for( ICommandBuffer*& command : commands )
+		std::array<CommandBuffer*, ourExpectedActiveCommandBuffers> commands{};
+		for( CommandBuffer*& command : commands )
 		{
 			command = &device.AcquireCommandBuffer();
 		}

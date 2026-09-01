@@ -21,7 +21,7 @@ namespace ldx12
 		return device_->manager_->GetGraphicsQueueContext().commandQueue_.Get();
 	}
 
-	ID3D12GraphicsCommandList* D3D12Native::GetCommandList( ICommandBuffer& commandBuffer ) const noexcept
+	ID3D12GraphicsCommandList* D3D12Native::GetCommandList( CommandBuffer& commandBuffer ) const noexcept
 	{
 		return commandBuffer.GetNativeGraphicsCommandList();
 	}

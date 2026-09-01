@@ -251,7 +251,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 			Framebuffer framebuffer{};
 			framebuffer.color[ 0 ].texture = backbuffer;
 
-			ICommandBuffer& commands = device.AcquireCommandBuffer();
+			CommandBuffer& commands = device.AcquireCommandBuffer();
 			commands.CmdBeginRendering( renderPass, framebuffer );
 			commands.CmdBindRenderPipeline( gfx.pipeline );
 			for( const MovingTriangle& triangle : triangles )

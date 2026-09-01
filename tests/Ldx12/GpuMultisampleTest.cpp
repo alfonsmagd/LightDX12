@@ -92,7 +92,7 @@ float4 PSMain() : SV_Target0
 		framebuffer.color[ 0 ].texture = multisampleColor;
 		framebuffer.depthStencil.texture = multisampleDepth;
 
-		ICommandBuffer& commands = device.AcquireCommandBuffer();
+		CommandBuffer& commands = device.AcquireCommandBuffer();
 		commands.CmdBeginRendering( renderPass, framebuffer );
 		commands.CmdBindRenderPipeline( pipeline );
 		commands.CmdEndRendering();

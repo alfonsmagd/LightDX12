@@ -633,7 +633,7 @@
 				<div class="api-grid">
 					<div class="api-node"><b>DeviceManager</b><span>Initialization, device and swapchains</span></div>
 					<div class="api-node"><b>RenderDevice</b><span>Resources, pipelines, submit and wait</span></div>
-					<div class="api-node"><b>ICommandBuffer</b><span>Graphics command recording</span></div>
+					<div class="api-node"><b>CommandBuffer</b><span>Concrete graphics and compute command recording</span></div>
 					<div class="api-node"><b>Handles + Descs</b><span>Lightweight data exposed to the user</span></div>
 					<div class="api-node"><b>D3D12Native</b><span>Explicit native access when required</span></div>
 				</div>
@@ -657,7 +657,7 @@
 							<p>Acquisition, recording, batching, fences and recycling.</p>
 							<ul>
 								<li>ImmediateCommands</li>
-								<li>CommandBufferImpl</li>
+								<li>Fixed command-buffer pool</li>
 								<li>CommandListWrapper</li>
 								<li>SubmitCommandBufferBatch</li>
 							</ul>
@@ -733,7 +733,7 @@
 			<h2>2. Command flow</h2>
 			<div class="flow">
 				<div class="flow-node node-public"><b>Acquire</b><span>RenderDevice returns a free command buffer.</span></div>
-				<div class="flow-node node-public"><b>Record</b><span>ICommandBuffer records draws and states.</span></div>
+				<div class="flow-node node-public"><b>Record</b><span>CommandBuffer records draws and states.</span></div>
 				<div class="flow-node node-internal"><b>Close</b><span>The associated command list is closed.</span></div>
 				<div class="flow-node node-public"><b>SubmitBatch</b><span>Public submission entry point.</span></div>
 				<div class="flow-node node-native"><b>Execute</b><span>The native queue executes the batch.</span></div>

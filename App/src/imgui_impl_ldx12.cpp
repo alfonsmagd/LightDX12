@@ -249,7 +249,7 @@ float4 PSMain(PixelInput input) : SV_Target0
 	void ImGui_ImplLdx12_SetupRenderState( const ImDrawData& drawData,
 		const ImGui_ImplLdx12_Data& data,
 		const ImGui_ImplLdx12_FrameResources& frame,
-		ldx12::ICommandBuffer& commandBuffer )
+		ldx12::CommandBuffer& commandBuffer )
 	{
 		commandBuffer.CmdSetViewport( 0.0f, 0.0f, drawData.DisplaySize.x * drawData.FramebufferScale.x, drawData.DisplaySize.y * drawData.FramebufferScale.y );
 		commandBuffer.CmdBindRenderPipeline( data.pipeline );
@@ -335,7 +335,7 @@ void ImGui_ImplLdx12_NewFrame()
 	assert( ImGui_ImplLdx12_GetBackendData() != nullptr );
 }
 
-void ImGui_ImplLdx12_RenderDrawData( ImDrawData* drawData, ldx12::ICommandBuffer& commandBuffer )
+void ImGui_ImplLdx12_RenderDrawData( ImDrawData* drawData, ldx12::CommandBuffer& commandBuffer )
 {
 	ImGui_ImplLdx12_Data* data = ImGui_ImplLdx12_GetBackendData();
 	assert( data != nullptr );

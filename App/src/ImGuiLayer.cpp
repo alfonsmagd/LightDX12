@@ -64,7 +64,7 @@ namespace App
 		ImGui::NewFrame();
 	}
 
-	void ImGuiLayer::Render( ldx12::ICommandBuffer& commandBuffer )
+	void ImGuiLayer::Render( ldx12::CommandBuffer& commandBuffer )
 	{
 		ImGui::Render();
 		ImGui_ImplLdx12_RenderDrawData( ImGui::GetDrawData(), commandBuffer );

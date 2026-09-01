@@ -112,7 +112,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 			ImGui::End();
 
 			// 6. Render ImGui through the same Ldx12 command buffer and bindless heap.
-			ICommandBuffer& commands = device.AcquireCommandBuffer();
+			CommandBuffer& commands = device.AcquireCommandBuffer();
 			const TextureHandle backBuffer = device.GetCurrentSwapchainTexture();
 			RenderPass renderPass{};
 			renderPass.color[ 0 ].loadOp = LoadOp::Clear;

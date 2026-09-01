@@ -263,6 +263,17 @@ if(LDX12_BUILD_EXAMPLES)
     set(TRANSPARENCY_SKYBOX_SHADER "${CMAKE_CURRENT_SOURCE_DIR}/samples/Transparency/shaders/TransparencySkybox.hlsl")
     set(DEPTH_PASS_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/samples/DepthPass/main.cpp")
     set(DEPTH_PASS_SHADER "${CMAKE_CURRENT_SOURCE_DIR}/samples/DepthPass/shaders/DepthPass.hlsl")
+    set(WIND_OCCLUSION_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/samples/WindOcclusion/main.cpp")
+    set(WIND_OCCLUSION_SHADERS
+        "${CMAKE_CURRENT_SOURCE_DIR}/samples/WindOcclusion/shaders/WindCommon.hlsli"
+        "${CMAKE_CURRENT_SOURCE_DIR}/samples/WindOcclusion/shaders/ObstacleMask.hlsl"
+        "${CMAKE_CURRENT_SOURCE_DIR}/samples/WindOcclusion/shaders/WakeGenerate.hlsl"
+        "${CMAKE_CURRENT_SOURCE_DIR}/samples/WindOcclusion/shaders/WakeAverage.hlsl"
+        "${CMAKE_CURRENT_SOURCE_DIR}/samples/WindOcclusion/shaders/WakeClear.hlsl"
+        "${CMAKE_CURRENT_SOURCE_DIR}/samples/WindOcclusion/shaders/WindField.hlsl"
+        "${CMAKE_CURRENT_SOURCE_DIR}/samples/WindOcclusion/shaders/WakePreview.hlsl"
+        "${CMAKE_CURRENT_SOURCE_DIR}/samples/WindOcclusion/shaders/SceneObstacle.hlsl"
+    )
     set(CUBE_MAP_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/samples/CubeMap/main.cpp")
     set(CUBE_MAP_COMMON_SHADER "${CMAKE_CURRENT_SOURCE_DIR}/samples/CubeMap/shaders/CubeMapCommon.hlsli")
     set(CUBE_MAP_OBJECT_SHADER "${CMAKE_CURRENT_SOURCE_DIR}/samples/CubeMap/shaders/CubeMapObject.hlsl")
@@ -292,6 +303,7 @@ if(LDX12_BUILD_EXAMPLES)
         "${TRANSPARENCY_QUAD_SHADER}"
         "${TRANSPARENCY_SKYBOX_SHADER}"
         "${DEPTH_PASS_SHADER}"
+        ${WIND_OCCLUSION_SHADERS}
         ${CUBE_MAP_MEDIA}
         PROPERTIES HEADER_FILE_ONLY TRUE
     )
@@ -311,6 +323,8 @@ if(LDX12_BUILD_EXAMPLES)
     )
     add_ldx12_utils_sample(15_DepthPass "${DEPTH_PASS_SOURCE}" "${DEPTH_PASS_SHADER}")
     target_link_libraries(15_DepthPass PRIVATE Ldx12::ImGui)
+    add_ldx12_utils_sample(16_WindOcclusion "${WIND_OCCLUSION_SOURCE}" ${WIND_OCCLUSION_SHADERS})
+    target_link_libraries(16_WindOcclusion PRIVATE Ldx12::ImGui)
     add_ldx12_utils_sample(10_CubeMap
         "${CUBE_MAP_SOURCE}"
         "${CUBE_MAP_COMMON_SHADER}"
@@ -345,7 +359,7 @@ if(LDX12_BUILD_EXAMPLES)
         target_compile_options(14_ImGuiDemoNative PRIVATE /W4 /EHsc /permissive- /MP)
     endif()
 
-    set(LDX12_EXAMPLE_TARGETS 01_Triangle 02_ViewportScissor 03_CBSRVCubes 05_ZFighting 06_TexturedCube 07_TextureSamplers 08_ImGuiDemo 09_WorldGeometry 10_CubeMap 11_Texture2DArray 12_Transparency 13_CookbookChapter02 14_ImGuiDemoNative 15_DepthPass)
+    set(LDX12_EXAMPLE_TARGETS 01_Triangle 02_ViewportScissor 03_CBSRVCubes 05_ZFighting 06_TexturedCube 07_TextureSamplers 08_ImGuiDemo 09_WorldGeometry 10_CubeMap 11_Texture2DArray 12_Transparency 13_CookbookChapter02 14_ImGuiDemoNative 15_DepthPass 16_WindOcclusion)
     set(LDX12_EXAMPLE_SOURCES
         "${TRIANGLE_SOURCE}"
         "${TEXTURED_CUBE_SOURCE}"
@@ -359,6 +373,8 @@ if(LDX12_BUILD_EXAMPLES)
         "${TRANSPARENCY_SKYBOX_SHADER}"
         "${DEPTH_PASS_SOURCE}"
         "${DEPTH_PASS_SHADER}"
+        "${WIND_OCCLUSION_SOURCE}"
+        ${WIND_OCCLUSION_SHADERS}
         "${CUBE_MAP_SOURCE}"
         "${CUBE_MAP_COMMON_SHADER}"
         "${CUBE_MAP_OBJECT_SHADER}"
@@ -404,6 +420,7 @@ if(LDX12_BUILD_EXAMPLES)
     set_target_properties(13_CookbookChapter02 PROPERTIES PROJECT_LABEL "13. CookbookChapter02" OUTPUT_NAME "CookbookChapter02")
     set_target_properties(14_ImGuiDemoNative PROPERTIES PROJECT_LABEL "14. ImGuiDemoNative" OUTPUT_NAME "ImGuiDemoNative")
     set_target_properties(15_DepthPass PROPERTIES PROJECT_LABEL "15. DepthPass" OUTPUT_NAME "DepthPass")
+    set_target_properties(16_WindOcclusion PROPERTIES PROJECT_LABEL "16. WindOcclusion" OUTPUT_NAME "WindOcclusion")
     set_target_properties(${LDX12_EXAMPLE_TARGETS} PROPERTIES FOLDER "examples")
     set_property(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" PROPERTY VS_STARTUP_PROJECT 01_Triangle)
 endif()

@@ -5,7 +5,7 @@
 namespace ldx12
 {
 	SubmitHandle SubmitCommandBufferBatch( DeviceManager& manager,
-		ICommandBuffer* const* commandBuffers,
+		CommandBuffer* const* commandBuffers,
 		uint32_t commandBufferCount,
 		TextureHandle presentTexture );
 }

@@ -78,10 +78,10 @@ namespace
 					"Stress test did not exhaust the configured bindless heap." );
 			}
 
-			std::array<ICommandBuffer*, ourBatchSize> commandBuffers{};
+			std::array<CommandBuffer*, ourBatchSize> commandBuffers{};
 			for( uint32_t batchIndex = 0; batchIndex < ourBatchSize; ++batchIndex )
 			{
-				ICommandBuffer& commandBuffer = device.AcquireCommandBuffer();
+				CommandBuffer& commandBuffer = device.AcquireCommandBuffer();
 				for( TextureHandle texture : textures )
 				{
 					commandBuffer.CmdTransitionTexture( texture, batchStates[ batchIndex ] );

@@ -2,6 +2,16 @@
 
 This file lists the main user-visible changes in each Ldx12 version.
 
+## 0.3.0 - Unreleased
+
+### Added
+
+- A compute wind-wake sample with an orbital camera, runtime cube/sphere insertion and a 512 x 512 vector field with vortices. It detects only downwind obstacle-edge seeds, propagates them through the local wind field and stores the strongest attenuation in a race-safe integer wake texture.
+
+### Fixed
+
+- Replaced the `ICommandBuffer`/`CommandBufferImpl` split with one concrete `CommandBuffer`, removing virtual command dispatch and interface-to-implementation conversion during submission.
+
 ## 0.2.0 - 2026-08-30
 
 ### Added

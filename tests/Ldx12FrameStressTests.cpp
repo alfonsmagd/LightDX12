@@ -77,7 +77,7 @@ namespace
 
 			const auto recordStart = Clock::now();
 			const TextureHandle transientTexture = device.CreateTexture( transientTextureDesc );
-			ICommandBuffer& commands = device.AcquireCommandBuffer();
+			CommandBuffer& commands = device.AcquireCommandBuffer();
 			commands.CmdTransitionTexture( transientTexture, D3D12_RESOURCE_STATE_COPY_DEST );
 
 			RenderPass renderPass{};

@@ -112,7 +112,7 @@ namespace
 		return constants;
 	}
 
-	void DrawCubes( ICommandBuffer& commands,
+	void DrawCubes( CommandBuffer& commands,
 		const RenderPipelineState& pipeline,
 		const utils::GeometryBuffers& cubeGeometry,
 		const XMMATRIX& viewProjection,
@@ -228,7 +228,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 			ImGui_ImplWin32_NewFrame();
 	
 
-			ICommandBuffer& commands = device.AcquireCommandBuffer();
+			CommandBuffer& commands = device.AcquireCommandBuffer();
 
 			RenderPass depthPass{};
 			depthPass.depthStencil.depthLoadOp = LoadOp::Clear;

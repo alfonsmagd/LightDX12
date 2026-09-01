@@ -73,7 +73,7 @@ namespace
 			}
 
 			const auto acquireStart = Clock::now();
-			ICommandBuffer& commands = device.AcquireCommandBuffer();
+			CommandBuffer& commands = device.AcquireCommandBuffer();
 			const auto acquireTime = Clock::now() - acquireStart;
 			totalAcquireTime += acquireTime;
 			slowestAcquireTime = std::max( slowestAcquireTime, std::chrono::duration_cast<std::chrono::nanoseconds>( acquireTime ) );

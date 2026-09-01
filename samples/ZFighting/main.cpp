@@ -311,7 +311,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 			framebuffer.color[ 0 ].texture = enableMsaa ? gfx.sceneTargets.multisampleColor : backbuffer;
 			framebuffer.depthStencil.texture = enableMsaa ? gfx.sceneTargets.multisampleDepth : gfx.sceneTargets.singleSampleDepth;
 
-			ICommandBuffer& commands = device.AcquireCommandBuffer();
+			CommandBuffer& commands = device.AcquireCommandBuffer();
 			commands.CmdBeginRendering( renderPass, framebuffer );
 			const RenderPipelineState& pipeline = enableMsaa ? gfx.multisamplePipeline : gfx.singleSamplePipeline;
 			commands.CmdBindRenderPipeline( pipeline );

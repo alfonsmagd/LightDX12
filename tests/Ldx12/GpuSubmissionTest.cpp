@@ -27,38 +27,38 @@ namespace ldx12::tests
 		batchTextureDesc.debugName = "Ldx12Tests batch state tracking";
 		const TextureHandle batchTexture = device.CreateTexture( batchTextureDesc );
 
-		ICommandBuffer& firstBatchCommandBuffer = device.AcquireCommandBuffer();
-		ICommandBuffer& secondBatchCommandBuffer = device.AcquireCommandBuffer();
-		ICommandBuffer& thirdBatchCommandBuffer = device.AcquireCommandBuffer();
-		ICommandBuffer& fourthBatchCommandBuffer = device.AcquireCommandBuffer();
+		CommandBuffer& firstBatchCommandBuffer = device.AcquireCommandBuffer();
+		CommandBuffer& secondBatchCommandBuffer = device.AcquireCommandBuffer();
+		CommandBuffer& thirdBatchCommandBuffer = device.AcquireCommandBuffer();
+		CommandBuffer& fourthBatchCommandBuffer = device.AcquireCommandBuffer();
 		firstBatchCommandBuffer.CmdTransitionTexture( batchTexture, D3D12_RESOURCE_STATE_COPY_DEST );
 		secondBatchCommandBuffer.CmdTransitionTexture( batchTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE );
 		thirdBatchCommandBuffer.CmdTransitionTexture( batchTexture, D3D12_RESOURCE_STATE_COPY_SOURCE );
 		fourthBatchCommandBuffer.CmdTransitionTexture( batchTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE );
 
-		ICommandBuffer* batchWithNull[] = { &firstBatchCommandBuffer, nullptr };
+		CommandBuffer* batchWithNull[] = { &firstBatchCommandBuffer, nullptr };
 		RequireThrows<std::invalid_argument>( [ &device, &batchWithNull ]
 			{ device.SubmitBatch( batchWithNull, static_cast<uint32_t>( std::size( batchWithNull ) ) ); },
 			"SubmitBatch accepted a null command buffer." );
 
-		ICommandBuffer* duplicateBatch[] = { &firstBatchCommandBuffer, &firstBatchCommandBuffer };
+		CommandBuffer* duplicateBatch[] = { &firstBatchCommandBuffer, &firstBatchCommandBuffer };
 		RequireThrows<std::invalid_argument>( [ &device, &duplicateBatch ]
 			{ device.SubmitBatch( duplicateBatch, static_cast<uint32_t>( std::size( duplicateBatch ) ) ); },
 			"SubmitBatch accepted a duplicate command buffer." );
 
-		ICommandBuffer* oversizedBatch[] = { &firstBatchCommandBuffer };
+		CommandBuffer* oversizedBatch[] = { &firstBatchCommandBuffer };
 		RequireThrows<std::length_error>( [ &device, &oversizedBatch ] { device.SubmitBatch( oversizedBatch, 5 ); },
 			"SubmitBatch accepted more command buffers than the supported maximum." );
 
-		ICommandBuffer* commandBufferBatch[] = { &firstBatchCommandBuffer, &secondBatchCommandBuffer, &thirdBatchCommandBuffer, &fourthBatchCommandBuffer };
+		CommandBuffer* commandBufferBatch[] = { &firstBatchCommandBuffer, &secondBatchCommandBuffer, &thirdBatchCommandBuffer, &fourthBatchCommandBuffer };
 		const SubmitHandle batchSubmission = device.SubmitBatch( commandBufferBatch, static_cast<uint32_t>( std::size( commandBufferBatch ) ) );
 		Require( !batchSubmission.Empty(), "Submitting a command-buffer batch returned an empty submission handle." );
 		device.Wait( batchSubmission );
 		Require( device.IsReady( batchSubmission ), "A waited command-buffer batch was not reported as ready." );
 		device.Destroy( batchTexture );
 
-		std::array<ICommandBuffer*, ourMaxActiveCommandBuffers> activeCommandBuffers{};
-		for( ICommandBuffer*& activeCommandBuffer : activeCommandBuffers )
+		std::array<CommandBuffer*, ourMaxActiveCommandBuffers> activeCommandBuffers{};
+		for( CommandBuffer*& activeCommandBuffer : activeCommandBuffers )
 		{
 			activeCommandBuffer = &device.AcquireCommandBuffer();
 		}
@@ -81,7 +81,7 @@ namespace ldx12::tests
 		device.Wait( poolSubmission );
 		Require( device.IsReady( poolSubmission ), "The fixed command-buffer pool did not complete its submissions." );
 
-		ICommandBuffer& commandBuffer = device.AcquireCommandBuffer();
+		CommandBuffer& commandBuffer = device.AcquireCommandBuffer();
 		Require( native.GetCommandList( commandBuffer ) != nullptr, "Command buffer does not expose its native D3D12 command list." );
 		commandBuffer.CmdSetViewport( 4.0f, 8.0f, 32.0f, 16.0f, 0.25f, 0.75f );
 		commandBuffer.CmdSetScissor( 4, 8, 36, 24 );
@@ -94,7 +94,7 @@ namespace ldx12::tests
 		constexpr uint32_t recycleSubmissionCount = 65;
 		for( uint32_t index = 0; index < recycleSubmissionCount; ++index )
 		{
-			ICommandBuffer& recycledCommandBuffer = device.AcquireCommandBuffer();
+			CommandBuffer& recycledCommandBuffer = device.AcquireCommandBuffer();
 			const SubmitHandle recycledSubmission = device.Submit( recycledCommandBuffer );
 			Require( !recycledSubmission.Empty(), "Command-buffer recycling returned an empty submission handle." );
 			device.Wait( recycledSubmission );

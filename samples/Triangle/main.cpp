@@ -110,7 +110,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 				continue;
 			}
 
-			ICommandBuffer& buffer = device.AcquireCommandBuffer();
+			CommandBuffer& buffer = device.AcquireCommandBuffer();
 			const TextureHandle currentTexture = device.GetCurrentSwapchainTexture();
 
 			RenderPass renderPass{};

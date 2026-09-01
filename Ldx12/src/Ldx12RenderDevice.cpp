@@ -555,7 +555,7 @@ namespace ldx12
 	{
 	}
 
-	ICommandBuffer& RenderDevice::AcquireCommandBuffer()
+	CommandBuffer& RenderDevice::AcquireCommandBuffer()
 	{
 		DeviceManager& manager = *manager_;
 		DeviceManager::QueueContext& graphicsQueue = manager.GetGraphicsQueueContext();
@@ -579,23 +579,23 @@ namespace ldx12
 		return nativeSwapchain->GetCurrentTexture();
 	}
 
-	SubmitHandle RenderDevice::SubmitBatch( ICommandBuffer* const* commandBuffers, uint32_t commandBufferCount, TextureHandle presentTexture ) const
+	SubmitHandle RenderDevice::SubmitBatch( CommandBuffer* const* commandBuffers, uint32_t commandBufferCount, TextureHandle presentTexture ) const
 	{
 		return SubmitCommandBufferBatch( *manager_, commandBuffers, commandBufferCount, presentTexture );
 	}
 
-	SubmitHandle RenderDevice::Submit( ICommandBuffer& buffer, TextureHandle presentTexture )
+	SubmitHandle RenderDevice::Submit( CommandBuffer& buffer, TextureHandle presentTexture )
 	{
-		ICommandBuffer* commandBuffers[] = { &buffer };
+		CommandBuffer* commandBuffers[] = { &buffer };
 		return SubmitBatch( commandBuffers, 1, presentTexture );
 	}
 
-	SubmitHandle RenderDevice::Submit( ICommandBuffer& buffer ) const
+	SubmitHandle RenderDevice::Submit( CommandBuffer& buffer ) const
 	{
-		ICommandBuffer* commandBuffers[] = { &buffer };
+		CommandBuffer* commandBuffers[] = { &buffer };
 		return SubmitBatch( commandBuffers, 1 );
 	}
-	SubmitHandle RenderDevice::SubmitAndPresent( ICommandBuffer& buffer, SwapchainHandle swapchain )
+	SubmitHandle RenderDevice::SubmitAndPresent( CommandBuffer& buffer, SwapchainHandle swapchain )
 	{
 		const TextureHandle presentTexture = GetCurrentSwapchainTexture( swapchain );
 		return Submit( buffer, presentTexture );

@@ -100,7 +100,7 @@ float4 PSMain(float4 position : SV_Position) : SV_Target0
 		Framebuffer framebuffer{};
 		framebuffer.color[ 0 ].texture = target;
 
-		ICommandBuffer& commands = device.AcquireCommandBuffer();
+		CommandBuffer& commands = device.AcquireCommandBuffer();
 		commands.CmdBeginRendering( renderPass, framebuffer );
 		commands.CmdBindRenderPipeline( pipeline );
 		commands.CmdPushConstants( constants.data(), sizeof( constants ) );

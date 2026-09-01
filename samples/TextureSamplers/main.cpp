@@ -126,7 +126,7 @@ float4 PSMain(PixelInput input) : SV_Target0
 		Framebuffer framebuffer{};
 		framebuffer.color[ 0 ].texture = backBuffer;
 
-		ICommandBuffer& commands = device.AcquireCommandBuffer();
+		CommandBuffer& commands = device.AcquireCommandBuffer();
 		commands.CmdBeginRendering( renderPass, framebuffer );
 		commands.CmdBindRenderPipeline( gfx.pipeline );
 

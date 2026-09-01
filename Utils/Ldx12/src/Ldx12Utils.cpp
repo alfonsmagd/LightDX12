@@ -296,7 +296,7 @@ float4 main(PSInput input) : SV_Target0
 		ReleaseBuffers();
 	}
 
-	void DebugRenderer::Render( ICommandBuffer& commands, const World& world, const Camera& camera )
+	void DebugRenderer::Render( CommandBuffer& commands, const World& world, const Camera& camera )
 	{
 		Synchronize( world );
 		if( indirectDraws_.empty() )

@@ -11,7 +11,7 @@ namespace ldx12
 	public:
 		[[nodiscard]] ID3D12Device* GetDevice() const noexcept;
 		[[nodiscard]] ID3D12CommandQueue* GetCommandQueue() const noexcept;
-		[[nodiscard]] ID3D12GraphicsCommandList* GetCommandList( ICommandBuffer& commandBuffer ) const noexcept;
+		[[nodiscard]] ID3D12GraphicsCommandList* GetCommandList( CommandBuffer& commandBuffer ) const noexcept;
 		[[nodiscard]] ID3D12Resource* GetResource( BufferHandle buffer ) const;
 		[[nodiscard]] ID3D12Resource* GetResource( TextureHandle texture ) const;
 

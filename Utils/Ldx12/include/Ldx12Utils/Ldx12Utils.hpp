@@ -163,7 +163,7 @@ namespace ldx12::utils
 		DebugRenderer( DebugRenderer&& ) = delete;
 		DebugRenderer& operator=( DebugRenderer&& ) = delete;
 
-		void Render( ICommandBuffer& commands, const World& world, const Camera& camera );
+		void Render( CommandBuffer& commands, const World& world, const Camera& camera );
 
 		[[nodiscard]] uint32_t GetVertexCount() const noexcept
 		{
