@@ -99,6 +99,79 @@ namespace
 		float wakeEffect = 1.0f;
 	};
 
+	class WindWakePanel final
+	{
+	public:
+		static void Draw( TextureHandle inputPreview, TextureHandle wakePreview, size_t obstacleCount, WindFieldTest& activeWindTest, PushConstants& constants )
+		{
+			ImGui::SetNextWindowPos( ImVec2( 12.0f, 12.0f ), ImGuiCond_FirstUseEver );
+			ImGui::SetNextWindowSize( ImVec2( 470.0f, 520.0f ), ImGuiCond_FirstUseEver );
+			ImGui::Begin( "Wind wake", nullptr, ImGuiWindowFlags_NoCollapse );
+			ImGui::Text( "Field %u x %u  |  Obstacles %zu", ourWindTextureSize, ourWindTextureSize, obstacleCount );
+			ImGui::TextDisabled( "Space adds a random cube or sphere" );
+			ImGui::Separator();
+			DrawPreviews( inputPreview, wakePreview );
+			ImGui::Separator();
+			DrawWindPreset( activeWindTest );
+			ImGui::Separator();
+			DrawWakeControls( constants );
+			ImGui::End();
+		}
+
+	private:
+		static void DrawPreviews( TextureHandle inputPreview, TextureHandle wakePreview )
+		{
+			const float previewSize = ( ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x ) * 0.5f;
+			if( ImGui::BeginTable( "Wind previews", 2, ImGuiTableFlags_SizingStretchSame ) )
+			{
+				ImGui::TableNextColumn();
+				ImGui::TextUnformatted( "Input wind" );
+				ImGui::Image( inputPreview, ImVec2( previewSize, previewSize ) );
+				ImGui::TableNextColumn();
+				ImGui::TextUnformatted( "Wake factor" );
+				ImGui::Image( wakePreview, ImVec2( previewSize, previewSize ) );
+				ImGui::TextDisabled( "Dark: wake  White: wind  Red: solid" );
+				ImGui::EndTable();
+			}
+		}
+
+		static void DrawWindPreset( WindFieldTest& activeWindTest )
+		{
+			ImGui::TextUnformatted( "Wind preset" );
+			const auto select = [ &activeWindTest ]( const char* label, WindFieldTest test )
+			{
+				if( ImGui::RadioButton( label, activeWindTest == test ) )
+				{
+					activeWindTest = test;
+				}
+			};
+			select( "+X", WindFieldTest::PositiveX );
+			ImGui::SameLine();
+			select( "-X", WindFieldTest::NegativeX );
+			ImGui::SameLine();
+			select( "+Z", WindFieldTest::PositiveZ );
+			ImGui::SameLine();
+			select( "-Z", WindFieldTest::NegativeZ );
+			ImGui::SameLine();
+			select( "Vortices", WindFieldTest::Vortices );
+		}
+
+		static void DrawWakeControls( PushConstants& constants )
+		{
+			ImGui::TextUnformatted( "Wake controls" );
+			ImGui::SetNextItemWidth( -1.0f );
+			ImGui::SliderFloat( "##EdgeStep", &constants.edgeStep, 0.5f, 2.0f, "Edge step %.2f" );
+			ImGui::SetNextItemWidth( -1.0f );
+			ImGui::SliderFloat( "##PropagationStep", &constants.propagationStep, 0.5f, 2.0f, "Propagation step %.2f" );
+			ImGui::SetNextItemWidth( -1.0f );
+			ImGui::SliderFloat( "##WakeLength", &constants.wakeLength, 1.0f, 256.0f, "Wake length %.1f" );
+			ImGui::SetNextItemWidth( -1.0f );
+			ImGui::SliderFloat( "##WakeFactor", &constants.wakeEffect, 0.0f, 1.0f, "Wake factor %.2f" );
+			constants.maxWakeSteps = static_cast<uint32_t>( std::ceil( constants.wakeLength / constants.propagationStep ) );
+			ImGui::TextDisabled( "Calculated steps: %u", constants.maxWakeSteps );
+		}
+	};
+
 	static_assert( sizeof( PushConstants ) == 204 );
 
 	bool HandleImGuiMessage( HWND window, UINT message, WPARAM wParam, LPARAM lParam, void* )
@@ -394,6 +467,8 @@ namespace
 			commands.CmdDrawIndexed( geometry.indexCount );
 		}
 	}
+
+	
 }
 
 int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
@@ -547,58 +622,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 				ImGui_ImplLdx12_NewFrame();
 				ImGui_ImplWin32_NewFrame();
 				ImGui::NewFrame();
-				ImGui::SetNextWindowPos( ImVec2( 12.0f, 12.0f ), ImGuiCond_FirstUseEver );
-				ImGui::SetNextWindowSize( ImVec2( 470.0f, 520.0f ), ImGuiCond_FirstUseEver );
-				ImGui::Begin( "Wind wake", nullptr, ImGuiWindowFlags_NoCollapse );
-				ImGui::Text( "Field %u x %u  |  Obstacles %zu", ourWindTextureSize, ourWindTextureSize, obstacles.size() );
-				ImGui::TextDisabled( "Space adds a random cube or sphere" );
-				ImGui::Separator();
-
-				const float previewSize = ( ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x ) * 0.5f;
-				if( ImGui::BeginTable( "Wind previews", 2, ImGuiTableFlags_SizingStretchSame ) )
-				{
-					ImGui::TableNextColumn();
-					ImGui::TextUnformatted( "Input wind" );
-					ImGui::Image( inputWindPreview, ImVec2( previewSize, previewSize ) );
-					ImGui::TableNextColumn();
-					ImGui::TextUnformatted( "Wake factor" );
-					ImGui::Image( generatedWindPreview, ImVec2( previewSize, previewSize ) );
-					ImGui::TextDisabled( "Dark: wake  White: wind  Red: solid" );
-					ImGui::EndTable();
-				}
-
-				ImGui::Separator();
-				ImGui::TextUnformatted( "Wind preset" );
-				const auto selectWindTest = [ &activeWindTest ]( const char* label, WindFieldTest test )
-				{
-					if( ImGui::RadioButton( label, activeWindTest == test ) )
-					{
-						activeWindTest = test;
-					}
-				};
-				selectWindTest( "+X", WindFieldTest::PositiveX );
-				ImGui::SameLine();
-				selectWindTest( "-X", WindFieldTest::NegativeX );
-				ImGui::SameLine();
-				selectWindTest( "+Z", WindFieldTest::PositiveZ );
-				ImGui::SameLine();
-				selectWindTest( "-Z", WindFieldTest::NegativeZ );
-				ImGui::SameLine();
-				selectWindTest( "Vortices", WindFieldTest::Vortices );
-
-				ImGui::Separator();
-				ImGui::TextUnformatted( "Wake controls" );
-				ImGui::SetNextItemWidth( -1.0f );
-				ImGui::SliderFloat( "##EdgeStep", &sharedConstants.edgeStep, 0.5f, 2.0f, "Edge step %.2f" );
-				ImGui::SetNextItemWidth( -1.0f );
-				ImGui::SliderFloat( "##PropagationStep", &sharedConstants.propagationStep, 0.5f, 2.0f, "Propagation step %.2f" );
-				ImGui::SetNextItemWidth( -1.0f );
-				ImGui::SliderFloat( "##WakeLength", &sharedConstants.wakeLength, 1.0f, 256.0f, "Wake length %.1f" );
-				ImGui::SetNextItemWidth( -1.0f );
-				ImGui::SliderFloat( "##WakeFactor", &sharedConstants.wakeEffect, 0.0f, 1.0f, "Wake factor %.2f" );
-				sharedConstants.maxWakeSteps = static_cast<uint32_t>( std::ceil( sharedConstants.wakeLength / sharedConstants.propagationStep ) );
-				ImGui::TextDisabled( "Calculated steps: %u", sharedConstants.maxWakeSteps );
-				ImGui::End();
+				WindWakePanel::Draw( inputWindPreview, generatedWindPreview, obstacles.size(), activeWindTest, sharedConstants );
 				if( !ImGui::GetIO().WantCaptureMouse )
 				{
 					camera.Update( app );
