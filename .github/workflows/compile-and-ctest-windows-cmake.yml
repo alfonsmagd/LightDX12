@@ -69,7 +69,7 @@ jobs:
           $engineChanged = Test-PathChange @(
               "Ldx12/*",
               "CMakeLists.txt",
-              "cmake/Ldx12BaseMipsShader.hpp.in",
+              "cmake/*",
               "GenerateSolution.bat",
               ".github/workflows/compile-and-ctest-windows-cmake.yml"
           )
@@ -92,7 +92,7 @@ jobs:
               "Utils/Ldx12/*"
           )
           $cmakeChanged = Test-PathChange @(
-              "cmake/Ldx12Config.cmake.in",
+              "cmake/*",
               "examples/InstalledLdx12/*",
               "Utils/Ldx12/CMakeLists.txt",
               "tests/cmake/*"
