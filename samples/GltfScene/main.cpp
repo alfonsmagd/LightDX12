@@ -277,7 +277,8 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 				const std::u8string filename = model.path.filename().u8string();
 				ImGui::TextUnformatted( reinterpret_cast<const char*>( filename.c_str() ) );
 				ImGui::Text( "%.1f FPS | %.2f ms", ImGui::GetIO().Framerate, 1000.0f / ImGui::GetIO().Framerate );
-				ImGui::Text( "%zu meshes | %zu textures", model.geometry.size(), model.materials.images.size() );
+				ImGui::TextUnformatted( "Render path: direct draws" );
+				ImGui::Text( "%zu DrawIndexed calls | %zu textures", model.geometry.size(), model.materials.images.size() );
 
 				if( !loadError.empty() )
 				{

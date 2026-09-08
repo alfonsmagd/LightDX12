@@ -2,8 +2,8 @@
 #include "Ldx12Utils/AppLdx.hpp"
 #include "Ldx12Utils/DepthTarget.hpp"
 #include "Ldx12Utils/OrbitCamera.hpp"
-#include "../GltfScene/SceneEnvironment.hpp"
-#include "../GltfScene/SceneTargets.hpp"
+#include "SceneEnvironment.hpp"
+#include "SceneTargets.hpp"
 #include "DrawIndirectModel.hpp"
 #include "App/imgui_impl_ldx12.h"
 
@@ -116,7 +116,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		appDesc.instance = instance;
 		appDesc.showCommand = showCommand;
 		appDesc.className = L"Ldx12DrawIndirectGltfWindow";
-		appDesc.title = L"Ldx12 DrawIndirect glTF";
+		appDesc.title = L"Ldx12 MultiDrawIndirect glTF";
 		appDesc.width = 1280;
 		appDesc.height = 720;
 		appDesc.messageHandler = HandleImGuiMessage;
@@ -206,7 +206,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 				ImGui::NewFrame();
 				ImGui::SetNextWindowPos( ImVec2( 12, 12 ), ImGuiCond_Once );
 				ImGui::SetNextWindowSize( ImVec2( 350, 0 ), ImGuiCond_Once );
-				ImGui::Begin( "DrawIndirect glTF", nullptr, ImGuiWindowFlags_AlwaysAutoResize );
+				ImGui::Begin( "MultiDrawIndirect glTF", nullptr, ImGuiWindowFlags_AlwaysAutoResize );
 
 				if( ImGui::Button( "Load .gltf" ) ) pendingPath = SelectSceneFile( app.GetWindow() );
 				int presentationModeIndex = static_cast<int>( presentationMode );
@@ -219,7 +219,8 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 				const std::u8string filename = model.path.filename().u8string();
 				ImGui::TextUnformatted( reinterpret_cast<const char*>( filename.c_str() ) );
 				ImGui::Text( "%.1f FPS | %.3f ms", ImGui::GetIO().Framerate, 1000.0f / ImGui::GetIO().Framerate );
-				ImGui::Text( "%u draws | 1 ExecuteIndirect", model.drawCount );
+				ImGui::TextUnformatted( "Render path: MultiDrawIndirect" );
+				ImGui::Text( "%u indirect commands | 1 ExecuteIndirect batch", model.drawCount );
 				ImGui::Text( "%u vertices | %u indices", model.vertexCount, model.indexCount );
 				ImGui::Text( "%zu textures", model.materialResources.images.size() );
 				if( !loadError.empty() ) ImGui::TextWrapped( "%s", loadError.c_str() );
@@ -247,7 +248,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 				const auto now = std::chrono::steady_clock::now();
 				if( now - titleUpdate >= std::chrono::milliseconds( 500 ) )
 				{
-					const std::wstring title = L"Ldx12 DrawIndirect glTF | " + model.path.filename().wstring() + L" | " +
+					const std::wstring title = L"Ldx12 MultiDrawIndirect glTF | " + model.path.filename().wstring() + L" | " +
 						std::to_wstring( static_cast<int>( ImGui::GetIO().Framerate + 0.5f ) ) + L" FPS | " +
 						std::to_wstring( model.drawCount ) + L" indirect draws" +
 						( presentationMode == PresentationMode::VSync ? L" | VSync" : L" | Uncapped + tearing" ) +

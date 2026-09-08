@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../GltfScene/SceneMaterials.hpp"
+#include "SceneMaterials.hpp"
 
 #include <DirectXMath.h>
 
