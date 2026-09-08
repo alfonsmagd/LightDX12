@@ -189,6 +189,14 @@ namespace ldx12::utils
 
 		switch( message )
 		{
+		case WM_DPICHANGED:
+		{
+			const RECT& suggested = *reinterpret_cast<const RECT*>( lParam );
+			SetWindowPos( window, nullptr, suggested.left, suggested.top,
+				suggested.right - suggested.left, suggested.bottom - suggested.top, SWP_NOZORDER | SWP_NOACTIVATE );
+			return 0;
+		}
+
 		case WM_SIZE:
 			if( app != nullptr )
 			{

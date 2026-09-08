@@ -13,6 +13,7 @@ set(LDX12_UTILS_PUBLIC_HEADERS
     "${LDX12_UTILS_ROOT}/include/Ldx12Utils/AppLdx.hpp"
     "${LDX12_UTILS_ROOT}/include/Ldx12Utils/DepthTarget.hpp"
     "${LDX12_UTILS_ROOT}/include/Ldx12Utils/Geometry.hpp"
+    "${LDX12_UTILS_ROOT}/include/Ldx12Utils/GltfLoader.hpp"
     "${LDX12_UTILS_ROOT}/include/Ldx12Utils/OrbitCamera.hpp"
     "${LDX12_UTILS_ROOT}/include/Ldx12Utils/TextureLoader.hpp"
 )
@@ -21,6 +22,7 @@ set(LDX12_UTILS_SOURCES
     "${LDX12_UTILS_ROOT}/src/AppLdx.cpp"
     "${LDX12_UTILS_ROOT}/src/DepthTarget.cpp"
     "${LDX12_UTILS_ROOT}/src/Geometry.cpp"
+    "${LDX12_UTILS_ROOT}/src/GltfLoader.cpp"
     "${LDX12_UTILS_ROOT}/src/OrbitCamera.cpp"
     "${LDX12_UTILS_ROOT}/src/TextureLoader.cpp"
 )
@@ -37,6 +39,7 @@ target_include_directories(Ldx12Utils
     PUBLIC
         "$<BUILD_INTERFACE:${LDX12_UTILS_ROOT}/include>"
         "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
+    PRIVATE "${LDX12_UTILS_ROOT}/../../third_party/cgltf"
 )
 target_link_libraries(Ldx12Utils
     PUBLIC Ldx12::Ldx12

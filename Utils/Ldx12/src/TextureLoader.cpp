@@ -5,6 +5,7 @@
 
 #include <array>
 #include <cstring>
+#include <limits>
 #include <stdexcept>
 
 namespace ldx12::utils
@@ -56,14 +57,10 @@ namespace ldx12::utils
 			return factory;
 		}
 
-		ImageRgba8 LoadImageRgba8( IWICImagingFactory& factory, const std::filesystem::path& path )
+		ImageRgba8 DecodeImage( IWICImagingFactory& factory, IWICBitmapDecoder& decoder )
 		{
-			Microsoft::WRL::ComPtr<IWICBitmapDecoder> decoder;
-			ThrowIfFailed( factory.CreateDecoderFromFilename( path.c_str(), nullptr, GENERIC_READ, WICDecodeMetadataCacheOnLoad, decoder.GetAddressOf() ),
-				"Failed to open an image." );
-
 			Microsoft::WRL::ComPtr<IWICBitmapFrameDecode> frame;
-			ThrowIfFailed( decoder->GetFrame( 0, frame.GetAddressOf() ), "Failed to decode an image." );
+			ThrowIfFailed( decoder.GetFrame( 0, frame.GetAddressOf() ), "Failed to decode an image." );
 
 			ImageRgba8 image{};
 			ThrowIfFailed( frame->GetSize( &image.width, &image.height ), "Failed to read image dimensions." );
@@ -74,11 +71,21 @@ namespace ldx12::utils
 							   ->Initialize( frame.Get(), GUID_WICPixelFormat32bppRGBA, WICBitmapDitherTypeNone, nullptr, 0.0, WICBitmapPaletteTypeCustom ),
 				"Failed to convert an image to RGBA8." );
 
+			if( image.width == 0 || image.height == 0 || static_cast<uint64_t>( image.width ) * image.height * 4 > UINT32_MAX )
+				throw std::runtime_error( "Invalid or oversized image dimensions." );
 			const uint32_t rowPitch = image.width * 4u;
 			const uint32_t imageSize = rowPitch * image.height;
 			image.pixels.resize( imageSize );
 			ThrowIfFailed( converter->CopyPixels( nullptr, rowPitch, imageSize, image.pixels.data() ), "Failed to copy image pixels." );
 			return image;
+		}
+
+		ImageRgba8 LoadImageRgba8( IWICImagingFactory& factory, const std::filesystem::path& path )
+		{
+			Microsoft::WRL::ComPtr<IWICBitmapDecoder> decoder;
+			ThrowIfFailed( factory.CreateDecoderFromFilename( path.c_str(), nullptr, GENERIC_READ, WICDecodeMetadataCacheOnLoad, decoder.GetAddressOf() ),
+				"Failed to open an image." );
+			return DecodeImage( factory, *decoder.Get() );
 		}
 	}
 
@@ -87,6 +94,21 @@ namespace ldx12::utils
 		ComInitialization com;
 		Microsoft::WRL::ComPtr<IWICImagingFactory> factory = CreateWicFactory();
 		return LoadImageRgba8( *factory.Get(), path );
+	}
+
+	ImageRgba8 LoadImageRgba8( std::span<const uint8_t> encodedImage )
+	{
+		if( encodedImage.empty() || encodedImage.size() > UINT32_MAX ) throw std::runtime_error( "Invalid encoded image size." );
+		ComInitialization com;
+		Microsoft::WRL::ComPtr<IWICImagingFactory> factory = CreateWicFactory();
+		Microsoft::WRL::ComPtr<IWICStream> stream;
+		ThrowIfFailed( factory->CreateStream( stream.GetAddressOf() ), "Failed to create image stream." );
+		ThrowIfFailed( stream->InitializeFromMemory( const_cast<BYTE*>( encodedImage.data() ), static_cast<DWORD>( encodedImage.size() ) ),
+			"Failed to initialize image stream." );
+		Microsoft::WRL::ComPtr<IWICBitmapDecoder> decoder;
+		ThrowIfFailed( factory->CreateDecoderFromStream( stream.Get(), nullptr, WICDecodeMetadataCacheOnLoad, decoder.GetAddressOf() ),
+			"Failed to decode image stream." );
+		return DecodeImage( *factory.Get(), *decoder.Get() );
 	}
 
 	TextureHandle CreateCheckerTexture( RenderDevice& device, uint32_t firstColor, uint32_t secondColor, uint32_t textureSize, uint32_t checkerSize )

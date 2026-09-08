@@ -101,9 +101,16 @@ jobs:
               "tests/nuget/*",
               "LICENSE*"
           )
-          $utilsChanged = Test-PathChange @(
-              "Utils/Ldx12/*",
-              "tests/Ldx12UtilsTests.cpp"
+            $utilsChanged = Test-PathChange @(
+                "Utils/Ldx12/*",
+                "third_party/cgltf/*",
+                "media/gltf/*",
+                "media/gltfMesh/*",
+                "media/pbr/*",
+                "samples/GltfScene/*",
+                "tests/Ldx12GltfTests.cpp",
+                "tests/Ldx12GltfMaterialTests.cpp",
+                "tests/Ldx12UtilsTests.cpp"
           )
 
           "engine=$($engineChanged.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
@@ -236,10 +243,10 @@ jobs:
           -DLDX12_INSTALL=OFF
 
       - name: Build Utils tests
-        run: cmake --build build-utils-tests --config Debug --target Ldx12UtilsTests --parallel
+        run: cmake --build build-utils-tests --config Debug --target Ldx12UtilsTests Ldx12GltfTests Ldx12GltfMaterialTests --parallel
 
       - name: Run Utils tests
-        run: ctest --test-dir build-utils-tests -C Debug -R "^Ldx12UtilsTests$" --output-on-failure
+        run: ctest --test-dir build-utils-tests -C Debug -R "^Ldx12(Utils|Gltf|GltfMaterial)Tests$" --output-on-failure
 
   nuget-package:
     name: NuGet Package and VS2022 Consumer

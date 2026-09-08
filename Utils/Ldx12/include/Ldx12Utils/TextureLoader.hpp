@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <span>
 #include <vector>
 
 namespace ldx12::utils
@@ -16,6 +17,7 @@ namespace ldx12::utils
 	};
 
 	ImageRgba8 LoadImageRgba8( const std::filesystem::path& path );
+	ImageRgba8 LoadImageRgba8( std::span<const uint8_t> encodedImage );
 	TextureHandle CreateCheckerTexture( RenderDevice& device,
 		uint32_t firstColor = 0xffffffffu,
 		uint32_t secondColor = 0xff000000u,

@@ -8,11 +8,14 @@ This file lists the main user-visible changes in each Ldx12 version.
 
 #### Features
 
+- Static glTF/GLB scene loading in `Ldx12Utils`, using vendored cgltf, with node transforms, geometry and metallic/roughness texture data.
 - Bindless unordered-access views for GPU-local `Structured` and `Raw` buffers, with separate SRV and UAV indices for shader reads and writes.
 - Explicit buffer state transitions and UAV barriers for compute-to-render workflows.
 
 #### Examples
 
+- `18_GltfScene` loads DamagedHelmet and renders its five material maps with GGX PBR, prefiltered HDR environment lighting, per-texture glTF samplers, sRGB color maps and full mip chains. Diagnostic views expose material channels and selected mip levels.
+- The glTF sample renders at native client resolution with Per-Monitor V2 DPI awareness and optional MSAA x4, with toggles for image-quality comparisons.
 - `17_ComputeParticles` updates and renders 8,388,608 particles entirely on the GPU. The particles form a cyan sphere and react to a radial impulse when the user clicks.
 
 ### Fixed

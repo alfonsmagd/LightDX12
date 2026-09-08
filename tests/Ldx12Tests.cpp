@@ -8,13 +8,14 @@ using namespace ldx12::tests;
 
 int main()
 {
-	const std::array<TestCase, 12> tests = { TestCase{ "SlotMap creation and properties", TestSlotMapCreationAndProperties },
+	const std::array<TestCase, 13> tests = { TestCase{ "SlotMap creation and properties", TestSlotMapCreationAndProperties },
 		TestCase{ "SlotMap destruction and reuse", TestSlotMapDestroyAndReuse },
 		TestCase{ "SlotMap stale-handle safety", TestSlotMapStaleHandleSafety },
 		TestCase{ "SlotMap fixed capacity", TestSlotMapCapacity },
 		TestCase{ "SlotMap virtual objects", TestSlotMapVirtualObjects },
 		TestCase{ "Public fixed-array properties", TestPublicArrayProperties },
 		TestCase{ "GPU resource lifecycle and properties", TestGpuResourceLifecycleAndProperties },
+		TestCase{ "GPU compute UAV and CPU readback", TestGpuComputeUav },
 		TestCase{ "GPU invalid-handle safety", TestGpuInvalidHandleSafety },
 		TestCase{ "GPU submission synchronization", TestGpuSubmissionSynchronization },
 		TestCase{ "GPU descriptor recycling", TestGpuDescriptorRecycling },

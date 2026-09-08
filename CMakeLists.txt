@@ -329,6 +329,30 @@ if(LDX12_BUILD_EXAMPLES)
     add_ldx12_utils_sample(16_WindOcclusion "${WIND_OCCLUSION_SOURCE}" ${WIND_OCCLUSION_SHADERS})
     target_link_libraries(16_WindOcclusion PRIVATE Ldx12::ImGui)
     add_ldx12_utils_sample(17_ComputeParticles "${COMPUTE_PARTICLES_SOURCE}" "${COMPUTE_PARTICLES_SHADER}")
+    set(GLTF_SCENE_SHADER "${CMAKE_CURRENT_SOURCE_DIR}/samples/GltfScene/shaders/GltfScene.hlsl")
+    set_source_files_properties("${GLTF_SCENE_SHADER}" PROPERTIES HEADER_FILE_ONLY TRUE)
+    add_ldx12_utils_sample(18_GltfScene
+        "${CMAKE_CURRENT_SOURCE_DIR}/samples/GltfScene/main.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/samples/GltfScene/SceneMaterials.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/samples/GltfScene/SceneEnvironment.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/samples/GltfScene/SceneTargets.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/samples/GltfScene/SceneModel.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/samples/GltfScene/GltfScene.manifest"
+        "${GLTF_SCENE_SHADER}")
+    set_target_properties(18_GltfScene PROPERTIES PROJECT_LABEL "18. GltfScene" OUTPUT_NAME "GltfScene" FOLDER "examples")
+    target_link_libraries(18_GltfScene PRIVATE Ldx12::ImGui comdlg32)
+    set(DRAW_INDIRECT_GLTF_SHADER "${CMAKE_CURRENT_SOURCE_DIR}/samples/DrawIndirectGltf/shaders/DrawIndirectGltf.hlsl")
+    set_source_files_properties("${DRAW_INDIRECT_GLTF_SHADER}" PROPERTIES HEADER_FILE_ONLY TRUE)
+    add_ldx12_utils_sample(19_DrawIndirectGltf
+        "${CMAKE_CURRENT_SOURCE_DIR}/samples/DrawIndirectGltf/main.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/samples/DrawIndirectGltf/DrawIndirectModel.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/samples/GltfScene/SceneMaterials.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/samples/GltfScene/SceneEnvironment.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/samples/GltfScene/SceneTargets.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/samples/GltfScene/GltfScene.manifest"
+        "${DRAW_INDIRECT_GLTF_SHADER}")
+    set_target_properties(19_DrawIndirectGltf PROPERTIES PROJECT_LABEL "19. DrawIndirectGltf" OUTPUT_NAME "DrawIndirectGltf" FOLDER "examples")
+    target_link_libraries(19_DrawIndirectGltf PRIVATE Ldx12::ImGui comdlg32)
     add_ldx12_utils_sample(10_CubeMap
         "${CUBE_MAP_SOURCE}"
         "${CUBE_MAP_COMMON_SHADER}"
@@ -396,6 +420,18 @@ if(LDX12_BUILD_EXAMPLES)
         "${IMGUI_DEMO_SOURCE}"
         "${IMGUI_DEMO_NATIVE_SOURCE}"
     )
+    list(APPEND LDX12_EXAMPLE_TARGETS 18_GltfScene 19_DrawIndirectGltf)
+    list(APPEND LDX12_EXAMPLE_SOURCES
+        "${CMAKE_CURRENT_SOURCE_DIR}/samples/GltfScene/main.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/samples/GltfScene/SceneMaterials.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/samples/GltfScene/SceneEnvironment.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/samples/GltfScene/SceneTargets.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/samples/GltfScene/SceneModel.hpp"
+        "${GLTF_SCENE_SHADER}"
+        "${CMAKE_CURRENT_SOURCE_DIR}/samples/DrawIndirectGltf/main.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/samples/DrawIndirectGltf/DrawIndirectModel.hpp"
+        "${DRAW_INDIRECT_GLTF_SHADER}"
+    )
 
     if(LDX12_BUILD_APP)
         set(IMGUI_NODE_EDITOR_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/samples/ImGuiNodeEditor/main.cpp")
@@ -444,6 +480,7 @@ if(LDX12_BUILD_TESTS)
         "${CMAKE_CURRENT_SOURCE_DIR}/tests/Ldx12/SlotMapVirtualObjectTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/tests/Ldx12/PublicArrayTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/tests/Ldx12/GpuResourceLifecycleTest.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/Ldx12/GpuComputeTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/tests/Ldx12/GpuInvalidHandleTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/tests/Ldx12/GpuSubmissionTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/tests/Ldx12/GpuDescriptorRecyclingTest.cpp"
@@ -504,6 +541,22 @@ if(LDX12_BUILD_TESTS)
 
     if(LDX12_UTILS_AVAILABLE)
         set(LDX12_UTILS_TEST_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/tests/Ldx12UtilsTests.cpp")
+        add_executable(Ldx12GltfTests "${CMAKE_CURRENT_SOURCE_DIR}/tests/Ldx12GltfTests.cpp")
+        target_link_libraries(Ldx12GltfTests PRIVATE Ldx12::Utils)
+        target_compile_definitions(Ldx12GltfTests PRIVATE LDX12_GLTF_FIXTURE_DIRECTORY="${CMAKE_CURRENT_SOURCE_DIR}/media/gltf")
+        add_test(NAME Ldx12GltfTests COMMAND Ldx12GltfTests)
+        set_tests_properties(Ldx12GltfTests PROPERTIES TIMEOUT 60)
+        list(APPEND LDX12_TEST_TARGETS Ldx12GltfTests)
+
+        add_executable(Ldx12GltfMaterialTests "${CMAKE_CURRENT_SOURCE_DIR}/tests/Ldx12GltfMaterialTests.cpp")
+        target_link_libraries(Ldx12GltfMaterialTests PRIVATE Ldx12::Utils)
+        target_compile_definitions(Ldx12GltfMaterialTests PRIVATE
+            LDX12_GLTF_MEDIA_DIRECTORY="${CMAKE_CURRENT_SOURCE_DIR}/media"
+            LDX12_GLTF_SAMPLE_DIRECTORY="${CMAKE_CURRENT_SOURCE_DIR}/samples/GltfScene")
+        add_test(NAME Ldx12GltfMaterialTests COMMAND Ldx12GltfMaterialTests)
+        set_tests_properties(Ldx12GltfMaterialTests PROPERTIES TIMEOUT 60)
+        list(APPEND LDX12_TEST_TARGETS Ldx12GltfMaterialTests)
+
         add_executable(Ldx12UtilsTests "${LDX12_UTILS_TEST_SOURCE}")
         target_compile_features(Ldx12UtilsTests PRIVATE cxx_std_20)
         target_link_libraries(Ldx12UtilsTests PRIVATE Ldx12::Utils)

@@ -99,6 +99,7 @@ namespace ldx12::tests
 	void TestSlotMapVirtualObjects();
 	void TestPublicArrayProperties();
 	void TestGpuResourceLifecycleAndProperties();
+	void TestGpuComputeUav();
 	void TestGpuInvalidHandleSafety();
 	void TestGpuSubmissionSynchronization();
 	void TestGpuDescriptorRecycling();
