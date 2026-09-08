@@ -827,6 +827,14 @@ namespace ldx12
 				throw std::length_error( "Raw buffer element count exceeds the D3D12 SRV limit." );
 			}
 		}
+		if( desc.unorderedAccess && desc.type != BufferType::Structured && desc.type != BufferType::Raw )
+		{
+			throw std::invalid_argument( "BufferDesc.unorderedAccess requires a Structured or Raw buffer." );
+		}
+		if( desc.unorderedAccess && desc.memory != BufferMemory::GpuLocal )
+		{
+			throw std::invalid_argument( "Unordered-access buffers must use GpuLocal memory." );
+		}
 	}
 
 	BufferResource RenderDevice::CreateBufferResource( const BufferDesc& desc )
@@ -839,9 +847,12 @@ namespace ldx12
 		resource.type_ = desc.type;
 		resource.memory_ = desc.memory;
 		resource.desc_ = BufferResource::CreateNativeDesc( resourceSize );
+		if( desc.unorderedAccess )
+		{
+			resource.desc_.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+		}
 
-		resource.currentState_ =
-			desc.memory == BufferMemory::CpuToGpu ? D3D12_RESOURCE_STATE_GENERIC_READ : D3D12_RESOURCE_STATE_COMMON;
+		resource.currentState_ = desc.memory == BufferMemory::CpuToGpu ? D3D12_RESOURCE_STATE_GENERIC_READ : D3D12_RESOURCE_STATE_COMMON;
 
 		const D3D12_HEAP_TYPE heapType = desc.memory == BufferMemory::CpuToGpu ? D3D12_HEAP_TYPE_UPLOAD : D3D12_HEAP_TYPE_DEFAULT;
 		const CD3DX12_HEAP_PROPERTIES heapProps( heapType );
@@ -886,6 +897,29 @@ namespace ldx12
 			}
 
 			manager_->device_->CreateShaderResourceView( resource.resource_.Get(), &srvDesc, resource.srvHandle_ );
+		}
+
+		if( desc.unorderedAccess )
+		{
+			resource.uavIndex_ = manager_->AllocateBindlessDescriptor();
+			resource.uavHandle_ = manager_->MakeBindlessCpuHandle( resource.uavIndex_ );
+
+			D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
+			uavDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+			if( desc.type == BufferType::Raw )
+			{
+				uavDesc.Format = DXGI_FORMAT_R32_TYPELESS;
+				uavDesc.Buffer.NumElements = static_cast<UINT>( desc.size / sizeof( uint32_t ) );
+				uavDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_RAW;
+			}
+			else
+			{
+				uavDesc.Format = DXGI_FORMAT_UNKNOWN;
+				uavDesc.Buffer.StructureByteStride = desc.stride;
+				uavDesc.Buffer.NumElements = static_cast<UINT>( desc.size / desc.stride );
+			}
+
+			manager_->device_->CreateUnorderedAccessView( resource.resource_.Get(), nullptr, &uavDesc, resource.uavHandle_ );
 		}
 
 		if( desc.type == BufferType::Constant )
@@ -1048,6 +1082,11 @@ namespace ldx12
 		return ToPublicDescriptorIndex( manager_->GetBufferResource( buffer ).srvIndex_ );
 	}
 
+	uint32_t RenderDevice::GetUnorderedAccessIndex( BufferHandle buffer ) const
+	{
+		return ToPublicDescriptorIndex( manager_->GetBufferResource( buffer ).uavIndex_ );
+	}
+
 	uint32_t RenderDevice::GetBindlessIndex( TextureHandle texture ) const
 	{
 		return ToPublicDescriptorIndex( manager_->GetTextureResource( texture ).srvIndex_ );
@@ -1114,14 +1153,16 @@ namespace ldx12
 		ComPtr<ID3D12Resource> nativeResource = std::move( resource->resource_ );
 		const bool wasMapped = resource->mappedPtr_ != nullptr;
 		const uint32_t srvIndex = resource->srvIndex_;
+		const uint32_t uavIndex = resource->uavIndex_;
 		const uint32_t cbvIndex = resource->cbvIndex_;
 
 		resource->mappedPtr_ = nullptr;
 		resource->srvIndex_ = UINT32_MAX;
+		resource->uavIndex_ = UINT32_MAX;
 		resource->cbvIndex_ = UINT32_MAX;
 		manager.slotMapBuffers_.Destroy( buffer );
 
-		std::function<void()> release = [ &manager, nativeResource = std::move( nativeResource ), wasMapped, srvIndex, cbvIndex ]() mutable
+		std::function<void()> release = [ &manager, nativeResource = std::move( nativeResource ), wasMapped, srvIndex, uavIndex, cbvIndex ]() mutable
 		{
 			if( nativeResource != nullptr && wasMapped )
 			{
@@ -1129,6 +1170,7 @@ namespace ldx12
 			}
 
 			manager.FreeBindlessDescriptor( srvIndex );
+			manager.FreeBindlessDescriptor( uavIndex );
 			manager.FreeBindlessDescriptor( cbvIndex );
 			nativeResource.Reset();
 		};

@@ -289,6 +289,7 @@ namespace ldx12
 		isRendering_ = false;
 		active_ = true;
 		debugGroupDepth_ = 0;
+		trackedBufferCount_ = 0;
 		trackedTextureCount_ = 0;
 
 		ID3D12DescriptorHeap* heaps[] = { manager_->bindlessHeap_.Get(), manager_->samplerHeap_.Get() };
@@ -307,7 +308,33 @@ namespace ldx12
 		wrapper_ = nullptr;
 		active_ = false;
 		debugGroupDepth_ = 0;
+		trackedBufferCount_ = 0;
 		trackedTextureCount_ = 0;
+	}
+
+	CommandBuffer::TrackedBufferState& CommandBuffer::GetTrackedBufferState( BufferHandle buffer )
+	{
+		for( uint32_t index = 0; index < trackedBufferCount_; ++index )
+		{
+			TrackedBufferState& trackedBuffer = trackedBuffers_[ index ];
+			if( trackedBuffer.handle_ == buffer )
+			{
+				return trackedBuffer;
+			}
+		}
+
+		const BufferResource& resource = manager_->GetBufferResource( buffer );
+		TrackedBufferState trackedBuffer;
+		trackedBuffer.handle_ = buffer;
+		trackedBuffer.initialState_ = resource.currentState_;
+		trackedBuffer.currentState_ = resource.currentState_;
+		if( trackedBufferCount_ == trackedBuffers_.size() )
+		{
+			throw std::length_error( "A command buffer cannot track more than 256 buffers." );
+		}
+
+		trackedBuffers_[ trackedBufferCount_ ] = trackedBuffer;
+		return trackedBuffers_[ trackedBufferCount_++ ];
 	}
 
 	CommandBuffer::TrackedTextureState& CommandBuffer::GetTrackedTextureState( TextureHandle texture )
@@ -348,8 +375,41 @@ namespace ldx12
 		trackedTexture.currentState_ = newState;
 	}
 
+	void CommandBuffer::TransitionBuffer( BufferHandle buffer, BufferResource& resource, D3D12_RESOURCE_STATES newState )
+	{
+		TrackedBufferState& trackedBuffer = GetTrackedBufferState( buffer );
+		if( trackedBuffer.currentState_ == newState )
+		{
+			return;
+		}
+
+		const D3D12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition( resource.resource_.Get(), trackedBuffer.currentState_, newState );
+		wrapper_->commandList_->ResourceBarrier( 1, &barrier );
+		trackedBuffer.currentState_ = newState;
+	}
+
 	CommandListWrapper* CommandBuffer::BuildSubmitFixup( CommandBuffer* const* previousCommandBuffers, uint32_t previousCommandBufferCount )
 	{
+		const auto getCurrentBufferState = [ this, previousCommandBuffers, previousCommandBufferCount ]( BufferHandle buffer )
+		{
+			for( uint32_t commandBufferIndex = previousCommandBufferCount; commandBufferIndex > 0; --commandBufferIndex )
+			{
+				assert( previousCommandBuffers != nullptr );
+				const CommandBuffer* previousCommandBuffer = previousCommandBuffers[ commandBufferIndex - 1 ];
+				assert( previousCommandBuffer != nullptr );
+				const TrackedBufferState* trackedBuffers = previousCommandBuffer->GetTrackedBuffers();
+				for( uint32_t bufferIndex = 0; bufferIndex < previousCommandBuffer->GetTrackedBufferCount(); ++bufferIndex )
+				{
+					if( trackedBuffers[ bufferIndex ].handle_ == buffer )
+					{
+						return trackedBuffers[ bufferIndex ].currentState_;
+					}
+				}
+			}
+
+			return manager_->GetBufferResource( buffer ).currentState_;
+		};
+
 		const auto getCurrentState = [ this, previousCommandBuffers, previousCommandBufferCount ]( TextureHandle texture )
 		{
 			for( uint32_t commandBufferIndex = previousCommandBufferCount; commandBufferIndex > 0; --commandBufferIndex )
@@ -371,6 +431,15 @@ namespace ldx12
 		};
 
 		bool requiresFixup = false;
+		for( uint32_t index = 0; index < trackedBufferCount_; ++index )
+		{
+			const TrackedBufferState& trackedBuffer = trackedBuffers_[ index ];
+			if( getCurrentBufferState( trackedBuffer.handle_ ) != trackedBuffer.initialState_ )
+			{
+				requiresFixup = true;
+				break;
+			}
+		}
 		for( uint32_t index = 0; index < trackedTextureCount_; ++index )
 		{
 			const TrackedTextureState& trackedTexture = trackedTextures_[ index ];
@@ -387,6 +456,20 @@ namespace ldx12
 		}
 
 		CommandListWrapper& fixup = manager_->GetGraphicsQueueContext().immediateCommands_->Acquire();
+
+		for( uint32_t index = 0; index < trackedBufferCount_; ++index )
+		{
+			const TrackedBufferState& trackedBuffer = trackedBuffers_[ index ];
+			const BufferResource& resource = manager_->GetBufferResource( trackedBuffer.handle_ );
+			const D3D12_RESOURCE_STATES currentState = getCurrentBufferState( trackedBuffer.handle_ );
+			if( currentState == trackedBuffer.initialState_ )
+			{
+				continue;
+			}
+
+			const D3D12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition( resource.resource_.Get(), currentState, trackedBuffer.initialState_ );
+			fixup.commandList_->ResourceBarrier( 1, &barrier );
+		}
 
 		for( uint32_t index = 0; index < trackedTextureCount_; ++index )
 		{
@@ -405,8 +488,15 @@ namespace ldx12
 		return &fixup;
 	}
 
-	void CommandBuffer::CommitSubmittedTextureStates()
+	void CommandBuffer::CommitSubmittedResourceStates()
 	{
+		for( uint32_t index = 0; index < trackedBufferCount_; ++index )
+		{
+			const TrackedBufferState& trackedBuffer = trackedBuffers_[ index ];
+			BufferResource& resource = manager_->GetBufferResource( trackedBuffer.handle_ );
+			resource.currentState_ = trackedBuffer.currentState_;
+		}
+
 		for( uint32_t index = 0; index < trackedTextureCount_; ++index )
 		{
 			const TrackedTextureState& trackedTexture = trackedTextures_[ index ];
@@ -549,6 +639,27 @@ namespace ldx12
 
 		const D3D12_RECT scissor{ left, top, right, bottom };
 		wrapper_->commandList_->RSSetScissorRects( 1, &scissor );
+	}
+
+	void CommandBuffer::CmdTransitionBuffer( BufferHandle buffer, D3D12_RESOURCE_STATES newState )
+	{
+		BufferResource& resource = manager_->GetBufferResource( buffer );
+		if( ( newState & D3D12_RESOURCE_STATE_UNORDERED_ACCESS ) != 0 && resource.uavIndex_ == UINT32_MAX )
+		{
+			throw std::runtime_error( "CmdTransitionBuffer requires an unordered-access buffer for the UAV state." );
+		}
+		TransitionBuffer( buffer, resource, newState );
+	}
+
+	void CommandBuffer::CmdUavBarrier( BufferHandle buffer )
+	{
+		const BufferResource& resource = manager_->GetBufferResource( buffer );
+		if( resource.uavIndex_ == UINT32_MAX )
+		{
+			throw std::runtime_error( "CmdUavBarrier requires an unordered-access buffer." );
+		}
+		const D3D12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::UAV( resource.resource_.Get() );
+		wrapper_->commandList_->ResourceBarrier( 1, &barrier );
 	}
 
 	void CommandBuffer::CmdTransitionTexture( TextureHandle texture, D3D12_RESOURCE_STATES newState )

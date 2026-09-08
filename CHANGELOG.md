@@ -6,6 +6,14 @@ This file lists the main user-visible changes in each Ldx12 version.
 
 ### Added
 
+#### Features
+
+- Bindless unordered-access views for GPU-local `Structured` and `Raw` buffers, with separate SRV and UAV indices for shader reads and writes.
+- Explicit buffer state transitions and UAV barriers for compute-to-render workflows.
+
+#### Examples
+
+- `17_ComputeParticles` updates and renders 8,388,608 particles entirely on the GPU. The particles form a cyan sphere and react to a radial impulse when the user clicks.
 
 ### Fixed
 

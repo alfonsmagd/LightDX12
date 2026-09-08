@@ -274,6 +274,8 @@ if(LDX12_BUILD_EXAMPLES)
         "${CMAKE_CURRENT_SOURCE_DIR}/samples/WindOcclusion/shaders/WakePreview.hlsl"
         "${CMAKE_CURRENT_SOURCE_DIR}/samples/WindOcclusion/shaders/SceneObstacle.hlsl"
     )
+    set(COMPUTE_PARTICLES_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/samples/ComputeParticles/main.cpp")
+    set(COMPUTE_PARTICLES_SHADER "${CMAKE_CURRENT_SOURCE_DIR}/samples/ComputeParticles/shaders/ComputeParticles.hlsl")
     set(CUBE_MAP_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/samples/CubeMap/main.cpp")
     set(CUBE_MAP_COMMON_SHADER "${CMAKE_CURRENT_SOURCE_DIR}/samples/CubeMap/shaders/CubeMapCommon.hlsli")
     set(CUBE_MAP_OBJECT_SHADER "${CMAKE_CURRENT_SOURCE_DIR}/samples/CubeMap/shaders/CubeMapObject.hlsl")
@@ -304,6 +306,7 @@ if(LDX12_BUILD_EXAMPLES)
         "${TRANSPARENCY_SKYBOX_SHADER}"
         "${DEPTH_PASS_SHADER}"
         ${WIND_OCCLUSION_SHADERS}
+        "${COMPUTE_PARTICLES_SHADER}"
         ${CUBE_MAP_MEDIA}
         PROPERTIES HEADER_FILE_ONLY TRUE
     )
@@ -325,6 +328,7 @@ if(LDX12_BUILD_EXAMPLES)
     target_link_libraries(15_DepthPass PRIVATE Ldx12::ImGui)
     add_ldx12_utils_sample(16_WindOcclusion "${WIND_OCCLUSION_SOURCE}" ${WIND_OCCLUSION_SHADERS})
     target_link_libraries(16_WindOcclusion PRIVATE Ldx12::ImGui)
+    add_ldx12_utils_sample(17_ComputeParticles "${COMPUTE_PARTICLES_SOURCE}" "${COMPUTE_PARTICLES_SHADER}")
     add_ldx12_utils_sample(10_CubeMap
         "${CUBE_MAP_SOURCE}"
         "${CUBE_MAP_COMMON_SHADER}"
@@ -359,7 +363,7 @@ if(LDX12_BUILD_EXAMPLES)
         target_compile_options(14_ImGuiDemoNative PRIVATE /W4 /EHsc /permissive- /MP)
     endif()
 
-    set(LDX12_EXAMPLE_TARGETS 01_Triangle 02_ViewportScissor 03_CBSRVCubes 05_ZFighting 06_TexturedCube 07_TextureSamplers 08_ImGuiDemo 09_WorldGeometry 10_CubeMap 11_Texture2DArray 12_Transparency 13_CookbookChapter02 14_ImGuiDemoNative 15_DepthPass 16_WindOcclusion)
+    set(LDX12_EXAMPLE_TARGETS 01_Triangle 02_ViewportScissor 03_CBSRVCubes 05_ZFighting 06_TexturedCube 07_TextureSamplers 08_ImGuiDemo 09_WorldGeometry 10_CubeMap 11_Texture2DArray 12_Transparency 13_CookbookChapter02 14_ImGuiDemoNative 15_DepthPass 16_WindOcclusion 17_ComputeParticles)
     set(LDX12_EXAMPLE_SOURCES
         "${TRIANGLE_SOURCE}"
         "${TEXTURED_CUBE_SOURCE}"
@@ -375,6 +379,8 @@ if(LDX12_BUILD_EXAMPLES)
         "${DEPTH_PASS_SHADER}"
         "${WIND_OCCLUSION_SOURCE}"
         ${WIND_OCCLUSION_SHADERS}
+        "${COMPUTE_PARTICLES_SOURCE}"
+        "${COMPUTE_PARTICLES_SHADER}"
         "${CUBE_MAP_SOURCE}"
         "${CUBE_MAP_COMMON_SHADER}"
         "${CUBE_MAP_OBJECT_SHADER}"
@@ -421,6 +427,7 @@ if(LDX12_BUILD_EXAMPLES)
     set_target_properties(14_ImGuiDemoNative PROPERTIES PROJECT_LABEL "14. ImGuiDemoNative" OUTPUT_NAME "ImGuiDemoNative")
     set_target_properties(15_DepthPass PROPERTIES PROJECT_LABEL "15. DepthPass" OUTPUT_NAME "DepthPass")
     set_target_properties(16_WindOcclusion PROPERTIES PROJECT_LABEL "16. WindOcclusion" OUTPUT_NAME "WindOcclusion")
+    set_target_properties(17_ComputeParticles PROPERTIES PROJECT_LABEL "17. ComputeParticles" OUTPUT_NAME "ComputeParticles")
     set_target_properties(${LDX12_EXAMPLE_TARGETS} PROPERTIES FOLDER "examples")
     set_property(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" PROPERTY VS_STARTUP_PROJECT 01_Triangle)
 endif()

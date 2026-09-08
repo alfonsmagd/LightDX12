@@ -37,6 +37,7 @@ namespace ldx12
 	static constexpr uint32_t ourMaxActiveCommandBuffers = 64;
 	static constexpr uint32_t ourMaxCommandBufferBatch = 4;
 	static constexpr uint32_t ourMaxImmediateCommandBuffers = ourMaxActiveCommandBuffers + ourMaxCommandBufferBatch;
+	static constexpr uint32_t ourMaxTrackedBuffersPerCommandBuffer = 256;
 	static constexpr uint32_t ourMaxTrackedTexturesPerCommandBuffer = 256;
 	static constexpr uint32_t ourMaxPushConstant32BitValues = 63;
 	static constexpr uint32_t ourCubeMapFaceCount = 6;
@@ -263,6 +264,7 @@ namespace ldx12
 		BufferType type = BufferType::Generic;
 		BufferMemory memory = BufferMemory::GpuLocal;
 		const void* initialData = nullptr;
+		bool unorderedAccess = false;
 	};
 
 	enum class TextureUsage : uint32_t
@@ -415,8 +417,10 @@ namespace ldx12
 		D3D12_RESOURCE_DESC desc_ = {};
 		BufferMemory memory_ = BufferMemory::GpuLocal;
 		D3D12_CPU_DESCRIPTOR_HANDLE srvHandle_{ 0 };
+		D3D12_CPU_DESCRIPTOR_HANDLE uavHandle_{ 0 };
 		D3D12_CPU_DESCRIPTOR_HANDLE cbvHandle_{ 0 };
 		uint32_t srvIndex_ = UINT32_MAX;
+		uint32_t uavIndex_ = UINT32_MAX;
 		uint32_t cbvIndex_ = UINT32_MAX;
 		void* mappedPtr_ = nullptr;
 	};
@@ -546,6 +550,8 @@ namespace ldx12
 		void CmdEndRendering();
 		void CmdSetViewport( float x, float y, float width, float height, float minDepth = 0.0f, float maxDepth = 1.0f );
 		void CmdSetScissor( int32_t left, int32_t top, int32_t right, int32_t bottom );
+		void CmdTransitionBuffer( BufferHandle buffer, D3D12_RESOURCE_STATES newState );
+		void CmdUavBarrier( BufferHandle buffer );
 		void CmdTransitionTexture( TextureHandle texture, D3D12_RESOURCE_STATES newState );
 		void CmdResolveTexture( TextureHandle source, TextureHandle destination );
 		void CmdBindRenderPipeline( const RenderPipelineState& pipeline );
@@ -556,11 +562,7 @@ namespace ldx12
 		void CmdPushDebugGroupLabel( const char* label, uint32_t color );
 		void CmdPopDebugGroupLabel();
 		void CmdDraw( uint32_t vertexCount, uint32_t instanceCount = 1, uint32_t firstVertex = 0, uint32_t firstInstance = 0 );
-		void CmdDrawIndexed( uint32_t indexCount,
-			uint32_t instanceCount = 1,
-			uint32_t firstIndex = 0,
-			int32_t vertexOffset = 0,
-			uint32_t firstInstance = 0 );
+		void CmdDrawIndexed( uint32_t indexCount, uint32_t instanceCount = 1, uint32_t firstIndex = 0, int32_t vertexOffset = 0, uint32_t firstInstance = 0 );
 		void CmdDrawIndexedIndirect( BufferHandle indirectBuffer, uint32_t drawCount, uint64_t byteOffset = 0 );
 		void CmdDispatch( uint32_t groupCountX, uint32_t groupCountY = 1, uint32_t groupCountZ = 1 );
 
@@ -573,6 +575,13 @@ namespace ldx12
 			TextureHandle presentTexture );
 
 		CommandBuffer() = default;
+
+		struct TrackedBufferState final
+		{
+			BufferHandle handle_ = {};
+			D3D12_RESOURCE_STATES initialState_ = D3D12_RESOURCE_STATE_COMMON;
+			D3D12_RESOURCE_STATES currentState_ = D3D12_RESOURCE_STATE_COMMON;
+		};
 
 		struct TrackedTextureState final
 		{
@@ -595,6 +604,14 @@ namespace ldx12
 		{
 			return isRendering_;
 		}
+		const TrackedBufferState* GetTrackedBuffers() const noexcept
+		{
+			return trackedBuffers_.data();
+		}
+		uint32_t GetTrackedBufferCount() const noexcept
+		{
+			return trackedBufferCount_;
+		}
 		const TrackedTextureState* GetTrackedTextures() const noexcept
 		{
 			return trackedTextures_.data();
@@ -604,16 +621,20 @@ namespace ldx12
 			return trackedTextureCount_;
 		}
 		ID3D12GraphicsCommandList* GetNativeGraphicsCommandList();
+		TrackedBufferState& GetTrackedBufferState( BufferHandle buffer );
 		TrackedTextureState& GetTrackedTextureState( TextureHandle texture );
+		void TransitionBuffer( BufferHandle buffer, BufferResource& resource, D3D12_RESOURCE_STATES newState );
 		void TransitionTexture( TextureHandle texture, TextureResource& resource, D3D12_RESOURCE_STATES newState );
 		CommandListWrapper* BuildSubmitFixup( CommandBuffer* const* previousCommandBuffers = nullptr, uint32_t previousCommandBufferCount = 0 );
-		void CommitSubmittedTextureStates();
+		void CommitSubmittedResourceStates();
 
 		DeviceManager* manager_ = nullptr;
 		CommandListWrapper* wrapper_ = nullptr;
 		bool isRendering_ = false;
 		bool active_ = false;
 		uint32_t debugGroupDepth_ = 0;
+		std::array<TrackedBufferState, ourMaxTrackedBuffersPerCommandBuffer> trackedBuffers_ = {};
+		uint32_t trackedBufferCount_ = 0;
 		std::array<TrackedTextureState, ourMaxTrackedTexturesPerCommandBuffer> trackedTextures_ = {};
 		uint32_t trackedTextureCount_ = 0;
 	};
@@ -681,6 +702,7 @@ namespace ldx12
 		ReadWriteResourceSlot GetAvailableReadWriteResource();
 		uint32_t GetConstantBufferIndex( BufferHandle buffer ) const;
 		uint32_t GetBindlessIndex( BufferHandle buffer ) const;
+		uint32_t GetUnorderedAccessIndex( BufferHandle buffer ) const;
 		uint32_t GetBindlessIndex( TextureHandle texture ) const;
 		uint32_t GetUnorderedAccessIndex( TextureHandle texture ) const;
 		uint32_t GetSamplerIndex( SamplerHandle sampler ) const;

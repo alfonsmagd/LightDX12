@@ -83,7 +83,7 @@ namespace ldx12
 
 		for( uint32_t index = 0; index < commandBufferCount; ++index )
 		{
-			commandBuffers[ index ]->CommitSubmittedTextureStates();
+			commandBuffers[ index ]->CommitSubmittedResourceStates();
 			graphicsQueue.immediateCommands_->ReleaseCommandBuffer( *commandBuffers[ index ] );
 		}
 
