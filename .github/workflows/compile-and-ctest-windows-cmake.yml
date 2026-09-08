@@ -76,6 +76,7 @@ jobs:
           $testsChanged = Test-PathChange @(
               "tests/Ldx12/*",
               "tests/Ldx12Tests.cpp",
+              "tests/Ldx12NativeImportTests.cpp",
               "tests/Ldx12StressTests.cpp",
               "tests/Ldx12FrameStressTests.cpp",
               "tests/Ldx12CommandStreamStressTests.cpp",
@@ -143,7 +144,7 @@ jobs:
           -DLDX12_INSTALL=OFF
 
       - name: Build core tests
-        run: cmake --build build-core-tests --config Debug --target Ldx12Tests Ldx12StressTests Ldx12FrameStressTests Ldx12CommandStreamStressTests Ldx12FullCapacityTests --parallel
+        run: cmake --build build-core-tests --config Debug --parallel
 
       - name: Run core tests
         run: ctest --test-dir build-core-tests -C Debug --output-on-failure
