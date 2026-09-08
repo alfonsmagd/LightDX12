@@ -32,7 +32,6 @@ if(LDX12_BUILD_THIRD_PARTY)
     add_library(cgltf INTERFACE
         "${LDX12_UTILS_ROOT}/../../third_party/cgltf/cgltf.h"
         "${LDX12_UTILS_ROOT}/../../third_party/cgltf/LICENSE"
-        "${LDX12_UTILS_ROOT}/../../third_party/cgltf/README.md"
     )
     add_library(Ldx12::cgltf ALIAS cgltf)
     target_include_directories(cgltf INTERFACE "${LDX12_UTILS_ROOT}/../../third_party/cgltf")

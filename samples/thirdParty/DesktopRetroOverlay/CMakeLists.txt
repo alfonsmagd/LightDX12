@@ -10,8 +10,7 @@ add_executable(DesktopRetroOverlay WIN32
     OverlayApplication.cpp OverlayApplication.hpp
     AppOptions.cpp AppOptions.hpp
     Diagnostics.cpp Diagnostics.hpp
-    OverlayControls.cpp OverlayControls.hpp
-    README.md START_HERE.md THIRD_PARTY_NOTICES.md)
+    OverlayControls.cpp OverlayControls.hpp)
 target_link_libraries(DesktopRetroOverlay PRIVATE DesktopRetroCapture DesktopRetroEffects shell32 windowsapp)
 set(RETRO_SHADERS shaders/DesktopRetroOverlayVS.hlsl shaders/DesktopRetroOverlayPS.hlsl
     shaders/NewPixieAccumulatePS.hlsl shaders/NewPixieBlurPS.hlsl)
