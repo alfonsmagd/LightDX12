@@ -1029,16 +1029,12 @@ namespace ldx12
 		{
 			throw std::invalid_argument( "Sampler minLod cannot be greater than maxLod." );
 		}
-		if( manager_->slotMapSamplers_.NumObjects() == ourCustomSamplerCount )
-		{
-			throw std::length_error( "All four custom sampler slots are already in use." );
-		}
-
-		const SamplerHandle handle = manager_->slotMapSamplers_.Create( SamplerResource{} );
-		SamplerResource* resource = manager_->slotMapSamplers_.Get( handle );
-		assert( resource != nullptr );
-		resource->descriptorIndex_ = LDX12_CUSTOM_SAMPLER_SLOT_FIRST + handle.Index();
-		manager_->WriteSamplerDescriptor( resource->descriptorIndex_, desc );
+		manager_->ProcessDeferredReleases();
+		const uint32_t descriptorIndex = manager_->AllocateSamplerDescriptor();
+		SamplerResource resource{};
+		resource.descriptorIndex_ = descriptorIndex;
+		const SamplerHandle handle = manager_->slotMapSamplers_.Create( std::move( resource ) );
+		manager_->WriteSamplerDescriptor( descriptorIndex, desc );
 		return handle;
 	}
 
@@ -1239,14 +1235,31 @@ namespace ldx12
 
 	bool RenderDevice::Destroy( SamplerHandle sampler )
 	{
-		if( !manager_->slotMapSamplers_.Contains( sampler ) )
+		DeviceManager& manager = *manager_;
+		SamplerResource* resource = manager.slotMapSamplers_.Get( sampler );
+		if( resource == nullptr )
 		{
 			ReportInvalidDestroy( "SamplerHandle", sampler.Index(), sampler.Gen() );
 			return false;
 		}
 
-		// The next CreateSampler() may overwrite this descriptor slot.
-		manager_->WaitIdle();
-		return manager_->slotMapSamplers_.Destroy( sampler );
+		DeviceManager::QueueContext& graphicsQueue = manager.GetGraphicsQueueContext();
+		const SubmitHandle releaseHandle =
+			graphicsQueue.immediateCommands_ != nullptr ? graphicsQueue.immediateCommands_->GetLastSubmitHandle() : SubmitHandle{};
+		const uint32_t descriptorIndex = resource->descriptorIndex_;
+		resource->descriptorIndex_ = UINT32_MAX;
+		manager.slotMapSamplers_.Destroy( sampler );
+
+		auto release = [ &manager, descriptorIndex ] { manager.FreeSamplerDescriptor( descriptorIndex ); };
+		if( graphicsQueue.immediateCommands_ == nullptr || releaseHandle.Empty() || graphicsQueue.immediateCommands_->IsReady( releaseHandle ) )
+		{
+			release();
+		}
+		else
+		{
+			manager.AddDeferredRelease( releaseHandle, std::move( release ) );
+		}
+
+		return true;
 	}
 } // namespace ldx12

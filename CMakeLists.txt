@@ -503,6 +503,7 @@ if(LDX12_BUILD_TESTS)
         "${CMAKE_CURRENT_SOURCE_DIR}/tests/Ldx12/SlotMapVirtualObjectTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/tests/Ldx12/PublicArrayTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/tests/Ldx12/GpuResourceLifecycleTest.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/Ldx12/GpuSamplerDeferredDestructionTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/tests/Ldx12/GpuComputeTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/tests/Ldx12/GpuInvalidHandleTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/tests/Ldx12/GpuSubmissionTest.cpp"

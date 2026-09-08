@@ -713,6 +713,9 @@ namespace ldx12
 		bool IsAlive( TextureHandle texture ) const noexcept;
 		bool IsAlive( SamplerHandle sampler ) const noexcept;
 		void WaitIdle();
+		// Submit or discard every command buffer that may use a resource before destroying it.
+		// A successful Destroy invalidates the CPU handle immediately and retires its GPU data
+		// and descriptors after submissions issued before this call have completed.
 		bool Destroy( BufferHandle buffer );
 		bool Destroy( TextureHandle texture );
 		bool Destroy( SamplerHandle sampler );
@@ -825,11 +828,13 @@ namespace ldx12
 		uint32_t AllocateBindlessDescriptor();
 		uint32_t AllocateBindlessDescriptorRange( uint32_t count );
 		uint32_t AllocateFixedBindlessDescriptor( uint32_t index );
+		uint32_t AllocateSamplerDescriptor();
 		uint32_t AllocateRtvDescriptor();
 		uint32_t AllocateDsvDescriptor();
 		void FreeBindlessDescriptor( uint32_t index );
 		void FreeBindlessDescriptorRange( uint32_t index, uint32_t count );
 		void EraseFreeBindlessRange( uint32_t rangeIndex ) noexcept;
+		void FreeSamplerDescriptor( uint32_t index ) noexcept;
 		void FreeRtvDescriptor( uint32_t index );
 		void FreeDsvDescriptor( uint32_t index );
 		BufferResource& GetBufferResource( BufferHandle handle );
@@ -878,9 +883,11 @@ namespace ldx12
 		uint32_t dsvDescriptorSize_ = 0;
 		std::array<DescriptorRange, ourMaxBindlessDescriptors> freeBindlessRanges_ = {};
 		std::array<uint8_t, LDX12_BINDLESS_DYNAMIC_SLOT_FIRST> fixedBindlessDescriptorUsed_ = {};
+		std::array<uint32_t, ourCustomSamplerCount> freeSamplerDescriptors_ = {};
 		std::array<uint32_t, ourMaxRtvDescriptors> freeRtvDescriptors_ = {};
 		std::array<uint32_t, ourMaxDsvDescriptors> freeDsvDescriptors_ = {};
 		uint32_t freeBindlessRangeCount_ = 0;
+		uint32_t freeSamplerCount_ = 0;
 		uint32_t freeRtvDescriptorCount_ = 0;
 		uint32_t freeDsvDescriptorCount_ = 0;
 		ComPtr<ID3D12RootSignature> rootSignature_;

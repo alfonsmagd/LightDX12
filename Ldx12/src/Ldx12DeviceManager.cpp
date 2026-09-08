@@ -537,6 +537,12 @@ namespace ldx12
 			WriteSamplerDescriptor( index, samplerDescs[ index ] );
 		}
 
+		freeSamplerCount_ = ourCustomSamplerCount;
+		for( uint32_t index = ourMaxSamplers; index > ourBuiltInSamplerCount; --index )
+		{
+			freeSamplerDescriptors_[ ourMaxSamplers - index ] = index - 1u;
+		}
+
 		freeBindlessRangeCount_ = 0;
 		const uint32_t dynamicDescriptorCount = desc_.bindlessCapacity - LDX12_BINDLESS_DYNAMIC_SLOT_FIRST;
 		if( dynamicDescriptorCount > 0 )
@@ -652,6 +658,17 @@ namespace ldx12
 		return index;
 	}
 
+	uint32_t DeviceManager::AllocateSamplerDescriptor()
+	{
+		if( freeSamplerCount_ == 0 )
+		{
+			throw std::length_error( "All custom sampler descriptors are in use or pending GPU release." );
+		}
+
+		--freeSamplerCount_;
+		return freeSamplerDescriptors_[ freeSamplerCount_ ];
+	}
+
 	uint32_t DeviceManager::AllocateRtvDescriptor()
 	{
 		if( freeRtvDescriptorCount_ == 0 )
@@ -730,6 +747,19 @@ namespace ldx12
 				EraseFreeBindlessRange( insertIndex + 1u );
 			}
 		}
+	}
+
+	void DeviceManager::FreeSamplerDescriptor( uint32_t index ) noexcept
+	{
+		if( index == UINT32_MAX )
+		{
+			return;
+		}
+
+		assert( index >= ourBuiltInSamplerCount && index < ourMaxSamplers );
+		assert( freeSamplerCount_ < freeSamplerDescriptors_.size() );
+		freeSamplerDescriptors_[ freeSamplerCount_ ] = index;
+		++freeSamplerCount_;
 	}
 
 	void DeviceManager::WriteSamplerDescriptor( uint32_t index, const SamplerDesc& desc )
