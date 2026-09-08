@@ -20,6 +20,8 @@ This file lists the main user-visible changes in each Ldx12 version.
 
 ### Fixed
 
+- Destroying a custom sampler now invalidates its handle immediately and defers descriptor reuse until earlier GPU submissions complete, without an implicit `WaitIdle`. Descriptor allocation is independent of handle slots, so pending releases continue to consume sampler capacity safely.
+- Added a dedicated sampler retirement regression test that holds a GPU submission pending, verifies that its retired descriptor cannot be reused, and checks descriptor recycling and stale-handle invalidation after completion. Verified in Debug and Release.
 - Replaced the `ICommandBuffer`/`CommandBufferImpl` split with one concrete `CommandBuffer`, removing virtual command dispatch and interface-to-implementation conversion during submission.
 - Default-heap buffers now start in their real D3D12 `COMMON` state and use implicit read-state promotion, removing ignored-initial-state validation warnings. Pipelines driven entirely by `SV_VertexID` now pass a null input layout instead of an empty descriptor array.
 
