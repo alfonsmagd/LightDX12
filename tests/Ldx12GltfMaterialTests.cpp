@@ -1,8 +1,8 @@
 #include "Ldx12/TestTemplate.hpp"
 #include "Ldx12/Ldx12Native.hpp"
 #include "Ldx12/HLSLLoader.hpp"
-#include "../samples/GltfScene/SceneMaterials.hpp"
-#include "../samples/GltfScene/SceneEnvironment.hpp"
+#include "../samples/GltfSampleCommon/SceneMaterials.hpp"
+#include "../samples/GltfSampleCommon/SceneEnvironment.hpp"
 
 #include <iostream>
 
