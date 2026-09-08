@@ -149,9 +149,8 @@ The predefined descriptor positions are conveniences, not resource limits. Appli
 
 ## Current scope
 
-Ldx12 requires Direct3D 12 feature level 12.0, bindless resource binding tier 2 and Shader Model 6.6. It currently does not provide:
+Ldx12 requires Direct3D 12 feature level 12.0, bindless resource binding tier 2 and Shader Model 6.6. NOT PROVIDE!!!! :
 
-- Dedicated compute queues, command buffers or submissions.
 - Ray tracing, mesh shaders or amplification shaders.
 - Traditional per-draw descriptor tables; binding is bindless-only.
 - Native swapchains for window types other than Win32 `HWND`.
