@@ -1,4 +1,5 @@
 #include "Ldx12/Ldx12Native.hpp"
+#include "Ldx12Internal.hpp"
 #include <stdexcept>
 
 namespace ldx12
@@ -61,16 +62,10 @@ namespace ldx12
 		resource.usageFlags_ = desc.Flags;
 		auto& manager = *device_->manager_;
 		uint32_t descriptor = UINT32_MAX;
-		try
-		{
-			manager.CreateTextureShaderResourceView( resource );
-			descriptor = resource.srvIndex_;
-			return manager.slotMapTextures_.Create( std::move( resource ) );
-		}
-		catch( ... )
-		{
-			manager.FreeBindlessDescriptor( descriptor );
-			throw;
-		}
+		DeviceManager::DeferredRelease::OnFailure cleanup( [ &manager, &descriptor ]() noexcept { manager.FreeBindlessDescriptor( descriptor ); } );
+		manager.CreateTextureShaderResourceView( resource );
+		descriptor = resource.srvIndex_;
+		const TextureHandle handle = manager.slotMapTextures_.Create( std::move( resource ) );
+		return handle;
 	}
 }

@@ -20,6 +20,7 @@ This file lists the main user-visible changes in each Ldx12 version.
 
 ### Fixed
 
+- Replaced internal exception-handler cleanup with `DeferredRelease::OnFailure` for device initialization, swapchain creation and native texture imports. It performs CPU cleanup during exception unwinding; GPU retirement continues to wait for its submission. Shutdown remains non-throwing and reports queue-fence failures to the debugger instead of silently swallowing them.
 - Destroying a custom sampler now invalidates its handle immediately and defers descriptor reuse until earlier GPU submissions complete, without an implicit `WaitIdle`. Descriptor allocation is independent of handle slots, so pending releases continue to consume sampler capacity safely.
 - Added a dedicated sampler retirement regression test that holds a GPU submission pending, verifies that its retired descriptor cannot be reused, and checks descriptor recycling and stale-handle invalidation after completion. Verified in Debug and Release.
 - Replaced the `ICommandBuffer`/`CommandBufferImpl` split with one concrete `CommandBuffer`, removing virtual command dispatch and interface-to-implementation conversion during submission.

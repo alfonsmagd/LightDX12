@@ -5,8 +5,11 @@
 
 #include <algorithm>
 #include <cstring>
+#include <exception>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
+#include <utility>
 
 #include <d3dcompiler.h>
 
@@ -14,6 +17,38 @@
 	#include <d3d12sdklayers.h>
 	#include <dxgidebug.h>
 #endif
+
+namespace ldx12
+{
+	// Failed CPU operations have no submission to wait for. Their cleanup runs
+	// during unwindin successful operations retain their allocated resources.
+	template <typename Function>
+	class DeviceManager::DeferredRelease::OnFailure final
+	{
+		static_assert( std::is_nothrow_invocable_v<Function&>, "Deferred cleanup must be noexcept." );
+	public:
+		explicit OnFailure( Function function ) noexcept( std::is_nothrow_move_constructible_v<Function> ) : function_( std::move( function ) )
+		{
+		}
+
+		OnFailure( const OnFailure& ) = delete;
+		OnFailure& operator=( const OnFailure& ) = delete;
+		OnFailure( OnFailure&& ) = delete;
+		OnFailure& operator=( OnFailure&& ) = delete;
+
+		~OnFailure() noexcept
+		{
+			if( std::uncaught_exceptions() > exceptionCount_ )
+			{
+				function_();
+			}
+		}
+
+	private:
+		Function function_;
+		int exceptionCount_ = std::uncaught_exceptions();
+	};
+}
 
 namespace ldx12::detail
 {

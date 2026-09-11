@@ -22,6 +22,10 @@ ldx12_add_test(Ldx12NativeImportTests
     SOURCES Ldx12NativeImportTests.cpp LIBRARIES Ldx12::Ldx12 TIMEOUT 60)
 add_subdirectory(Ldx12)
 
+ldx12_add_test(Ldx12DeferredTests
+    SOURCES Ldx12DeferredTests.cpp LIBRARIES Ldx12::Ldx12 TIMEOUT 10 WARNINGS)
+target_include_directories(Ldx12DeferredTests PRIVATE "${LDX12_PROJECT_ROOT}/Ldx12/src")
+
 ldx12_add_test(Ldx12StressTests
     SOURCES Ldx12StressTests.cpp LIBRARIES Ldx12::Ldx12 TIMEOUT 120 WARNINGS)
 ldx12_add_test(Ldx12FrameStressTests

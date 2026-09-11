@@ -257,7 +257,7 @@ namespace ldx12
 		}
 	}
 
-	void ImmediateCommands::WaitAll()
+	void ImmediateCommands::WaitAll() noexcept
 	{
 		for( uint32_t index = 0; index < bufferCount_; ++index )
 		{

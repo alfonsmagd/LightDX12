@@ -772,9 +772,13 @@ namespace ldx12
 
 		struct DeferredRelease final
 		{
+			// CPU cleanup on exception; defined internally, independent of GPU retirement.
+			template <typename Function> class OnFailure;
+
 			SubmitHandle handle_;
 			std::function<void()> release_;
 		};
+		friend struct DeferredReleaseTestAccess;
 
 		struct QueueContext final
 		{
@@ -846,6 +850,7 @@ namespace ldx12
 		void ProcessDeferredReleases( QueueContext& context );
 		void WaitForQueueIdle();
 		void WaitForQueueIdle( QueueContext& context );
+		void WaitForQueueIdleNoThrow( QueueContext& context ) noexcept;
 		void Shutdown() noexcept;
 		void ReportLiveObjects() noexcept;
 		void CreateCommittedTextureResource( const TextureDesc& desc, TextureResource& resource );

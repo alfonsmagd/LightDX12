@@ -24,7 +24,7 @@ namespace ldx12
 		SubmitHandle GetNextSubmitHandle() const noexcept;
 		bool IsReady( SubmitHandle handle, bool fastCheckNoD3D12 = false ) const;
 		void Wait( SubmitHandle handle );
-		void WaitAll();
+		void WaitAll() noexcept;
 
 	private:
 		CommandListWrapper* FindOldestSubmittedBuffer() noexcept;
