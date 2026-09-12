@@ -117,7 +117,7 @@ Without Ldx12, you would configure the DXGI factory and adapter, D3D12 device an
 
 ## Bindless layout
 
-The diagram follows your light or dark theme. See the [architecture document](Ldx12/docs/architecture.html) for the complete internal design.
+The diagram follows your light or dark theme.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="Ldx12/docs/images/bindless-layout-dark.png">
