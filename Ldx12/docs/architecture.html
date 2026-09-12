@@ -7,7 +7,7 @@
 	<style>
 		:root {
 			color-scheme: light;
-			--background: #f5f6f7;
+			--background: #ffffff;
 			--surface: #ffffff;
 			--surface-strong: #fafbfc;
 			--border: #cfd5dc;
@@ -18,6 +18,23 @@
 			--green: #2f855a;
 			--orange: #b56b1c;
 			--cyan: #257f8c;
+		}
+
+		@media (prefers-color-scheme: dark) {
+			:root {
+				color-scheme: dark;
+				--background: #0d1117;
+				--surface: #0d1117;
+				--surface-strong: #161b22;
+				--border: #30363d;
+				--text: #f0f6fc;
+				--muted: #b1bac4;
+				--blue: #79b8ff;
+				--purple: #d2a8ff;
+				--green: #7ee787;
+				--orange: #ffa657;
+				--cyan: #76e3ea;
+			}
 		}
 
 		* {
@@ -315,7 +332,7 @@
 			padding: 14px;
 			border: 1px solid var(--border);
 			border-radius: 3px;
-			background: #ffffff;
+			background: var(--surface);
 		}
 
 		.bindless-picture {
@@ -326,7 +343,7 @@
 		}
 
 		.bindless-picture .picture-container {
-			fill: #fafbfc;
+			fill: var(--surface-strong);
 			stroke: var(--border);
 			stroke-width: 2;
 		}
@@ -609,6 +626,53 @@
 				grid-template-columns: 1fr;
 			}
 		}
+		#bindless-layout { padding: 32px 24px; }
+		.bindless-stack { display: flex; flex-direction: column; max-width: 720px; margin: 0 auto; font-size: 14px; line-height: 1.6; }
+		.bindless-stack h2 { margin-bottom: 8px; }
+		.bindless-lead { color: var(--muted); margin-bottom: 22px; }
+		.bindless-block { position: relative; margin-bottom: 18px; padding: 18px; border: 1px solid var(--border); border-radius: 4px; background: var(--surface-strong); }
+		.bindless-block:not(:last-child)::after { position: absolute; left: 32px; bottom: -19px; width: 2px; height: 18px; background: var(--border); content: ""; }
+		.bindless-block:last-child { margin-bottom: 0; }
+		.bindless-heading { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+		.bindless-heading h3 { margin: 0; font-size: 18px; }
+		.bindless-number { display: grid; flex: 0 0 28px; width: 28px; height: 28px; place-items: center; border: 1px solid rgba(47, 111, 189, 0.42); border-radius: 3px; background: rgba(47, 111, 189, 0.08); color: var(--blue); font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
+		.bindless-block p { color: var(--muted); margin-bottom: 14px; }
+		.bindless-rows { display: flex; flex-direction: column; gap: 8px; margin: 0; }
+		.bindless-rows > div { padding: 10px 12px; border: 1px solid var(--border); border-left: 3px solid var(--blue); border-radius: 3px; background: var(--surface); }
+		.bindless-rows dt { font-weight: 600; }
+		.bindless-rows dd { margin: 2px 0 0; color: var(--muted); }
+		.bindless-stack code { font-size: 12px; overflow-wrap: anywhere; white-space: normal; }
+		.bindless-block .bindless-footnote { margin: 12px 0 0; font-size: 12px; }
+		.bindless-resource { margin-top: 12px; padding: 14px; border: 1px solid var(--border); border-radius: 3px; background: var(--surface); }
+		.bindless-resource + .bindless-resource { margin-top: 10px; }
+		.bindless-resource h4 { margin: 0 0 4px; font-size: 15px; }
+		.bindless-resource h4 span { display: block; font-size: 12px; font-weight: 400; color: var(--muted); }
+		.bindless-resource p { margin: 6px 0 0; font-size: 13px; }
+		.bindless-details { margin-top: 12px; font-size: 12px; }
+		.bindless-details summary { cursor: pointer; color: var(--blue); width: fit-content; padding: 4px 0; }
+		.bindless-details summary:focus-visible { outline: 2px solid var(--blue); outline-offset: 4px; }
+		.bindless-details > code { display: block; margin-top: 8px; }
+		.bindless-range-panel { margin-top: 16px; }
+		.bindless-range-panel h5 { margin: 0 0 4px; font-size: 15px; }
+		.bindless-range-panel > p { margin: 0 0 10px; font-size: 12px; }
+		.bindless-range-table { width: 100%; border-spacing: 0 7px; font-size: 14px; }
+		.bindless-range-table th { padding: 0 12px 2px; color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-align: left; text-transform: uppercase; }
+		.bindless-range-table td { padding: 11px 12px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); background: var(--surface-strong); }
+		.bindless-range-table td:first-child { width: 112px; border-left: 4px solid var(--border); border-radius: 3px 0 0 3px; color: var(--text); font-size: 16px; font-weight: 700; white-space: nowrap; }
+		.bindless-range-table td:last-child { border-right: 1px solid var(--border); border-radius: 0 3px 3px 0; color: var(--muted); }
+		.bindless-range-table .range-public td,
+		.bindless-range-table .range-dynamic td { background: color-mix(in srgb, var(--green) 9%, var(--surface)); }
+		.bindless-range-table .range-public td:first-child,
+		.bindless-range-table .range-dynamic td:first-child { border-left-color: var(--green); color: var(--green); }
+		.bindless-range-table .range-engine td:first-child { border-left-color: var(--cyan); }
+		.bindless-range-table .range-invalid td:first-child { border-left-color: #8c96a3; }
+		@media (max-width: 600px) {
+			#bindless-layout { padding: 24px 16px; }
+			.bindless-stack h2 { font-size: 18px; }
+			.bindless-block { padding: 14px; }
+			.bindless-block:not(:last-child)::after { left: 28px; }
+			.bindless-range-table td:first-child { width: 88px; font-size: 14px; }
+		}
 	</style>
 </head>
 <body>
@@ -755,143 +819,85 @@
 		</section>
 
 		<section class="diagram" id="bindless-layout">
-			<h2>4. Bindless layout and root signature</h2>
-			<div class="legend section-legend" aria-label="Bindless diagram color legend">
-				<span style="color: var(--blue)"><i></i>Public user-facing API</span>
-				<span style="color: var(--purple)"><i></i>Ownership and orchestration</span>
-				<span style="color: var(--cyan)"><i></i>Internal implementation</span>
-				<span style="color: var(--orange)"><i></i>Native D3D12 / DXGI</span>
-				<span class="flow-key" style="color: var(--green)"><i></i>Execution or lifetime flow</span>
-			</div>
-			<div class="bindless-picture-shell">
-				<svg class="bindless-picture" viewBox="0 0 1400 790" role="img" aria-labelledby="bindless-title bindless-description">
-					<title id="bindless-title">Ldx12 bindless root signature and descriptor heaps</title>
-					<desc id="bindless-description">The root signature contains two groups of root constants and direct heap indexing flags. The flags connect to the shader-visible CBV SRV UAV and sampler heaps. RTV and DSV heaps are selected separately by CmdBeginRendering.</desc>
-					<defs>
-						<marker id="bindless-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
-							<path d="M 0 0 L 10 5 L 0 10 z" fill="#56d995"/>
-						</marker>
-					</defs>
+			<div class="bindless-stack">
+				<h2>4. Bindless layout and root signature</h2>
+				<p class="bindless-lead">What you can bind, where it lives, and the limits that matter when recording commands.</p>
 
-					<rect class="picture-container" x="30" y="30" width="520" height="500" rx="3"/>
-					<text class="picture-title" x="60" y="75">Root Signature</text>
-					<text class="picture-copy" x="290" y="101">2 root parameters · 0 descriptor tables</text>
+				<section class="bindless-block" aria-labelledby="root-heading">
+					<div class="bindless-heading"><span class="bindless-number">01</span><h3 id="root-heading">Root signature</h3></div>
+					<p>Two root parameters. No descriptor tables.</p>
+					<dl class="bindless-rows">
+						<div><dt>Application constants <code>b0</code></dt><dd>63 × 32-bit values · 252 bytes<br><code>CmdPushConstants()</code></dd></div>
+						<div><dt>Engine-reserved constant <code>b1</code></dt><dd>Indirect draw index · written by CommandSignature</dd></div>
+					</dl>
+					<p class="bindless-footnote">Direct heap indexing is enabled for resources and samplers.</p>
+					<details class="bindless-details">
+						<summary>Root signature flags</summary>
+						<code>CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED</code>
+						<code>SAMPLER_HEAP_DIRECTLY_INDEXED</code>
+					</details>
+				</section>
 
-					<rect class="picture-public" x="60" y="125" width="460" height="105" rx="2"/>
-					<text class="picture-heading" x="290" y="164">Root parameter 0 · b0</text>
-					<text class="picture-copy" x="290" y="190">63 × 32-bit constants · 252 bytes</text>
-					<text class="picture-copy" x="290" y="211">CmdPushConstants()</text>
-
-					<rect class="picture-internal" x="60" y="250" width="460" height="105" rx="2"/>
-					<text class="picture-heading" x="290" y="289">Root parameter 1 · b1</text>
-					<text class="picture-copy" x="290" y="315">1 × 32-bit constant · indirect draw index</text>
-					<text class="picture-copy" x="290" y="336">Written by CommandSignature</text>
-
-					<rect class="picture-internal" x="60" y="375" width="460" height="125" rx="2"/>
-					<text class="picture-heading" x="290" y="414">Direct heap indexing flags</text>
-					<text class="picture-copy" x="290" y="443">CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED</text>
-					<text class="picture-copy" x="290" y="468">SAMPLER_HEAP_DIRECTLY_INDEXED</text>
-
-					<rect class="picture-container" x="650" y="30" width="720" height="500" rx="3"/>
-					<text class="picture-title" x="680" y="75">Shader-visible Descriptor Heaps</text>
-
-					<rect class="picture-native" x="680" y="105" width="660" height="235" rx="2"/>
-					<text class="picture-heading" x="1010" y="139">CBV / SRV / UAV heap · 4,096 descriptors</text>
-					<rect class="picture-public" x="705" y="165" width="190" height="72" rx="2"/>
-					<text class="picture-heading" x="800" y="196">User fixed</text>
-					<text class="picture-copy" x="800" y="219">CBV · SRV · UAV</text>
-					<rect class="picture-internal" x="915" y="165" width="190" height="72" rx="2"/>
-					<text class="picture-heading" x="1010" y="196">Engine fixed</text>
-					<text class="picture-copy" x="1010" y="219">CBV · SRV · UAV</text>
-					<rect class="picture-internal" x="1125" y="165" width="190" height="72" rx="2"/>
-					<text class="picture-heading" x="1220" y="196">Dynamic</text>
-					<text class="picture-copy" x="1220" y="219">slots 26–4,095</text>
-					<text class="picture-copy" x="1010" y="282">One shared physical heap · direct shader indexing</text>
-					<text class="picture-copy" x="1010" y="308">ResourceDescriptorHeap[index]</text>
-
-					<rect class="picture-native" x="680" y="365" width="660" height="135" rx="2"/>
-					<text class="picture-heading" x="1010" y="399">Sampler heap · 8 descriptors</text>
-					<rect class="picture-internal" x="705" y="420" width="290" height="56" rx="2"/>
-					<text class="picture-heading" x="850" y="446">Built-in samplers · 0–3</text>
-					<text class="picture-copy" x="850" y="466">Linear · Point · Shadow</text>
-					<rect class="picture-public" x="1015" y="420" width="300" height="56" rx="2"/>
-					<text class="picture-heading" x="1165" y="446">Custom samplers · 4–7</text>
-					<text class="picture-copy" x="1165" y="466">4 runtime slots</text>
-
-					<path class="picture-flow" d="M 520 420 C 610 420, 585 225, 680 225"/>
-					<path class="picture-flow" d="M 520 460 C 610 460, 600 432, 680 432"/>
-					<text class="picture-flow-label" x="603" y="325">direct indexing</text>
-
-					<rect class="picture-container" x="30" y="580" width="1340" height="170" rx="3"/>
-					<text class="picture-title" x="60" y="623">Output Attachment Heaps</text>
-					<text class="picture-copy" x="700" y="623">CPU-only · not indexed through the root signature</text>
-					<rect class="picture-public" x="80" y="655" width="300" height="66" rx="2"/>
-					<text class="picture-heading" x="230" y="684">CmdBeginRendering</text>
-					<text class="picture-copy" x="230" y="706">Framebuffer attachments</text>
-					<rect class="picture-native" x="535" y="655" width="300" height="66" rx="2"/>
-					<text class="picture-heading" x="685" y="680">RTV heap · 256 descriptors</text>
-					<text class="picture-copy" x="685" y="702">Up to 8 active per render pass</text>
-					<rect class="picture-native" x="990" y="655" width="300" height="66" rx="2"/>
-					<text class="picture-heading" x="1140" y="680">DSV heap · 64 descriptors</text>
-					<text class="picture-copy" x="1140" y="702">Up to 1 active per render pass</text>
-					<path class="picture-flow" d="M 380 688 L 535 688"/>
-					<path class="picture-flow" d="M 380 706 C 650 770, 790 688, 990 688"/>
-				</svg>
-			</div>
-
-			<div class="binding-card">
-					<h3>Exact descriptor ranges</h3>
-					<p>CBV, SRV and UAV share one physical shader-visible heap. Samplers use a second shader-visible heap. RTV and DSV remain separate CPU-only heaps.</p>
-
-					<div class="heap-list">
-						<div class="heap-card">
-							<div class="heap-header">
-								<b>CBV / SRV / UAV bindless heap</b>
-								<span>Shader visible · default 4,096 · configurable up to 4,096</span>
-							</div>
-							<div class="heap-layout" aria-label="CBV SRV UAV descriptor heap layout">
-								<div class="heap-slot invalid-slot"><b>Invalid</b><span>slot 0</span></div>
-								<div class="heap-slot public-slot"><b>User CBV</b><span>1–5 · 5 slots</span></div>
-								<div class="heap-slot internal-slot"><b>Engine CBV</b><span>6–10 · 5 slots</span></div>
-								<div class="heap-slot public-slot"><b>User SRV</b><span>11–15 · 5 slots</span></div>
-								<div class="heap-slot internal-slot"><b>Engine SRV</b><span>16–20 · 5 slots</span></div>
-								<div class="heap-slot public-slot"><b>User UAV</b><span>21–23 · 3 slots</span></div>
-								<div class="heap-slot internal-slot"><b>Engine UAV</b><span>24–25 · 2 slots</span></div>
-								<div class="heap-slot dynamic-slot"><b>Dynamic descriptors</b><span>26–4,095 · 4,070 slots by default</span></div>
-							</div>
-						</div>
-
-						<div class="heap-card">
-							<div class="heap-header">
-								<b>Sampler heap</b>
-								<span>Shader visible · 8 descriptors</span>
-							</div>
-							<div class="heap-layout" aria-label="Sampler descriptor heap layout">
-								<div class="heap-slot internal-slot"><b>LinearClamp</b><span>slot 0</span></div>
-								<div class="heap-slot internal-slot"><b>LinearWrap</b><span>slot 1</span></div>
-								<div class="heap-slot internal-slot"><b>PointClamp</b><span>slot 2</span></div>
-								<div class="heap-slot internal-slot"><b>ShadowComparison</b><span>slot 3</span></div>
-								<div class="heap-slot public-slot"><b>Custom samplers</b><span>slots 4–7 · 4 runtime slots</span></div>
-							</div>
-						</div>
-
-						<div class="heap-summary">
-							<div class="compact-heap">
-								<b>RTV heap · 256 default / maximum</b>
-								<span>Descriptor storage capacity. A render pass can bind up to 8 color attachments simultaneously. The heap is CPU only and is not directly indexed by shaders.</span>
-							</div>
-							<div class="compact-heap">
-								<b>DSV heap · 64 default / maximum</b>
-								<span>Descriptor storage capacity. A render pass can bind one depth/stencil attachment. The heap is CPU only and is not directly indexed by shaders.</span>
-							</div>
+				<section class="bindless-block" aria-labelledby="shader-heaps-heading">
+					<div class="bindless-heading"><span class="bindless-number">02</span><h3 id="shader-heaps-heading">Shader-visible heaps</h3></div>
+					<p>The shader accesses two separate heaps directly by index.</p>
+					<div class="bindless-resource">
+						<h4>Resources <span>CBV, SRV and UAV share one heap</span></h4>
+						<code>ResourceDescriptorHeap[index]</code>
+						<dl class="bindless-rows">
+							<div><dt>Your fixed slots</dt><dd>5 CBVs · slots 1–5<br>5 SRVs · slots 11–15<br>3 UAVs · slots 21–23</dd></div>
+							<div><dt>Dynamic resources</dt><dd>Allocated from slot 26. Use the descriptor index returned by Ldx12; do not choose these slots manually.</dd></div>
+						</dl>
+						<p>CBV: constant buffers · SRV: read-only views · UAV: read/write views. Engine slots are reserved.</p>
+						<div class="bindless-range-panel">
+							<h5>Descriptor ranges</h5>
+							<p>One shared CBV / SRV / UAV heap · maximum capacity: 4,096 descriptors.</p>
+							<table class="bindless-range-table" aria-label="Resource descriptor ranges">
+								<thead><tr><th scope="col">Slots</th><th scope="col">Description</th></tr></thead>
+								<tbody>
+									<tr class="range-invalid"><td>0</td><td>Invalid descriptor · reserved as the null slot</td></tr>
+									<tr class="range-public"><td>1–5</td><td>User CBV · constant buffer views</td></tr>
+									<tr class="range-engine"><td>6–10</td><td>Engine CBV · internal constant buffers</td></tr>
+									<tr class="range-public"><td>11–15</td><td>User SRV · read-only resource views</td></tr>
+									<tr class="range-engine"><td>16–20</td><td>Engine SRV · internal read-only views</td></tr>
+									<tr class="range-public"><td>21–23</td><td>User UAV · read/write resource views</td></tr>
+									<tr class="range-engine"><td>24–25</td><td>Engine UAV · internal read/write views</td></tr>
+									<tr class="range-dynamic"><td>26–4,095</td><td>Dynamic bindless resources · 4,070 slots by default</td></tr>
+								</tbody>
+							</table>
 						</div>
 					</div>
-			</div>
+					<div class="bindless-resource">
+						<h4>Samplers <span>A separate heap for sampling settings</span></h4>
+						<code>SamplerDescriptorHeap[index]</code>
+						<dl class="bindless-rows">
+							<div><dt>Built-in · slots 0–3</dt><dd>LinearClamp · LinearWrap · PointClamp · ShadowComparison</dd></div>
+							<div><dt>Your samplers · slots 4–7</dt><dd>Up to 4 custom samplers. Use <code>CreateSampler()</code> and <code>GetSamplerIndex()</code>.</dd></div>
+						</dl>
+						<p>A destroyed sampler's slot remains reserved until its pending GPU work completes.</p>
+						<div class="bindless-range-panel">
+							<h5>Descriptor ranges</h5>
+							<p>Separate shader-visible sampler heap · 8 descriptors.</p>
+							<table class="bindless-range-table" aria-label="Sampler descriptor ranges">
+								<thead><tr><th scope="col">Slots</th><th scope="col">Description</th></tr></thead>
+								<tbody>
+									<tr class="range-engine"><td>0–3</td><td>Built-in samplers · LinearClamp, LinearWrap, PointClamp and ShadowComparison</td></tr>
+									<tr class="range-public"><td>4–7</td><td>Custom samplers · 4 runtime slots available to the application</td></tr>
+								</tbody>
+							</table>
+						</div>
+					</div>
+				</section>
 
-			<div class="binding-notes">
-				<div class="binding-note"><b>CBV</b><br>Constant Buffer View. Fixed public slots 1–5 and fixed engine slots 6–10.</div>
-				<div class="binding-note"><b>SRV / UAV</b><br>Read-only and read-write resource views. Fixed slots cover common bindings; dynamic slots hold ordinary bindless resources.</div>
-				<div class="binding-note"><b>Capacity is not simultaneous usage</b><br>The heaps store 256 RTV and 64 DSV descriptors, while one render pass can activate at most 8 RTVs and 1 DSV through CmdBeginRendering.</div>
+				<section class="bindless-block" aria-labelledby="attachments-heading">
+					<div class="bindless-heading"><span class="bindless-number">03</span><h3 id="attachments-heading">Render attachments</h3></div>
+					<p><code>CmdBeginRendering()</code> selects these through the framebuffer. Their heaps are CPU-only.</p>
+					<dl class="bindless-rows">
+						<div><dt>Color · RTV</dt><dd>Up to <strong>8 color attachments per render pass</strong>.</dd></div>
+						<div><dt>Depth / stencil · DSV</dt><dd>Up to <strong>1 depth/stencil attachment per render pass</strong>.</dd></div>
+					</dl>
+					<p class="bindless-footnote">Select attachments in the framebuffer. Shaders do not access RTV or DSV descriptors through a heap index.</p>
+				</section>
 			</div>
 		</section>
 	</main>

@@ -4,7 +4,7 @@
 
 # Ldx12
 
-**Prototype Direct3D 12  Bindless renderers quickly with a modern, lightweight API and low overhead.**
+**Prototype Direct3D 12 bindless renderers quickly with a modern, lightweight API and low overhead.**
 
 Ldx12 is a C++20 static library that removes repetitive Direct3D 12 setup while keeping rendering explicit. It follows modern design patterns through bindless resources, typed generational handles, reusable command buffers and GPU-safe deferred destruction.
 
@@ -23,6 +23,8 @@ It is intended for graphics experiments, tools and renderer prototypes—not as 
 
 ## A frame at a glance
 
+With the device, swapchain and graphics pipeline already initialized:
+
 ```cpp
 TextureHandle backbuffer = device.GetCurrentSwapchainTexture();
 Framebuffer framebuffer{};
@@ -38,21 +40,100 @@ device.Submit( commands, backbuffer );
 
 Ldx12 manages the device, swapchain, descriptor heaps, root signature, command-list recycling, fences, resource states and deferred resource releases behind this flow.
 
+## Bindless: pass indices, not resource bindings
+
+### Before: binding resources
+
+With conventional descriptor tables, selecting a texture and a buffer can look like this (illustrative native D3D12):
+
+```cpp
+commandList->SetGraphicsRootDescriptorTable(textureSlot, textureDescriptor);
+commandList->SetGraphicsRootDescriptorTable(bufferSlot, bufferDescriptor);
+```
+
+The shader uses fixed registers matched by the root signature. Here the sampler is configured as a static sampler at `s0`:
+
+```hlsl
+Texture2D<float4> texture : register(t0);
+StructuredBuffer<float4> colors : register(t1);
+SamplerState linearClamp : register(s0);
+
+float4 PSMain(float2 uv : TEXCOORD0) : SV_Target0
+{
+    return texture.Sample(linearClamp, uv) * colors[0];
+}
+```
+
+### After: bindless with Ldx12
+
+With Ldx12, pass their indices instead. Here `texture` is an existing sampled texture and `buffer` is a structured buffer of `float4` colors:
+
+```cpp
+const uint32_t indices[] = {
+    device.GetBindlessIndex(texture),
+    device.GetBindlessIndex(buffer)
+};
+commands.CmdPushConstants(indices, sizeof(indices));
+```
+
+The shader reads both directly from the shared heap:
+
+```hlsl
+cbuffer Resources : register(b0) { uint textureIndex; uint bufferIndex; }
+
+float4 PSMain(float2 uv : TEXCOORD0) : SV_Target0
+{
+    Texture2D<float4> texture = ResourceDescriptorHeap[textureIndex];
+    StructuredBuffer<float4> colors = ResourceDescriptorHeap[bufferIndex];
+    SamplerState linearClamp = SamplerDescriptorHeap[0]; // Built into Ldx12.
+    return texture.Sample(linearClamp, uv) * colors[0];
+}
+```
+
+Changing either resource means changing an index, not binding another resource table. Ldx12 configures the heaps and root signature for you. The snippets assume a prepared render pass, pipeline and resource states; bindless does not remove draws or synchronization.
+
+## Minimal setup
+
+Starting from an existing Win32 window:
+
+```cpp
+using namespace ldx12;
+
+ContextDesc context{};
+SwapchainDesc swapchain{};
+swapchain.window = MakeWin32WindowHandle(hwnd);
+swapchain.width = 1280;
+swapchain.height = 720;
+swapchain.vsync = true;
+
+DeviceManager& manager = DeviceManager::Initialize(context, swapchain);
+RenderDevice& device = *manager.GetRenderDevice();
+```
+
+Without Ldx12, you would configure the DXGI factory and adapter, D3D12 device and queue, swapchain, descriptor heaps, bindless root signature and fence tracking yourself. Here that infrastructure is initialized behind `DeviceManager`; you provide resources, shaders and draw commands. See [Triangle](samples/Triangle/main.cpp) for the complete lifecycle.
+
 ## Architecture
 
-The public API stays small while `DeviceManager` owns the internal command, resource, binding and presentation systems that map to D3D12 and DXGI.
+These diagrams come from [the architecture document](Ldx12/docs/architecture.html) and follow your light or dark theme.
 
-![Ldx12 component architecture](Ldx12/docs/images/architecture-overview.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="Ldx12/docs/images/architecture-overview-dark.png">
+  <img alt="Ldx12 component architecture" src="Ldx12/docs/images/architecture-overview-light.png">
+</picture>
 
-The bindless model uses direct heap indexing, two root-constant parameters, a shared CBV/SRV/UAV heap and a separate sampler heap. RTV and DSV descriptors are output attachments and remain outside the shader-visible heaps.
+<details>
+<summary>Bindless layout and root signature</summary>
 
-![Ldx12 bindless layout](Ldx12/docs/images/bindless-layout.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="Ldx12/docs/images/bindless-layout-dark.png">
+  <img alt="Ldx12 bindless layout" src="Ldx12/docs/images/bindless-layout-light.png">
+</picture>
 
-The complete standalone diagram is available in [`Ldx12/docs/architecture.html`](Ldx12/docs/architecture.html).
+</details>
 
 ## Get started
 
-Requirements: Windows 10/11, Visual Studio 2022 with Desktop development with C++, the Windows SDK with DXC, and an x64 target.
+Requirements: Windows 10/11, Visual Studio 2022 with Desktop development with C++, CMake 3.24+, the Windows SDK with DXC, and an x64 target.
 
 ### NuGet
 
@@ -81,12 +162,14 @@ include(FetchContent)
 FetchContent_Declare(
     Ldx12
     GIT_REPOSITORY https://github.com/alfonsmagd/LightDX12.git
-    GIT_TAG main
+    GIT_TAG version-0.3.0
 )
 FetchContent_MakeAvailable(Ldx12)
 
 target_link_libraries(MyApplication PRIVATE Ldx12::Ldx12)
 ```
+
+The snippet targets the `version-0.3.0` development branch. Pin a commit for reproducible builds; the NuGet command above installs the separate 0.2.0 release.
 
 When used as a subproject, Ldx12 builds only the core library by default. Installation with `find_package` is demonstrated in [`examples/InstalledLdx12`](examples/InstalledLdx12/README.md).
 
@@ -149,7 +232,7 @@ The predefined descriptor positions are conveniences, not resource limits. Appli
 
 ## Current scope
 
-Ldx12 requires Direct3D 12 feature level 12.0, bindless resource binding tier 2 and Shader Model 6.6. It currently does not provide:
+Ldx12 requires Direct3D 12 feature level 12.0, bindless resource binding tier 3 and Shader Model 6.6. It currently does not provide:
 
 - Dedicated compute queues, command buffers or submissions.
 - Ray tracing, mesh shaders or amplification shaders.
@@ -157,6 +240,8 @@ Ldx12 requires Direct3D 12 feature level 12.0, bindless resource binding tier 2 
 - Native swapchains for window types other than Win32 `HWND`.
 
 Stress and functional tests are described in the [tests documentation](tests/README.md).
+
+Build options, capacities and limitations are also collected in the [technical reference](Ldx12/docs/REFERENCE.md). See the [CMake guide](cmake/README.md) for project organization.
 
 ## Origin and license
 
