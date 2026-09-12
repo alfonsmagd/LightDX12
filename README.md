@@ -47,8 +47,8 @@ Ldx12 manages the device, swapchain, descriptor heaps, root signature, command-l
 With conventional descriptor tables, selecting a texture and a buffer can look like this (illustrative native D3D12):
 
 ```cpp
-commandList->SetGraphicsRootDescriptorTable(textureSlot, textureDescriptor);
-commandList->SetGraphicsRootDescriptorTable(bufferSlot, bufferDescriptor);
+commandList->SetGraphicsRootDescriptorTable(0, textureDescriptor);
+commandList->SetGraphicsRootDescriptorTable(1, bufferDescriptor);
 ```
 
 The shader uses fixed registers matched by the root signature. Here the sampler is configured as a static sampler at `s0`:
