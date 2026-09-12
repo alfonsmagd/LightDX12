@@ -8,6 +8,7 @@
 #include <memory>
 #include <string>
 #include <string_view>
+#include <type_traits>
 
 #ifndef WIN32_LEAN_AND_MEAN
 	#define WIN32_LEAN_AND_MEAN
@@ -559,6 +560,15 @@ namespace ldx12
 		void CmdBindVertexBuffer( BufferHandle buffer, uint32_t stride = 0, uint32_t offset = 0, uint32_t slot = 0 );
 		void CmdBindIndexBuffer( BufferHandle buffer, DXGI_FORMAT format = DXGI_FORMAT_R32_UINT, uint32_t offset = 0 );
 		void CmdPushConstants( const void* data, uint32_t sizeBytes, uint32_t offset32BitValues = 0 );
+
+		template<typename T>
+		void CmdPushConstants( const T& data )
+		{
+			static_assert( !std::is_pointer_v<T>, "Pass the object directly, not a pointer." );
+			static_assert( sizeof( T ) <= ourMaxPushConstant32BitValues * sizeof( uint32_t ), "Push constants cannot exceed 63 32-bit values (252 bytes)." );
+			CmdPushConstants( &data, static_cast<uint32_t>( sizeof( data ) ) );
+		}
+
 		void CmdPushDebugGroupLabel( const char* label, uint32_t color );
 		void CmdPopDebugGroupLabel();
 		void CmdDraw( uint32_t vertexCount, uint32_t instanceCount = 1, uint32_t firstVertex = 0, uint32_t firstInstance = 0 );

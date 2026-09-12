@@ -103,7 +103,7 @@ void Copy(uint3 id : SV_DispatchThreadID)
 
 		CommandBuffer& producer = device.AcquireCommandBuffer();
 		producer.CmdTransitionBuffer( input, D3D12_RESOURCE_STATE_UNORDERED_ACCESS );
-		producer.CmdPushConstants( constants.data(), sizeof( constants ) );
+		producer.CmdPushConstants( constants );
 		producer.CmdBindComputePipeline( seed );
 		producer.CmdDispatch( groups );
 		producer.CmdUavBarrier( input );
