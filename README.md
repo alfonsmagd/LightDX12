@@ -84,8 +84,11 @@ cbuffer Resources : register(b0) { uint textureIndex; uint bufferIndex; }
 float4 PSMain(float2 uv : TEXCOORD0) : SV_Target0
 {
     Texture2D<float4> texture = ResourceDescriptorHeap[textureIndex];
+
     StructuredBuffer<float4> colors = ResourceDescriptorHeap[bufferIndex];
+
     SamplerState linearClamp = SamplerDescriptorHeap[0]; // Built into Ldx12.
+
     return texture.Sample(linearClamp, uv) * colors[0];
 }
 ```
