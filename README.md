@@ -40,6 +40,17 @@ device.Submit( commands, backbuffer );
 
 Ldx12 manages the device, swapchain, descriptor heaps, root signature, command-list recycling, fences, resource states and deferred resource releases behind this flow.
 
+If an acquired recording will not be submitted, return it to the pool explicitly:
+
+```cpp
+CommandBuffer& commands = device.AcquireCommandBuffer();
+if( !PrepareFrame() )
+{
+    device.Discard( commands );
+    return;
+}
+```
+
 ## Bindless: pass indices, not resource bindings
 
 ### Before: binding resources

@@ -687,6 +687,8 @@ namespace ldx12
 	{
 	public:
 		CommandBuffer& AcquireCommandBuffer();
+		// Abandons an active recording and immediately returns its slot to the pool.
+		void Discard( CommandBuffer& commandBuffer ) const;
 		TextureHandle GetCurrentSwapchainTexture( SwapchainHandle swapchain = {} ) const;
 		// Submits commandBuffers[0..commandBufferCount) in array order as one queue batch.
 		// If presentTexture is valid, the last command buffer transitions and presents it.

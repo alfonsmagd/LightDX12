@@ -99,6 +99,26 @@ namespace ldx12
 		throw std::length_error( "A maximum of " + std::to_string( ourMaxActiveCommandBuffers ) + " active command buffers are allowed per render device." );
 	}
 
+	void ImmediateCommands::DiscardCommandBuffer( DeviceManager& manager, CommandBuffer& commandBuffer )
+	{
+		if( !commandBuffer.IsActive() || commandBuffer.manager_ != &manager )
+		{
+			throw std::invalid_argument( "Discard requires an active command buffer from this render device." );
+		}
+		if( commandBuffer.IsRendering() )
+		{
+			throw std::logic_error( "Cannot discard a command buffer while a render pass is still active." );
+		}
+
+		CommandListWrapper& wrapper = commandBuffer.Wrapper();
+		assert( wrapper.isEncoding_ );
+		assert( wrapper.fenceValue_ == 0 );
+		C_RESULT( wrapper.commandList_->Close(), "Failed to close discarded command list." );
+		wrapper.isEncoding_ = false;
+		numAvailableCommandBuffers_++;
+		commandBuffer.Release();
+	}
+
 	void ImmediateCommands::ReleaseCommandBuffer( CommandBuffer& commandBuffer ) noexcept
 	{
 		assert( commandBuffer.IsActive() );

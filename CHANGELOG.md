@@ -11,6 +11,7 @@ This file lists the main user-visible changes in each Ldx12 version.
 - Static glTF/GLB scene loading in `Ldx12Utils`, using vendored cgltf, with node transforms, geometry and metallic/roughness texture data.
 - Bindless unordered-access views for GPU-local `Structured` and `Raw` buffers, with separate SRV and UAV indices for shader reads and writes.
 - Explicit buffer state transitions and UAV barriers for compute-to-render workflows.
+- `RenderDevice::Discard()` for abandoning an acquired command buffer and immediately returning its slot to the pool without submitting GPU work.
 
 #### Examples
 

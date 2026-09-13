@@ -2,6 +2,10 @@
 
 See the [README](../../README.md) for getting started and the [public header](../include/Ldx12/Ldx12.hpp) for API declarations.
 
+## Command buffer lifetime
+
+`AcquireCommandBuffer()` reserves a command buffer until it is submitted or discarded. Call `Discard()` when an acquired recording will not be submitted; this immediately returns its slot to the pool and drops its pending resource-state tracking. End an active render pass before submitting or discarding. A command-buffer reference is invalid after either operation.
+
 ## Build options
 
 Defaults for a fresh CMake configuration:

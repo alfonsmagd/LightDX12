@@ -563,6 +563,13 @@ namespace ldx12
 		return graphicsQueue.immediateCommands_->AcquireCommandBuffer( manager );
 	}
 
+	void RenderDevice::Discard( CommandBuffer& commandBuffer ) const
+	{
+		DeviceManager& manager = *manager_;
+		DeviceManager::QueueContext& graphicsQueue = manager.GetGraphicsQueueContext();
+		graphicsQueue.immediateCommands_->DiscardCommandBuffer( manager, commandBuffer );
+	}
+
 	TextureHandle RenderDevice::GetCurrentSwapchainTexture( SwapchainHandle swapchain ) const
 	{
 		if( !swapchain.Valid() )

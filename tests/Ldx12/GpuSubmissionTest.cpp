@@ -73,6 +73,13 @@ namespace ldx12::tests
 		}
 		Require( activeCommandBufferLimitReached, "AcquireCommandBuffer exceeded the fixed active-command-buffer pool." );
 
+		device.Discard( *activeCommandBuffers[ 0 ] );
+		RequireThrows<std::invalid_argument>(
+			[ &device, &activeCommandBuffers ] { device.Discard( *activeCommandBuffers[ 0 ] ); }, "Discard accepted an inactive command buffer." );
+		RequireThrows<std::invalid_argument>(
+			[ &device, &activeCommandBuffers ] { device.Submit( *activeCommandBuffers[ 0 ] ); }, "Submit accepted a discarded command buffer." );
+		activeCommandBuffers[ 0 ] = &device.AcquireCommandBuffer();
+
 		SubmitHandle poolSubmission{};
 		for( uint32_t offset = 0; offset < ourMaxActiveCommandBuffers; offset += ourMaxCommandBufferBatch )
 		{

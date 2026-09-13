@@ -15,6 +15,7 @@ namespace ldx12
 		ImmediateCommands& operator=( const ImmediateCommands& ) = delete;
 
 		CommandBuffer& AcquireCommandBuffer( DeviceManager& manager );
+		void DiscardCommandBuffer( DeviceManager& manager, CommandBuffer& commandBuffer );
 		void ReleaseCommandBuffer( CommandBuffer& commandBuffer ) noexcept;
 		void ReleaseAllCommandBuffers() noexcept;
 		CommandListWrapper& Acquire();
