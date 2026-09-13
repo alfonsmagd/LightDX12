@@ -127,9 +127,6 @@ RenderDevice& device = *manager.GetRenderDevice();
 Without Ldx12, you would configure the DXGI factory and adapter, D3D12 device and queue, swapchain, descriptor heaps, bindless root signature and fence tracking yourself. Here that infrastructure is initialized behind `DeviceManager`; you provide resources, shaders and draw commands. See [Triangle](samples/Triangle/main.cpp) for the complete lifecycle.
 
 ## Bindless layout
-
-The diagram follows your light or dark theme.
-
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="Ldx12/docs/images/bindless-layout-dark.png">
   <img alt="Ldx12 bindless layout" src="Ldx12/docs/images/bindless-layout-light.png">
