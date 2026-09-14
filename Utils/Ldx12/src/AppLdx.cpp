@@ -21,8 +21,12 @@ namespace ldx12::utils
 	}
 
 	AppLdx::AppLdx( const AppLdxDesc& desc )
-		: instance_( desc.instance ), className_( desc.className ), messageHandler_( desc.messageHandler ), messageUserData_( desc.messageUserData ),
-		  width_( desc.width ), height_( desc.height )
+		: instance_( desc.instance ),
+		className_( desc.className ), 
+		messageHandler_( desc.messageHandler ), 
+		messageUserData_( desc.messageUserData ),
+		width_( desc.width ),
+		height_( desc.height )
 	{
 		WNDCLASSEXW windowClass{};
 		windowClass.cbSize = sizeof( WNDCLASSEXW );
