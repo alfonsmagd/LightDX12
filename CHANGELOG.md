@@ -30,6 +30,7 @@ This file lists the main user-visible changes in each Ldx12 version.
 - Default-heap buffers now start in their real D3D12 `COMMON` state and use implicit read-state promotion, removing ignored-initial-state validation warnings. Pipelines driven entirely by `SV_VertexID` now pass a null input layout instead of an empty descriptor array.
 - Binding a render pipeline now reports debugger warnings when its color formats do not match the active framebuffer. `RenderPipelineDesc::colorFormat` is deprecated in favor of `color[i].format` and remains available throughout `0.3.x`.
 - Submission fixups now collect all required buffer and texture transitions and issue them through a single D3D12 `ResourceBarrier` call.
+- `AppLdx` now initializes OLE for the lifetime of its Win32 window, preventing `MSCTF.dll` from reporting `CO_E_NOTINITIALIZED` when Windows activates text and handwriting services.
 
 ## 0.2.0 - 2026-08-30
 

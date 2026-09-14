@@ -1,11 +1,25 @@
 #include "Ldx12Utils/AppLdx.hpp"
 
+#include <ole2.h>
 #include <windowsx.h>
 
 #include <stdexcept>
 
 namespace ldx12::utils
 {
+	AppLdx::OleInitialization::OleInitialization()
+	{
+		if( FAILED( OleInitialize( nullptr ) ) )
+		{
+			throw std::runtime_error( "Failed to initialize OLE on the window thread." );
+		}
+	}
+
+	AppLdx::OleInitialization::~OleInitialization()
+	{
+		OleUninitialize();
+	}
+
 	AppLdx::AppLdx( const AppLdxDesc& desc )
 		: instance_( desc.instance ), className_( desc.className ), messageHandler_( desc.messageHandler ), messageUserData_( desc.messageUserData ),
 		  width_( desc.width ), height_( desc.height )

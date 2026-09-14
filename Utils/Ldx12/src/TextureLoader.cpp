@@ -54,6 +54,7 @@ namespace ldx12::utils
 			Microsoft::WRL::ComPtr<IWICImagingFactory> factory;
 			ThrowIfFailed( CoCreateInstance( CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS( factory.GetAddressOf() ) ),
 				"Failed to create the WIC imaging factory." );
+
 			return factory;
 		}
 
@@ -67,24 +68,35 @@ namespace ldx12::utils
 
 			Microsoft::WRL::ComPtr<IWICFormatConverter> converter;
 			ThrowIfFailed( factory.CreateFormatConverter( converter.GetAddressOf() ), "Failed to create a WIC format converter." );
-			ThrowIfFailed( converter
-							   ->Initialize( frame.Get(), GUID_WICPixelFormat32bppRGBA, WICBitmapDitherTypeNone, nullptr, 0.0, WICBitmapPaletteTypeCustom ),
-				"Failed to convert an image to RGBA8." );
+			ThrowIfFailed( converter->Initialize( frame.Get(),
+												  GUID_WICPixelFormat32bppRGBA,
+												  WICBitmapDitherTypeNone, 
+												  nullptr,
+												  0.0, 
+												  WICBitmapPaletteTypeCustom ),
+												  "Failed to convert an image to RGBA8." );
 
 			if( image.width == 0 || image.height == 0 || static_cast<uint64_t>( image.width ) * image.height * 4 > UINT32_MAX )
 				throw std::runtime_error( "Invalid or oversized image dimensions." );
+
 			const uint32_t rowPitch = image.width * 4u;
 			const uint32_t imageSize = rowPitch * image.height;
 			image.pixels.resize( imageSize );
+
 			ThrowIfFailed( converter->CopyPixels( nullptr, rowPitch, imageSize, image.pixels.data() ), "Failed to copy image pixels." );
+
 			return image;
 		}
 
 		ImageRgba8 LoadImageRgba8( IWICImagingFactory& factory, const std::filesystem::path& path )
 		{
 			Microsoft::WRL::ComPtr<IWICBitmapDecoder> decoder;
-			ThrowIfFailed( factory.CreateDecoderFromFilename( path.c_str(), nullptr, GENERIC_READ, WICDecodeMetadataCacheOnLoad, decoder.GetAddressOf() ),
-				"Failed to open an image." );
+			ThrowIfFailed( factory.CreateDecoderFromFilename( path.c_str(), 
+															  nullptr, 
+															  GENERIC_READ,
+															  WICDecodeMetadataCacheOnLoad,
+															  decoder.GetAddressOf() ),
+															  "Failed to open an image." );
 			return DecodeImage( factory, *decoder.Get() );
 		}
 	}
@@ -93,21 +105,31 @@ namespace ldx12::utils
 	{
 		ComInitialization com;
 		Microsoft::WRL::ComPtr<IWICImagingFactory> factory = CreateWicFactory();
+
 		return LoadImageRgba8( *factory.Get(), path );
 	}
 
 	ImageRgba8 LoadImageRgba8( std::span<const uint8_t> encodedImage )
 	{
-		if( encodedImage.empty() || encodedImage.size() > UINT32_MAX ) throw std::runtime_error( "Invalid encoded image size." );
+		if( encodedImage.empty() || encodedImage.size() > UINT32_MAX )
+			throw std::runtime_error( "Invalid encoded image size." );
+
 		ComInitialization com;
 		Microsoft::WRL::ComPtr<IWICImagingFactory> factory = CreateWicFactory();
 		Microsoft::WRL::ComPtr<IWICStream> stream;
+
 		ThrowIfFailed( factory->CreateStream( stream.GetAddressOf() ), "Failed to create image stream." );
-		ThrowIfFailed( stream->InitializeFromMemory( const_cast<BYTE*>( encodedImage.data() ), static_cast<DWORD>( encodedImage.size() ) ),
-			"Failed to initialize image stream." );
+		ThrowIfFailed( stream->InitializeFromMemory( const_cast<BYTE*>( encodedImage.data() ), 
+													 static_cast<DWORD>( encodedImage.size() ) ),
+													 "Failed to initialize image stream." );
+
 		Microsoft::WRL::ComPtr<IWICBitmapDecoder> decoder;
-		ThrowIfFailed( factory->CreateDecoderFromStream( stream.Get(), nullptr, WICDecodeMetadataCacheOnLoad, decoder.GetAddressOf() ),
-			"Failed to decode image stream." );
+		ThrowIfFailed( factory->CreateDecoderFromStream( stream.Get(), 
+														 nullptr,
+														 WICDecodeMetadataCacheOnLoad, 
+														 decoder.GetAddressOf() ),
+														"Failed to decode image stream." );
+
 		return DecodeImage( *factory.Get(), *decoder.Get() );
 	}
 
@@ -132,6 +154,7 @@ namespace ldx12::utils
 		desc.data = pixels.data();
 		desc.rowPitch = textureSize * sizeof( uint32_t );
 		desc.slicePitch = desc.rowPitch * textureSize;
+
 		return device.CreateTexture( desc );
 	}
 
@@ -176,6 +199,7 @@ namespace ldx12::utils
 		desc.data = pixels.data();
 		desc.rowPitch = rowPitch;
 		desc.slicePitch = slicePitch;
+
 		return device.CreateTexture( desc );
 	}
 }
