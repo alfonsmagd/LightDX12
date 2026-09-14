@@ -90,7 +90,7 @@ float4 main() : SV_Target0
 		desc.vertexShader.profile = "vs_6_6";
 		desc.fragmentShader.source = ourPixelShader;
 		desc.fragmentShader.profile = "ps_6_6";
-		desc.colorFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+		desc.color[ 0 ].format = DXGI_FORMAT_R8G8B8A8_UNORM;
 		desc.depthStencilState.DepthEnable = FALSE;
 		desc.depthStencilState.StencilEnable = FALSE;
 		return device.CreateRenderPipeline( desc );

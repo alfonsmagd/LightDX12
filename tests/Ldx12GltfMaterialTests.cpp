@@ -63,7 +63,7 @@ int main()
 		RenderPipelineDesc pipelineDesc;
 		pipelineDesc.vertexShader = HLSLLoader::LoadStage( "shaders/GltfScene.hlsl", "vs_6_6", "VSMain" );
 		pipelineDesc.fragmentShader = HLSLLoader::LoadStage( "shaders/GltfScene.hlsl", "ps_6_6", "PSMain" );
-		pipelineDesc.colorFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+		pipelineDesc.color[ 0 ].format = DXGI_FORMAT_R8G8B8A8_UNORM;
 		pipelineDesc.inputElements[ 0 ].semanticName = "POSITION";
 		pipelineDesc.inputElements[ 0 ].format = DXGI_FORMAT_R32G32B32_FLOAT;
 		pipelineDesc.inputElements[ 1 ].semanticName = "NORMAL";

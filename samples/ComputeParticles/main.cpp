@@ -50,7 +50,7 @@ namespace
 		RenderPipelineDesc desc{};
 		desc.vertexShader = HLSLLoader::LoadStage( "shaders/ComputeParticles.hlsl", "vs_6_6", "VSMain" );
 		desc.fragmentShader = HLSLLoader::LoadStage( "shaders/ComputeParticles.hlsl", "ps_6_6", "PSMain" );
-		desc.colorFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+		desc.color[ 0 ].format = DXGI_FORMAT_R8G8B8A8_UNORM;
 		desc.depthFormat = DXGI_FORMAT_D32_FLOAT;
 		desc.primitiveType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_POINT;
 		desc.topology = D3D_PRIMITIVE_TOPOLOGY_POINTLIST;

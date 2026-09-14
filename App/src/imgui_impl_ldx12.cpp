@@ -114,7 +114,6 @@ float4 PSMain(PixelInput input) : SV_Target0
 		desc.fragmentShader.profile = "ps_6_6";
 		desc.fragmentShader.sourceName = "imgui_impl_ldx12_ps";
 		desc.color[ 0 ].format = renderTargetFormat;
-		desc.colorFormat = DXGI_FORMAT_UNKNOWN;
 		desc.depthFormat = depthFormat;
 
 		desc.inputElements[ 0 ].semanticName = "POSITION";

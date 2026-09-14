@@ -12,6 +12,8 @@ This file lists the main user-visible changes in each Ldx12 version.
 - Bindless unordered-access views for GPU-local `Structured` and `Raw` buffers, with separate SRV and UAV indices for shader reads and writes.
 - Explicit buffer state transitions and UAV barriers for compute-to-render workflows.
 - `RenderDevice::Discard()` for abandoning an acquired command buffer and immediately returning its slot to the pool without submitting GPU work.
+- `CmdPushConstants(const T&)` for sending an object directly, with a clear compile-time check for the 63-value limit.
+- `RenderDevice::GetTextureFormat()` for configuring render-pipeline attachments from the textures that will be rendered into.
 
 #### Examples
 
@@ -26,6 +28,8 @@ This file lists the main user-visible changes in each Ldx12 version.
 - Added a dedicated sampler retirement regression test that holds a GPU submission pending, verifies that its retired descriptor cannot be reused, and checks descriptor recycling and stale-handle invalidation after completion. Verified in Debug and Release.
 - Replaced the `ICommandBuffer`/`CommandBufferImpl` split with one concrete `CommandBuffer`, removing virtual command dispatch and interface-to-implementation conversion during submission.
 - Default-heap buffers now start in their real D3D12 `COMMON` state and use implicit read-state promotion, removing ignored-initial-state validation warnings. Pipelines driven entirely by `SV_VertexID` now pass a null input layout instead of an empty descriptor array.
+- Binding a render pipeline now reports debugger warnings when its color formats do not match the active framebuffer. `RenderPipelineDesc::colorFormat` is deprecated in favor of `color[i].format` and remains available throughout `0.3.x`.
+- Submission fixups now collect all required buffer and texture transitions and issue them through a single D3D12 `ResourceBarrier` call.
 
 ## 0.2.0 - 2026-08-30
 

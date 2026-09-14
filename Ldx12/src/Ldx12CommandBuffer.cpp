@@ -3,9 +3,12 @@
 
 #include <cstdlib>
 #include <cassert>
+#include <cstdio>
 #include <cstring>
 #include <filesystem>
 #include <mutex>
+
+#include <d3d12sdklayers.h>
 
 #if defined( LDX12_ENABLE_PIX )
 	#define LDX12_INTERNAL_PIX_ENABLED 1
@@ -17,6 +20,18 @@ namespace ldx12
 {
 	namespace
 	{
+		void ReportValidationWarning( ID3D12Device* device, const char* message ) noexcept
+		{
+			ComPtr<ID3D12InfoQueue> infoQueue;
+			if( device != nullptr && SUCCEEDED( device->QueryInterface( IID_PPV_ARGS( infoQueue.GetAddressOf() ) ) ) &&
+				SUCCEEDED( infoQueue->AddApplicationMessage( D3D12_MESSAGE_SEVERITY_WARNING, message ) ) )
+			{
+				return;
+			}
+
+			OutputDebugStringA( message );
+		}
+
 #if LDX12_INTERNAL_PIX_ENABLED
 		std::array<uint32_t, 4> ParseVersionComponents( const std::wstring& versionText )
 		{
@@ -289,6 +304,7 @@ namespace ldx12
 		isRendering_ = false;
 		active_ = true;
 		debugGroupDepth_ = 0;
+		framebufferColorFormats_ = {};
 		trackedBufferCount_ = 0;
 		trackedTextureCount_ = 0;
 
@@ -308,6 +324,7 @@ namespace ldx12
 		wrapper_ = nullptr;
 		active_ = false;
 		debugGroupDepth_ = 0;
+		framebufferColorFormats_ = {};
 		trackedBufferCount_ = 0;
 		trackedTextureCount_ = 0;
 	}
@@ -410,7 +427,7 @@ namespace ldx12
 			return manager_->GetBufferResource( buffer ).currentState_;
 		};
 
-		const auto getCurrentState = [ this, previousCommandBuffers, previousCommandBufferCount ]( TextureHandle texture )
+		const auto getCurrentTextureState = [ this, previousCommandBuffers, previousCommandBufferCount ]( TextureHandle texture )
 		{
 			for( uint32_t commandBufferIndex = previousCommandBufferCount; commandBufferIndex > 0; --commandBufferIndex )
 			{
@@ -430,60 +447,44 @@ namespace ldx12
 			return manager_->GetTextureResource( texture ).currentState_;
 		};
 
-		bool requiresFixup = false;
-		for( uint32_t index = 0; index < trackedBufferCount_; ++index )
-		{
-			const TrackedBufferState& trackedBuffer = trackedBuffers_[ index ];
-			if( getCurrentBufferState( trackedBuffer.handle_ ) != trackedBuffer.initialState_ )
-			{
-				requiresFixup = true;
-				break;
-			}
-		}
-		for( uint32_t index = 0; index < trackedTextureCount_; ++index )
-		{
-			const TrackedTextureState& trackedTexture = trackedTextures_[ index ];
-			if( getCurrentState( trackedTexture.handle_ ) != trackedTexture.initialState_ )
-			{
-				requiresFixup = true;
-				break;
-			}
-		}
-
-		if( !requiresFixup )
-		{
-			return nullptr;
-		}
-
-		CommandListWrapper& fixup = manager_->GetGraphicsQueueContext().immediateCommands_->Acquire();
+		std::array<D3D12_RESOURCE_BARRIER, ourMaxTrackedBuffersPerCommandBuffer + ourMaxTrackedTexturesPerCommandBuffer> barriers{};
+		uint32_t barrierCount = 0;
 
 		for( uint32_t index = 0; index < trackedBufferCount_; ++index )
 		{
 			const TrackedBufferState& trackedBuffer = trackedBuffers_[ index ];
-			const BufferResource& resource = manager_->GetBufferResource( trackedBuffer.handle_ );
 			const D3D12_RESOURCE_STATES currentState = getCurrentBufferState( trackedBuffer.handle_ );
 			if( currentState == trackedBuffer.initialState_ )
 			{
 				continue;
 			}
 
-			const D3D12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition( resource.resource_.Get(), currentState, trackedBuffer.initialState_ );
-			fixup.commandList_->ResourceBarrier( 1, &barrier );
+			const BufferResource& resource = manager_->GetBufferResource( trackedBuffer.handle_ );
+			barriers[ barrierCount++ ] =
+				CD3DX12_RESOURCE_BARRIER::Transition( resource.resource_.Get(), currentState, trackedBuffer.initialState_ );
 		}
 
 		for( uint32_t index = 0; index < trackedTextureCount_; ++index )
 		{
 			const TrackedTextureState& trackedTexture = trackedTextures_[ index ];
-			const TextureResource& resource = manager_->GetTextureResource( trackedTexture.handle_ );
-			const D3D12_RESOURCE_STATES currentState = getCurrentState( trackedTexture.handle_ );
+			const D3D12_RESOURCE_STATES currentState = getCurrentTextureState( trackedTexture.handle_ );
 			if( currentState == trackedTexture.initialState_ )
 			{
 				continue;
 			}
 
-			const D3D12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition( resource.resource_.Get(), currentState, trackedTexture.initialState_ );
-			fixup.commandList_->ResourceBarrier( 1, &barrier );
+			const TextureResource& resource = manager_->GetTextureResource( trackedTexture.handle_ );
+			barriers[ barrierCount++ ] =
+				CD3DX12_RESOURCE_BARRIER::Transition( resource.resource_.Get(), currentState, trackedTexture.initialState_ );
 		}
+
+		if( barrierCount == 0 )
+		{
+			return nullptr;
+		}
+
+		CommandListWrapper& fixup = manager_->GetGraphicsQueueContext().immediateCommands_->Acquire();
+		fixup.commandList_->ResourceBarrier( barrierCount, barriers.data() );
 
 		return &fixup;
 	}
@@ -505,6 +506,34 @@ namespace ldx12
 		}
 	}
 
+	void CommandBuffer::ValidateRenderPipelineFramebuffer( const RenderPipelineState& pipeline ) const noexcept
+	{
+		if( manager_ == nullptr || !manager_->desc_.enableDebugLayer || !isRendering_ )
+		{
+			return;
+		}
+
+		char message[ 256 ]{};
+		for( uint32_t index = 0; index < ourMaxColorAttachments; ++index )
+		{
+			const DXGI_FORMAT pipelineFormat = pipeline.colorFormats_[ index ];
+			const DXGI_FORMAT framebufferFormat = framebufferColorFormats_[ index ];
+			if( pipelineFormat == framebufferFormat )
+			{
+				continue;
+			}
+
+			std::snprintf( message,
+				sizeof( message ),
+				"Ldx12 warning: render pipeline color[%u] format (%u) does not match the framebuffer texture format (%u). "
+				"Use RenderDevice::GetTextureFormat() when creating the pipeline.\n",
+				index,
+				static_cast<uint32_t>( pipelineFormat ),
+				static_cast<uint32_t>( framebufferFormat ) );
+			ReportValidationWarning( manager_->device_.Get(), message );
+		}
+	}
+
 	void CommandBuffer::CmdBeginRendering( const RenderPass& renderPass, const Framebuffer& framebuffer )
 	{
 		if( isRendering_ )
@@ -513,6 +542,7 @@ namespace ldx12
 		}
 
 		std::array<D3D12_RENDER_PASS_RENDER_TARGET_DESC, ourMaxColorAttachments> renderTargetDescs{};
+		std::array<DXGI_FORMAT, ourMaxColorAttachments> framebufferColorFormats{};
 		uint32_t numRenderTargets = 0;
 		uint32_t framebufferSampleCount = 0;
 
@@ -541,9 +571,12 @@ namespace ldx12
 
 			TransitionTexture( framebuffer.color[ index ].texture, colorTexture, D3D12_RESOURCE_STATE_RENDER_TARGET );
 
+			const DXGI_FORMAT colorFormat =
+				colorTexture.formats_.rtv_ != DXGI_FORMAT_UNKNOWN ? colorTexture.formats_.rtv_ : colorTexture.format_;
+			framebufferColorFormats[ numRenderTargets ] = colorFormat;
 			renderTargetDescs[ numRenderTargets ].cpuDescriptor = colorTexture.rtvHandle_;
 			renderTargetDescs[ numRenderTargets ].BeginningAccess = CreateBeginningAccess( renderPass.color[ index ].loadOp,
-				colorTexture.formats_.rtv_ != DXGI_FORMAT_UNKNOWN ? colorTexture.formats_.rtv_ : colorTexture.format_,
+				colorFormat,
 				renderPass.color[ index ].clearColor );
 			renderTargetDescs[ numRenderTargets ].EndingAccess = CreateEndingAccess( renderPass.color[ index ].storeOp );
 			numRenderTargets++;
@@ -603,6 +636,8 @@ namespace ldx12
 			throw std::runtime_error( "Framebuffer does not contain any attachments." );
 		}
 
+		framebufferColorFormats_ = framebufferColorFormats;
+
 		wrapper_->commandList_->BeginRenderPass( numRenderTargets,
 			numRenderTargets > 0 ? renderTargetDescs.data() : nullptr,
 			depthStencilDescPtr,
@@ -622,6 +657,7 @@ namespace ldx12
 
 		wrapper_->commandList_->EndRenderPass();
 		isRendering_ = false;
+		framebufferColorFormats_ = {};
 	}
 
 	void CommandBuffer::CmdSetViewport( float x, float y, float width, float height, float minDepth, float maxDepth )
@@ -707,6 +743,7 @@ namespace ldx12
 	{
 		wrapper_->commandList_->SetPipelineState( pipeline.pipelineState_.Get() );
 		wrapper_->commandList_->IASetPrimitiveTopology( pipeline.topology_ );
+		ValidateRenderPipelineFramebuffer( pipeline );
 	}
 
 	void CommandBuffer::CmdBindComputePipeline( const ComputePipelineState& pipeline )

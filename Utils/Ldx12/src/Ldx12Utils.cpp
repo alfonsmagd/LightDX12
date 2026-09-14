@@ -92,7 +92,6 @@ float4 main(PSInput input) : SV_Target0
 			desc.fragmentShader.profile = "ps_6_6";
 			desc.fragmentShader.sourceName = "Ldx12UtilsWorldPS";
 			desc.color[ 0 ].format = worldDesc.colorFormat;
-			desc.colorFormat = worldDesc.colorFormat;
 			desc.depthFormat = worldDesc.depthFormat;
 			desc.primitiveType = primitiveType;
 			desc.topology = topology;

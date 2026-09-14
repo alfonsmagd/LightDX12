@@ -215,7 +215,6 @@ PSOutput PSMain()
 		desc.fragmentShader.source = pixelShader;
 		desc.fragmentShader.entryPoint = "PSMain";
 		desc.fragmentShader.profile = "ps_6_6";
-		desc.colorFormat = DXGI_FORMAT_UNKNOWN;
 		for( RenderPipelineColorAttachmentDesc& color : desc.color )
 		{
 			color.format = DXGI_FORMAT_R8G8B8A8_UNORM;

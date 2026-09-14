@@ -221,7 +221,8 @@ namespace ldx12
 	{
 		RenderPipelineDesc() noexcept;
 
-		std::array<RenderPipelineColorAttachmentDesc, ourMaxColorAttachments> color = {};
+		std::array<RenderPipelineColorAttachmentDesc, ourMaxColorAttachments> color = { RenderPipelineColorAttachmentDesc{
+			DXGI_FORMAT_R8G8B8A8_UNORM } };
 		std::array<VertexInputElementDesc, ourMaxVertexInputElements> inputElements = {};
 		ShaderStageSource vertexShader = {};
 		ShaderStageSource fragmentShader = {};
@@ -230,6 +231,7 @@ namespace ldx12
 		D3D12_DEPTH_STENCIL_DESC depthStencilState = {};
 		D3D12_PRIMITIVE_TOPOLOGY_TYPE primitiveType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 		D3D_PRIMITIVE_TOPOLOGY topology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+		[[deprecated( "Use color[0].format. colorFormat will be removed in Ldx12 0.4.0." )]]
 		DXGI_FORMAT colorFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
 		DXGI_FORMAT depthFormat = DXGI_FORMAT_UNKNOWN;
 		uint32_t sampleCount = 1;
@@ -519,6 +521,7 @@ namespace ldx12
 
 		ComPtr<ID3D12PipelineState> pipelineState_;
 		D3D_PRIMITIVE_TOPOLOGY topology_ = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+		std::array<DXGI_FORMAT, ourMaxColorAttachments> colorFormats_ = {};
 	};
 
 	class ComputePipelineState
@@ -635,6 +638,7 @@ namespace ldx12
 		TrackedTextureState& GetTrackedTextureState( TextureHandle texture );
 		void TransitionBuffer( BufferHandle buffer, BufferResource& resource, D3D12_RESOURCE_STATES newState );
 		void TransitionTexture( TextureHandle texture, TextureResource& resource, D3D12_RESOURCE_STATES newState );
+		void ValidateRenderPipelineFramebuffer( const RenderPipelineState& pipeline ) const noexcept;
 		CommandListWrapper* BuildSubmitFixup( CommandBuffer* const* previousCommandBuffers = nullptr, uint32_t previousCommandBufferCount = 0 );
 		void CommitSubmittedResourceStates();
 
@@ -643,6 +647,7 @@ namespace ldx12
 		bool isRendering_ = false;
 		bool active_ = false;
 		uint32_t debugGroupDepth_ = 0;
+		std::array<DXGI_FORMAT, ourMaxColorAttachments> framebufferColorFormats_ = {};
 		std::array<TrackedBufferState, ourMaxTrackedBuffersPerCommandBuffer> trackedBuffers_ = {};
 		uint32_t trackedBufferCount_ = 0;
 		std::array<TrackedTextureState, ourMaxTrackedTexturesPerCommandBuffer> trackedTextures_ = {};
@@ -717,6 +722,7 @@ namespace ldx12
 		uint32_t GetUnorderedAccessIndex( BufferHandle buffer ) const;
 		uint32_t GetBindlessIndex( TextureHandle texture ) const;
 		uint32_t GetUnorderedAccessIndex( TextureHandle texture ) const;
+		DXGI_FORMAT GetTextureFormat( TextureHandle texture ) const;
 		uint32_t GetSamplerIndex( SamplerHandle sampler ) const;
 		bool SupportsSampleCount( DXGI_FORMAT format, uint32_t sampleCount ) const noexcept;
 		[[nodiscard]] D3D12Native GetNative() noexcept;

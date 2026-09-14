@@ -185,7 +185,6 @@ namespace
 		desc.vertexShader = HLSLLoader::LoadStage( "shaders/ObstacleMask.hlsl", "vs_6_6", "VSMain" );
 		desc.fragmentShader = HLSLLoader::LoadStage( "shaders/ObstacleMask.hlsl", "ps_6_6", "PSMain" );
 		desc.color[ 0 ].format = DXGI_FORMAT_R8G8B8A8_UNORM;
-		desc.colorFormat = DXGI_FORMAT_UNKNOWN;
 		desc.inputElements[ 0 ].semanticName = "POSITION";
 		desc.inputElements[ 0 ].format = DXGI_FORMAT_R32G32B32_FLOAT;
 		desc.inputElements[ 0 ].alignedByteOffset = 0;
@@ -217,7 +216,6 @@ namespace
 		desc.vertexShader = HLSLLoader::LoadStage( "shaders/WakeClear.hlsl", "vs_6_6", "VSMain" );
 		desc.fragmentShader = HLSLLoader::LoadStage( "shaders/WakeClear.hlsl", "ps_6_6", "PSMain" );
 		desc.color[ 0 ].format = DXGI_FORMAT_R32_UINT;
-		desc.colorFormat = DXGI_FORMAT_UNKNOWN;
 		desc.rasterizerState.CullMode = D3D12_CULL_MODE_NONE;
 		desc.depthStencilState.DepthEnable = FALSE;
 		desc.depthStencilState.StencilEnable = FALSE;
@@ -231,7 +229,6 @@ namespace
 		desc.vertexShader = HLSLLoader::LoadStage( "shaders/WindField.hlsl", "vs_6_6", "VSMain" );
 		desc.fragmentShader = HLSLLoader::LoadStage( "shaders/WindField.hlsl", "ps_6_6", "PSMain" );
 		desc.color[ 0 ].format = swapchainFormat;
-		desc.colorFormat = DXGI_FORMAT_UNKNOWN;
 		desc.depthFormat = DXGI_FORMAT_D32_FLOAT;
 		desc.rasterizerState.CullMode = D3D12_CULL_MODE_NONE;
 		desc.depthStencilState.DepthEnable = TRUE;
@@ -248,7 +245,6 @@ namespace
 		desc.vertexShader = HLSLLoader::LoadStage( "shaders/WindField.hlsl", "vs_6_6", "VSMain" );
 		desc.fragmentShader = HLSLLoader::LoadStage( "shaders/WindField.hlsl", "ps_6_6", "PSMain" );
 		desc.color[ 0 ].format = DXGI_FORMAT_R8G8B8A8_UNORM;
-		desc.colorFormat = DXGI_FORMAT_UNKNOWN;
 		desc.rasterizerState.CullMode = D3D12_CULL_MODE_NONE;
 		desc.depthStencilState.DepthEnable = FALSE;
 		desc.depthStencilState.StencilEnable = FALSE;
@@ -262,7 +258,6 @@ namespace
 		desc.vertexShader = HLSLLoader::LoadStage( "shaders/WakePreview.hlsl", "vs_6_6", "VSMain" );
 		desc.fragmentShader = HLSLLoader::LoadStage( "shaders/WakePreview.hlsl", "ps_6_6", "PSMain" );
 		desc.color[ 0 ].format = DXGI_FORMAT_R8G8B8A8_UNORM;
-		desc.colorFormat = DXGI_FORMAT_UNKNOWN;
 		desc.rasterizerState.CullMode = D3D12_CULL_MODE_NONE;
 		desc.depthStencilState.DepthEnable = FALSE;
 		desc.depthStencilState.StencilEnable = FALSE;
@@ -276,7 +271,6 @@ namespace
 		desc.vertexShader = HLSLLoader::LoadStage( "shaders/SceneObstacle.hlsl", "vs_6_6", "VSMain" );
 		desc.fragmentShader = HLSLLoader::LoadStage( "shaders/SceneObstacle.hlsl", "ps_6_6", "PSMain" );
 		desc.color[ 0 ].format = swapchainFormat;
-		desc.colorFormat = DXGI_FORMAT_UNKNOWN;
 		desc.depthFormat = DXGI_FORMAT_D32_FLOAT;
 		desc.inputElements[ 0 ].semanticName = "POSITION";
 		desc.inputElements[ 0 ].format = DXGI_FORMAT_R32G32B32_FLOAT;

@@ -6,6 +6,37 @@ See the [README](../../README.md) for getting started and the [public header](..
 
 `AcquireCommandBuffer()` reserves a command buffer until it is submitted or discarded. Call `Discard()` when an acquired recording will not be submitted; this immediately returns its slot to the pool and drops its pending resource-state tracking. End an active render pass before submitting or discarding. A command-buffer reference is invalid after either operation.
 
+## Pipeline color formats
+
+Create the render-target texture first, then use its actual format when creating the pipeline. This keeps the texture as the source of truth.
+
+```cpp
+TextureDesc targetDesc{};
+targetDesc.width = width;
+targetDesc.height = height;
+targetDesc.format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+targetDesc.usage = TextureUsage::RenderTarget;
+
+TextureHandle target = device.CreateTexture( targetDesc );
+
+RenderPipelineDesc pipelineDesc{};
+pipelineDesc.color[ 0 ].format = device.GetTextureFormat( target );
+```
+
+For MRT, query every texture in framebuffer order:
+
+```cpp
+pipelineDesc.color[ 0 ].format = device.GetTextureFormat( albedo );
+pipelineDesc.color[ 1 ].format = device.GetTextureFormat( normals );
+pipelineDesc.color[ 2 ].format = device.GetTextureFormat( objectId );
+```
+
+When the D3D12 debug layer is enabled, binding a render pipeline reports debugger warnings if its color formats differ from the active framebuffer. `DXGI_FORMAT_UNKNOWN` also makes missing or additional color attachments visible through the same comparison. The warning does not interrupt command recording.
+
+`color[0].format` defaults to `DXGI_FORMAT_R8G8B8A8_UNORM`. For a depth-only pipeline, set it to `DXGI_FORMAT_UNKNOWN`.
+
+`RenderPipelineDesc::colorFormat` remains as a deprecated single-RTV compatibility fallback for `0.3.x` and will be removed in `0.4.0`. Explicit `color[i].format` configuration takes precedence.
+
 ## Build options
 
 Defaults for a fresh CMake configuration:

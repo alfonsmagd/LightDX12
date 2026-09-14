@@ -522,7 +522,9 @@ namespace ldx12
 		{
 			pipelineState_ = std::move( other.pipelineState_ );
 			topology_ = other.topology_;
+			colorFormats_ = other.colorFormats_;
 			other.topology_ = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+			other.colorFormats_ = {};
 		}
 		return *this;
 	}
@@ -689,22 +691,45 @@ namespace ldx12
 		psoDesc.InputLayout.pInputElementDescs = nativeInputElementCount > 0 ? nativeInputElements.data() : nullptr;
 		psoDesc.InputLayout.NumElements = nativeInputElementCount;
 
-		uint32_t numRenderTargets = 0;
-		for( uint32_t index = 0; index < desc.color.size(); ++index )
-		{
-			if( desc.color[ index ].format == DXGI_FORMAT_UNKNOWN )
-			{
-				continue;
-			}
+		constexpr DXGI_FORMAT defaultColorFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+		DXGI_FORMAT legacyColorFormat = DXGI_FORMAT_UNKNOWN;
+#if defined( _MSC_VER )
+		#pragma warning( push )
+		#pragma warning( disable : 4996 )
+#endif
+		legacyColorFormat = desc.colorFormat;
+#if defined( _MSC_VER )
+		#pragma warning( pop )
+#endif
 
-			psoDesc.RTVFormats[ numRenderTargets ] = desc.color[ index ].format;
-			numRenderTargets++;
+		// Preserve the old single-RTV field only while the new color array still has its untouched default value.
+		bool usesDefaultColorArray = desc.color[ 0 ].format == defaultColorFormat;
+		for( uint32_t index = 1; index < desc.color.size(); ++index )
+		{
+			usesDefaultColorArray = usesDefaultColorArray && desc.color[ index ].format == DXGI_FORMAT_UNKNOWN;
 		}
 
-		if( numRenderTargets == 0 && desc.colorFormat != DXGI_FORMAT_UNKNOWN )
+		uint32_t numRenderTargets = 0;
+		if( usesDefaultColorArray && legacyColorFormat != defaultColorFormat )
 		{
-			psoDesc.RTVFormats[ 0 ] = desc.colorFormat;
-			numRenderTargets = 1;
+			if( legacyColorFormat != DXGI_FORMAT_UNKNOWN )
+			{
+				psoDesc.RTVFormats[ 0 ] = legacyColorFormat;
+				numRenderTargets = 1;
+			}
+		}
+		else
+		{
+			for( uint32_t index = 0; index < desc.color.size(); ++index )
+			{
+				if( desc.color[ index ].format == DXGI_FORMAT_UNKNOWN )
+				{
+					continue;
+				}
+
+				psoDesc.RTVFormats[ numRenderTargets ] = desc.color[ index ].format;
+				numRenderTargets++;
+			}
 		}
 
 		for( uint32_t index = 0; index < numRenderTargets; ++index )
@@ -731,6 +756,10 @@ namespace ldx12
 		C_RESULT( manager_->device_->CreateGraphicsPipelineState( &psoDesc, IID_PPV_ARGS( pipeline.pipelineState_.GetAddressOf() ) ),
 			"Failed to create graphics pipeline state." );
 		pipeline.topology_ = desc.topology;
+		for( uint32_t index = 0; index < numRenderTargets; ++index )
+		{
+			pipeline.colorFormats_[ index ] = psoDesc.RTVFormats[ index ];
+		}
 		return pipeline;
 	}
 
@@ -1098,6 +1127,11 @@ namespace ldx12
 	uint32_t RenderDevice::GetUnorderedAccessIndex( TextureHandle texture ) const
 	{
 		return ToPublicDescriptorIndex( manager_->GetTextureResource( texture ).uavIndex_ );
+	}
+
+	DXGI_FORMAT RenderDevice::GetTextureFormat( TextureHandle texture ) const
+	{
+		return manager_->GetTextureResource( texture ).format_;
 	}
 
 	uint32_t RenderDevice::GetSamplerIndex( SamplerHandle sampler ) const

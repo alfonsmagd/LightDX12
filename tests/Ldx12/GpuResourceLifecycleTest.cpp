@@ -117,6 +117,7 @@ namespace ldx12::tests
 		textureDesc.usage = TextureUsage::Sampled | TextureUsage::UnorderedAccess;
 		const TextureHandle texture = device.CreateTexture( textureDesc );
 		Require( texture.Valid(), "Texture creation returned an invalid handle." );
+		Require( device.GetTextureFormat( texture ) == textureDesc.format, "GetTextureFormat did not return the texture's creation format." );
 		const uint32_t textureSrv = device.GetBindlessIndex( texture );
 		const uint32_t textureUav = device.GetUnorderedAccessIndex( texture );
 		Require( textureSrv >= LDX12_BINDLESS_DYNAMIC_SLOT_FIRST && textureSrv < context.bindlessCapacity, "Texture SRV index is outside the bindless heap." );
