@@ -2,7 +2,7 @@
 
 This file lists the main user-visible changes in each Ldx12 version.
 
-## 0.3.0 - Unreleased
+## 0.3.0 - 2026-09-15
 
 ### Added
 
