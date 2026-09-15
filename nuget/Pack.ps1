@@ -2,8 +2,8 @@
 param(
     [ValidatePattern( '^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$' )]
     [string] $Version = '0.3.1-local',
-    [ValidatePattern( '^\d+\.\d+\.\d+(?:\.\d+)?$' )]
-    [string] $MsvcToolsetVersion = '14.38.33130',
+    [ValidatePattern( '^\d+\.\d+(?:\.\d+){0,2}$' )]
+    [string] $MsvcToolsetVersion = '14.38',
     [string] $NuGetExe = ''
 )
 
