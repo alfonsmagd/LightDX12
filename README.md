@@ -138,10 +138,10 @@ Requirements: Windows 10/11, Visual Studio 2022 with Desktop development with C+
 
 ### NuGet
 
-Ldx12 0.2.0 is available on [NuGet.org](https://www.nuget.org/packages/Ldx12/0.2.0):
+Ldx12 0.3.0 is available on [NuGet.org](https://www.nuget.org/packages/Ldx12/0.3.0):
 
 ```powershell
-Install-Package Ldx12 -Version 0.2.0
+Install-Package Ldx12 -Version 0.3.0
 ```
 
 The package includes the public Ldx12 and Ldx12Utils headers and automatically selects their Debug or Release static libraries.
@@ -170,7 +170,7 @@ FetchContent_MakeAvailable(Ldx12)
 target_link_libraries(MyApplication PRIVATE Ldx12::Ldx12)
 ```
 
-The snippet targets the `version-0.3.0` development branch. Pin a commit for reproducible builds; the NuGet command above installs the separate 0.2.0 release.
+The snippet targets the `version-0.3.0` branch. Pin a commit for reproducible builds; the NuGet command above installs the matching 0.3.0 release.
 
 When used as a subproject, Ldx12 builds only the core library by default. Installation with `find_package` is demonstrated in [`examples/InstalledLdx12`](examples/InstalledLdx12/README.md).
 

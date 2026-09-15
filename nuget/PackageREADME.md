@@ -1,6 +1,6 @@
-![Ldx12](https://raw.githubusercontent.com/alfonsmagd/LightDX12/v0.2.0/nuget/Ldx12Banner.png)
+![Ldx12](https://raw.githubusercontent.com/alfonsmagd/LightDX12/v0.3.0/nuget/Ldx12Banner.png)
 
-# Ldx12 0.2.0
+# Ldx12 0.3.0
 
 **Lightweight. Fully bindless.**
 
@@ -19,7 +19,7 @@ The package configures include paths and selects the correct libraries automatic
 
 Resources and samplers are accessed by index from shaders. Ldx12 owns the descriptor heaps and exposes small typed handles to the application.
 
-![Ldx12 bindless layout and root signature](https://raw.githubusercontent.com/alfonsmagd/LightDX12/v0.2.0/Ldx12/docs/images/bindless-layout.png)
+![Ldx12 bindless layout and root signature](https://raw.githubusercontent.com/alfonsmagd/LightDX12/v0.3.0/Ldx12/docs/images/bindless-layout.png)
 
 ## Minimal use
 
