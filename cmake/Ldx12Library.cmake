@@ -93,3 +93,9 @@ target_link_libraries(Ldx12
 )
 
 ldx12_enable_warnings(Ldx12)
+
+# Static libraries distributed through NuGet must carry their Debug symbols in
+# the object files. This avoids a dependency on build-machine PDB paths.
+if(MSVC)
+    target_compile_options(Ldx12 PRIVATE "$<$<CONFIG:Debug>:/Z7>")
+endif()

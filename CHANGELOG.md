@@ -2,6 +2,13 @@
 
 This file lists the main user-visible changes in each Ldx12 version.
 
+## 0.3.1 - 2026-09-15
+
+### Fixed
+
+- NuGet libraries are built with MSVC 14.38 so projects using the established Visual Studio 2022 v143 baseline do not fail to link against newer STL helper symbols.
+- Debug information for the packaged static libraries is embedded with `/Z7`, removing `LNK4099` warnings without distributing compiler PDB files.
+
 ## 0.3.0 - 2026-09-15
 
 ### Added

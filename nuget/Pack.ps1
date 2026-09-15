@@ -1,7 +1,9 @@
 [CmdletBinding()]
 param(
     [ValidatePattern( '^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$' )]
-    [string] $Version = '0.3.0-local',
+    [string] $Version = '0.3.1-local',
+    [ValidatePattern( '^\d+\.\d+\.\d+(?:\.\d+)?$' )]
+    [string] $MsvcToolsetVersion = '14.38.33130',
     [string] $NuGetExe = ''
 )
 
@@ -9,7 +11,8 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = Split-Path -Parent $PSScriptRoot
-$packageBuildDirectory = Join-Path $repositoryRoot 'build\nuget-package'
+$toolsetDirectoryName = "nuget-package-msvc-$($MsvcToolsetVersion -replace '\.', '-')"
+$packageBuildDirectory = Join-Path $repositoryRoot "build\$toolsetDirectoryName"
 $installDirectory = Join-Path $repositoryRoot 'build\nuget-install'
 $outputDirectory = Join-Path $repositoryRoot 'packages'
 $nuspecPath = Join-Path $PSScriptRoot 'Ldx12.nuspec'
@@ -44,9 +47,11 @@ if( -not ( Test-Path -LiteralPath $NuGetExe -PathType Leaf ) )
 New-Item -ItemType Directory -Force -Path $outputDirectory | Out-Null
 
 Invoke-Checked 'cmake' @(
+    '--fresh',
     '-S', $repositoryRoot,
     '-B', $packageBuildDirectory,
     '-A', 'x64',
+    '-T', "v143,version=$MsvcToolsetVersion",
     '-DLDX12_BUILD_APP=OFF',
     '-DLDX12_BUILD_EXAMPLES=OFF',
     '-DLDX12_BUILD_TESTS=OFF',

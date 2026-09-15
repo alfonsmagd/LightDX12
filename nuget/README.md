@@ -7,11 +7,11 @@ The package is intended for native x64 Visual Studio 2022 projects. It contains 
 Download `nuget.exe` from <https://www.nuget.org/downloads> and place it at `build/tools/nuget.exe`, or pass its path explicitly:
 
 ```powershell
-./nuget/Pack.ps1 -Version 0.3.0-local -NuGetExe C:/Tools/NuGet/nuget.exe
-./nuget/TestPackage.ps1 -Version 0.3.0-local -NuGetExe C:/Tools/NuGet/nuget.exe
+./nuget/Pack.ps1 -Version 0.3.1-local -NuGetExe C:/Tools/NuGet/nuget.exe
+./nuget/TestPackage.ps1 -Version 0.3.1-local -NuGetExe C:/Tools/NuGet/nuget.exe
 ```
 
-The package is written to `packages/Ldx12.0.3.0-local.nupkg`. The test extracts it through NuGet and compiles a native VS2022 consumer of Ldx12 and Ldx12Utils in both Debug and Release.
+The package is written to `packages/Ldx12.0.3.1-local.nupkg`. The test extracts it through NuGet and compiles a native VS2022 consumer of Ldx12 and Ldx12Utils in both Debug and Release with the MSVC 14.38 toolset. It also fails if linking emits `LNK4099`.
 
 To inspect it in the Visual Studio package manager before publishing:
 
@@ -33,18 +33,18 @@ Configure a NuGet.org Trusted Publishing policy with:
 Add the GitHub Actions secret `NUGET_USER` containing the NuGet.org profile name. Then create and push a semantic-version tag:
 
 ```powershell
-git tag v0.3.0
-git push origin v0.3.0
+git tag v0.3.1
+git push origin v0.3.1
 ```
 
-The existing workflow builds the package, verifies the VS2022 Debug and Release consumers, obtains a short-lived NuGet.org credential through OIDC and publishes `Ldx12.0.3.0.nupkg`. Branches and pull requests only build and test a prerelease package; they never publish it.
+The existing workflow builds the package, verifies the VS2022 Debug and Release consumers, obtains a short-lived NuGet.org credential through OIDC and publishes `Ldx12.0.3.1.nupkg`. Branches and pull requests only build and test a prerelease package; they never publish it.
 
 NuGet.org package versions cannot be overwritten. Publish a newer tag when a package needs a correction.
 
 After NuGet.org validates and indexes the package, select the `nuget.org` source in Visual Studio's package manager and search for `Ldx12`. It can also be installed from the Visual Studio Package Manager Console:
 
 ```powershell
-Install-Package Ldx12 -Version 0.3.0
+Install-Package Ldx12 -Version 0.3.1
 ```
 
 ## Consumer behavior
