@@ -108,9 +108,34 @@ framebuffer.color[ 2 ].texture = materialTexture;
 
 When a pipeline is bound, Ldx12 reports a debugger warning if its attachment formats do not match the active framebuffer.
 
+## Load glTF and GLB scenes with Ldx12Utils
+
+Version 0.3.0 updates the bundled `Ldx12Utils` library with a static glTF 2.0 scene loader powered by the vendored [cgltf](https://github.com/jkuhlmann/cgltf) parser. Loading is CPU-only and does not require a D3D12 device:
+
+```cpp
+#include <Ldx12Utils/GltfLoader.hpp>
+
+ldx12::utils::GltfScene scene =
+    ldx12::utils::LoadGltfScene( "scene.glb" );
+
+for( const ldx12::utils::GltfPrimitive& primitive : scene.primitives )
+{
+    // Upload primitive.vertices, primitive.indices and its material textures.
+}
+```
+
+The loader supports `.gltf` and `.glb`, scene-node transforms, indexed and non-indexed triangle geometry, generated normals, metallic/roughness materials, external or embedded images and per-texture glTF samplers. Node transforms are baked into vertices and converted to left-handed coordinates.
+
+Complete examples are available in the repository:
+
+- [18_GltfScene](https://github.com/alfonsmagd/LightDX12/tree/v0.3.0/samples/GltfScene) uploads a complete scene and renders its material textures with GGX PBR, HDR environment lighting and optional MSAA.
+- [19_DrawIndirectGltf](https://github.com/alfonsmagd/LightDX12/tree/v0.3.0/samples/DrawIndirectGltf) loads glTF scenes and renders their primitives through bindless material buffers and indexed indirect draws.
+
+The loader intentionally targets static demo scenes in 0.3.0; animation, skinning, compression, alpha blending and glTF extensions are outside its current scope.
+
 ## What is new in 0.3.0
 
-- Static glTF/GLB scene loading with transforms, geometry, materials and metallic/roughness textures.
+- Updated `Ldx12Utils` with cgltf-based static glTF/GLB scene loading, including transforms, geometry, materials and metallic/roughness textures.
 - Bindless UAV access for GPU-local structured and raw buffers.
 - Explicit buffer transitions and UAV barriers for compute-to-render workflows.
 - Batched submission fixups for tracked buffer and texture states.

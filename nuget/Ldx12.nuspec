@@ -5,14 +5,15 @@
     <version>0.3.0</version>
     <title>Ldx12</title>
     <authors>alfonsmagd</authors>
-    <description>Lightweight and fully bindless C++20 Direct3D 12 rendering library with Ldx12Utils helpers for Windows and Visual Studio 2022.</description>
+    <description>Lightweight and fully bindless C++20 Direct3D 12 rendering library. Includes Ldx12Utils with Win32 helpers, geometry, texture loading and cgltf-based static glTF/GLB scene loading.</description>
     <projectUrl>https://github.com/alfonsmagd/LightDX12</projectUrl>
     <repository type="git" url="https://github.com/alfonsmagd/LightDX12.git" />
     <license type="expression">MIT</license>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <icon>Ldx12.png</icon>
     <readme>README.md</readme>
-    <tags>native nativepackage c++ cpp directx12 d3d12 bindless graphics rendering</tags>
+    <releaseNotes>Ldx12 0.3.0 adds cgltf-based static glTF/GLB scene loading to Ldx12Utils, bindless structured/raw UAVs, compute synchronization, multiple render-target format validation and safer command-buffer/resource lifetimes. Examples: https://github.com/alfonsmagd/LightDX12/tree/v0.3.0/samples/GltfScene and https://github.com/alfonsmagd/LightDX12/tree/v0.3.0/samples/DrawIndirectGltf</releaseNotes>
+    <tags>native nativepackage c++ cpp directx12 d3d12 bindless graphics rendering gltf glb cgltf pbr</tags>
     <dependencies>
       <group targetFramework="native" />
     </dependencies>
