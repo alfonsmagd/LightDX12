@@ -608,21 +608,35 @@ namespace ldx12
 
 			TransitionTexture( framebuffer.depthStencil.texture, depthTexture, D3D12_RESOURCE_STATE_DEPTH_WRITE );
 
+			const DXGI_FORMAT depthStencilFormat =
+				depthTexture.formats_.dsv_ != DXGI_FORMAT_UNKNOWN ? depthTexture.formats_.dsv_ : depthTexture.format_;
+
 			depthStencilDesc.cpuDescriptor = depthTexture.dsvHandle_;
-			depthStencilDesc.DepthBeginningAccess =
-				depthTexture.isDepthFormat_ ? CreateDepthBeginningAccess( renderPass.depthStencil.depthLoadOp,
-												  depthTexture.formats_.dsv_ != DXGI_FORMAT_UNKNOWN ? depthTexture.formats_.dsv_ : depthTexture.format_,
-												  renderPass.depthStencil.clearDepth )
-											: CreateNoAccessBeginningAccess();
-			depthStencilDesc.DepthEndingAccess =
-				depthTexture.isDepthFormat_ ? CreateEndingAccess( renderPass.depthStencil.depthStoreOp ) : CreateNoAccessEndingAccess();
-			depthStencilDesc.StencilBeginningAccess =
-				depthTexture.isStencilFormat_ ? CreateStencilBeginningAccess( renderPass.depthStencil.stencilLoadOp,
-													depthTexture.formats_.dsv_ != DXGI_FORMAT_UNKNOWN ? depthTexture.formats_.dsv_ : depthTexture.format_,
-													renderPass.depthStencil.clearStencil )
-											  : CreateNoAccessBeginningAccess();
-			depthStencilDesc.StencilEndingAccess =
-				depthTexture.isStencilFormat_ ? CreateEndingAccess( renderPass.depthStencil.stencilStoreOp ) : CreateNoAccessEndingAccess();
+			depthStencilDesc.DepthBeginningAccess = CreateNoAccessBeginningAccess();
+			depthStencilDesc.DepthEndingAccess = CreateNoAccessEndingAccess();
+			depthStencilDesc.StencilBeginningAccess = CreateNoAccessBeginningAccess();
+			depthStencilDesc.StencilEndingAccess = CreateNoAccessEndingAccess();
+
+			if( depthTexture.isDepthFormat_ )
+			{
+				depthStencilDesc.DepthBeginningAccess =
+					CreateDepthBeginningAccess( renderPass.depthStencil.depthLoadOp,
+						depthStencilFormat,
+						renderPass.depthStencil.clearDepth );
+				depthStencilDesc.DepthEndingAccess =
+					CreateEndingAccess( renderPass.depthStencil.depthStoreOp );
+			}
+
+			if( depthTexture.isStencilFormat_ )
+			{
+				depthStencilDesc.StencilBeginningAccess =
+					CreateStencilBeginningAccess( renderPass.depthStencil.stencilLoadOp,
+						depthStencilFormat,
+						renderPass.depthStencil.clearStencil );
+				depthStencilDesc.StencilEndingAccess =
+					CreateEndingAccess( renderPass.depthStencil.stencilStoreOp );
+			}
+
 			depthStencilDescPtr = &depthStencilDesc;
 
 			if( viewportTexture == nullptr )
