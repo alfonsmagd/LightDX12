@@ -537,6 +537,12 @@ namespace ldx12
 			WriteSamplerDescriptor( index, samplerDescs[ index ] );
 		}
 
+		freeSamplerCount_ = ourCustomSamplerCount;
+		for( uint32_t index = ourMaxSamplers; index > ourBuiltInSamplerCount; --index )
+		{
+			freeSamplerDescriptors_[ ourMaxSamplers - index ] = index - 1u;
+		}
+
 		freeBindlessRangeCount_ = 0;
 		const uint32_t dynamicDescriptorCount = desc_.bindlessCapacity - LDX12_BINDLESS_DYNAMIC_SLOT_FIRST;
 		if( dynamicDescriptorCount > 0 )
@@ -652,6 +658,17 @@ namespace ldx12
 		return index;
 	}
 
+	uint32_t DeviceManager::AllocateSamplerDescriptor()
+	{
+		if( freeSamplerCount_ == 0 )
+		{
+			throw std::length_error( "All custom sampler descriptors are in use or pending GPU release." );
+		}
+
+		--freeSamplerCount_;
+		return freeSamplerDescriptors_[ freeSamplerCount_ ];
+	}
+
 	uint32_t DeviceManager::AllocateRtvDescriptor()
 	{
 		if( freeRtvDescriptorCount_ == 0 )
@@ -730,6 +747,19 @@ namespace ldx12
 				EraseFreeBindlessRange( insertIndex + 1u );
 			}
 		}
+	}
+
+	void DeviceManager::FreeSamplerDescriptor( uint32_t index ) noexcept
+	{
+		if( index == UINT32_MAX )
+		{
+			return;
+		}
+
+		assert( index >= ourBuiltInSamplerCount && index < ourMaxSamplers );
+		assert( freeSamplerCount_ < freeSamplerDescriptors_.size() );
+		freeSamplerDescriptors_[ freeSamplerCount_ ] = index;
+		++freeSamplerCount_;
 	}
 
 	void DeviceManager::WriteSamplerDescriptor( uint32_t index, const SamplerDesc& desc )
@@ -867,6 +897,32 @@ namespace ldx12
 		}
 	}
 
+	void DeviceManager::WaitForQueueIdleNoThrow( QueueContext& context ) noexcept
+	{
+		if( context.commandQueue_ == nullptr || context.queueIdleFence_ == nullptr )
+		{
+			return;
+		}
+
+		context.queueIdleFenceValue_++;
+		if( FAILED( context.commandQueue_->Signal( context.queueIdleFence_.Get(), context.queueIdleFenceValue_ ) ) )
+		{
+			OutputDebugStringA( "Ldx12 shutdown could not signal the queue idle fence.\n" );
+			return;
+		}
+		if( context.queueIdleFence_->GetCompletedValue() >= context.queueIdleFenceValue_ )
+		{
+			return;
+		}
+		if( FAILED( context.queueIdleFence_->SetEventOnCompletion( context.queueIdleFenceValue_, context.queueIdleEvent_ ) ) )
+		{
+			OutputDebugStringA( "Ldx12 shutdown could not register the queue idle event.\n" );
+			return;
+		}
+
+		WaitForSingleObject( context.queueIdleEvent_, INFINITE );
+	}
+
 	void DeviceManager::WaitIdle()
 	{
 		auto waitQueueIdle = [ this ]( QueueContext& context )
@@ -893,15 +949,10 @@ namespace ldx12
 		if( graphicsQueue_.immediateCommands_ != nullptr )
 		{
 			graphicsQueue_.immediateCommands_->ReleaseAllCommandBuffers();
+			graphicsQueue_.immediateCommands_->WaitAll();
 		}
-
-		try
-		{
-			WaitIdle();
-		}
-		catch( ... )
-		{
-		}
+		WaitForQueueIdleNoThrow( graphicsQueue_ );
+		graphicsQueue_.deferredReleases_.clear();
 
 		stagingDevice_.reset();
 		graphicsQueue_.immediateCommands_.reset();
@@ -1002,15 +1053,8 @@ namespace ldx12
 			throw std::runtime_error( "Failed to allocate swapchain slot." );
 		}
 
-		try
-		{
-			resource->swapchain_ = std::make_unique<Swapchain>( *this, handle, detail::GetHwnd( desc.window ), desc.width, desc.height );
-		}
-		catch( ... )
-		{
-			slotMapSwapchains_.Destroy( handle );
-			throw;
-		}
+		DeferredRelease::OnFailure cleanup( [ this, handle ]() noexcept { slotMapSwapchains_.Destroy( handle ); } );
+		resource->swapchain_ = std::make_unique<Swapchain>( *this, handle, detail::GetHwnd( desc.window ), desc.width, desc.height );
 
 		return handle;
 	}
@@ -1064,15 +1108,8 @@ namespace ldx12
 
 	DeviceManager::DeviceManager( const ContextDesc& desc ) : desc_( desc ), renderDevice_( *this )
 	{
-		try
-		{
-			Initialize();
-		}
-		catch( ... )
-		{
-			Shutdown();
-			throw;
-		}
+		DeferredRelease::OnFailure cleanup( [ this ]() noexcept { Shutdown(); } );
+		Initialize();
 	}
 
 	DeviceManager& DeviceManager::Initialize( const ContextDesc& desc )
@@ -1094,17 +1131,10 @@ namespace ldx12
 	DeviceManager& DeviceManager::Initialize( const ContextDesc& desc, const SwapchainDesc& primarySwapchainDesc )
 	{
 		DeviceManager& manager = Initialize( desc );
-		try
+		DeferredRelease::OnFailure cleanup( []() noexcept { ReleaseDeviceManagerSingleton(); } );
+		if( !manager.primarySwapchain_.Valid() )
 		{
-			if( !manager.primarySwapchain_.Valid() )
-			{
-				manager.primarySwapchain_ = manager.CreateSwapchain( primarySwapchainDesc );
-			}
-		}
-		catch( ... )
-		{
-			ReleaseDeviceManagerSingleton();
-			throw;
+			manager.primarySwapchain_ = manager.CreateSwapchain( primarySwapchainDesc );
 		}
 
 		return manager;

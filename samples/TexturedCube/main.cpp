@@ -85,7 +85,7 @@ float4 PSMain(float4 position : SV_Position, float2 uv : TEXCOORD0) : SV_Target0
 		desc.fragmentShader.entryPoint = "PSMain";
 		desc.fragmentShader.profile = "ps_6_6";
 		desc.fragmentShader.sourceName = "TexturedCubePS";
-		desc.colorFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+		desc.color[ 0 ].format = DXGI_FORMAT_R8G8B8A8_UNORM;
 		desc.depthFormat = DXGI_FORMAT_UNKNOWN;
 		desc.inputElements[ 0 ].semanticName = "POSITION";
 		desc.inputElements[ 0 ].format = DXGI_FORMAT_R32G32B32_FLOAT;
@@ -164,7 +164,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 			Framebuffer framebuffer{};
 			framebuffer.color[ 0 ].texture = backbuffer;
 
-			ICommandBuffer& commands = device.AcquireCommandBuffer();
+			CommandBuffer& commands = device.AcquireCommandBuffer();
 			commands.CmdBeginRendering( renderPass, framebuffer );
 			commands.CmdBindRenderPipeline( gfx.pipeline );
 			commands.CmdBindVertexBuffer( gfx.cube.vertexBuffer );

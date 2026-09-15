@@ -522,7 +522,9 @@ namespace ldx12
 		{
 			pipelineState_ = std::move( other.pipelineState_ );
 			topology_ = other.topology_;
+			colorFormats_ = other.colorFormats_;
 			other.topology_ = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+			other.colorFormats_ = {};
 		}
 		return *this;
 	}
@@ -555,12 +557,19 @@ namespace ldx12
 	{
 	}
 
-	ICommandBuffer& RenderDevice::AcquireCommandBuffer()
+	CommandBuffer& RenderDevice::AcquireCommandBuffer()
 	{
 		DeviceManager& manager = *manager_;
 		DeviceManager::QueueContext& graphicsQueue = manager.GetGraphicsQueueContext();
 		manager.ProcessDeferredReleases();
 		return graphicsQueue.immediateCommands_->AcquireCommandBuffer( manager );
+	}
+
+	void RenderDevice::Discard( CommandBuffer& commandBuffer ) const
+	{
+		DeviceManager& manager = *manager_;
+		DeviceManager::QueueContext& graphicsQueue = manager.GetGraphicsQueueContext();
+		graphicsQueue.immediateCommands_->DiscardCommandBuffer( manager, commandBuffer );
 	}
 
 	TextureHandle RenderDevice::GetCurrentSwapchainTexture( SwapchainHandle swapchain ) const
@@ -579,23 +588,23 @@ namespace ldx12
 		return nativeSwapchain->GetCurrentTexture();
 	}
 
-	SubmitHandle RenderDevice::SubmitBatch( ICommandBuffer* const* commandBuffers, uint32_t commandBufferCount, TextureHandle presentTexture ) const
+	SubmitHandle RenderDevice::SubmitBatch( CommandBuffer* const* commandBuffers, uint32_t commandBufferCount, TextureHandle presentTexture ) const
 	{
 		return SubmitCommandBufferBatch( *manager_, commandBuffers, commandBufferCount, presentTexture );
 	}
 
-	SubmitHandle RenderDevice::Submit( ICommandBuffer& buffer, TextureHandle presentTexture )
+	SubmitHandle RenderDevice::Submit( CommandBuffer& buffer, TextureHandle presentTexture )
 	{
-		ICommandBuffer* commandBuffers[] = { &buffer };
+		CommandBuffer* commandBuffers[] = { &buffer };
 		return SubmitBatch( commandBuffers, 1, presentTexture );
 	}
 
-	SubmitHandle RenderDevice::Submit( ICommandBuffer& buffer ) const
+	SubmitHandle RenderDevice::Submit( CommandBuffer& buffer ) const
 	{
-		ICommandBuffer* commandBuffers[] = { &buffer };
+		CommandBuffer* commandBuffers[] = { &buffer };
 		return SubmitBatch( commandBuffers, 1 );
 	}
-	SubmitHandle RenderDevice::SubmitAndPresent( ICommandBuffer& buffer, SwapchainHandle swapchain )
+	SubmitHandle RenderDevice::SubmitAndPresent( CommandBuffer& buffer, SwapchainHandle swapchain )
 	{
 		const TextureHandle presentTexture = GetCurrentSwapchainTexture( swapchain );
 		return Submit( buffer, presentTexture );
@@ -679,25 +688,48 @@ namespace ldx12
 			nativeInputElement.InstanceDataStepRate = inputElement.instanceDataStepRate;
 			nativeInputElements[ nativeInputElementCount++ ] = nativeInputElement;
 		}
-		psoDesc.InputLayout.pInputElementDescs = nativeInputElements.data();
+		psoDesc.InputLayout.pInputElementDescs = nativeInputElementCount > 0 ? nativeInputElements.data() : nullptr;
 		psoDesc.InputLayout.NumElements = nativeInputElementCount;
 
-		uint32_t numRenderTargets = 0;
-		for( uint32_t index = 0; index < desc.color.size(); ++index )
-		{
-			if( desc.color[ index ].format == DXGI_FORMAT_UNKNOWN )
-			{
-				continue;
-			}
+		constexpr DXGI_FORMAT defaultColorFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+		DXGI_FORMAT legacyColorFormat = DXGI_FORMAT_UNKNOWN;
+#if defined( _MSC_VER )
+		#pragma warning( push )
+		#pragma warning( disable : 4996 )
+#endif
+		legacyColorFormat = desc.colorFormat;
+#if defined( _MSC_VER )
+		#pragma warning( pop )
+#endif
 
-			psoDesc.RTVFormats[ numRenderTargets ] = desc.color[ index ].format;
-			numRenderTargets++;
+		// Preserve the old single-RTV field only while the new color array still has its untouched default value.
+		bool usesDefaultColorArray = desc.color[ 0 ].format == defaultColorFormat;
+		for( uint32_t index = 1; index < desc.color.size(); ++index )
+		{
+			usesDefaultColorArray = usesDefaultColorArray && desc.color[ index ].format == DXGI_FORMAT_UNKNOWN;
 		}
 
-		if( numRenderTargets == 0 && desc.colorFormat != DXGI_FORMAT_UNKNOWN )
+		uint32_t numRenderTargets = 0;
+		if( usesDefaultColorArray && legacyColorFormat != defaultColorFormat )
 		{
-			psoDesc.RTVFormats[ 0 ] = desc.colorFormat;
-			numRenderTargets = 1;
+			if( legacyColorFormat != DXGI_FORMAT_UNKNOWN )
+			{
+				psoDesc.RTVFormats[ 0 ] = legacyColorFormat;
+				numRenderTargets = 1;
+			}
+		}
+		else
+		{
+			for( uint32_t index = 0; index < desc.color.size(); ++index )
+			{
+				if( desc.color[ index ].format == DXGI_FORMAT_UNKNOWN )
+				{
+					continue;
+				}
+
+				psoDesc.RTVFormats[ numRenderTargets ] = desc.color[ index ].format;
+				numRenderTargets++;
+			}
 		}
 
 		for( uint32_t index = 0; index < numRenderTargets; ++index )
@@ -724,6 +756,10 @@ namespace ldx12
 		C_RESULT( manager_->device_->CreateGraphicsPipelineState( &psoDesc, IID_PPV_ARGS( pipeline.pipelineState_.GetAddressOf() ) ),
 			"Failed to create graphics pipeline state." );
 		pipeline.topology_ = desc.topology;
+		for( uint32_t index = 0; index < numRenderTargets; ++index )
+		{
+			pipeline.colorFormats_[ index ] = psoDesc.RTVFormats[ index ];
+		}
 		return pipeline;
 	}
 
@@ -827,6 +863,14 @@ namespace ldx12
 				throw std::length_error( "Raw buffer element count exceeds the D3D12 SRV limit." );
 			}
 		}
+		if( desc.unorderedAccess && desc.type != BufferType::Structured && desc.type != BufferType::Raw )
+		{
+			throw std::invalid_argument( "BufferDesc.unorderedAccess requires a Structured or Raw buffer." );
+		}
+		if( desc.unorderedAccess && desc.memory != BufferMemory::GpuLocal )
+		{
+			throw std::invalid_argument( "Unordered-access buffers must use GpuLocal memory." );
+		}
 	}
 
 	BufferResource RenderDevice::CreateBufferResource( const BufferDesc& desc )
@@ -839,34 +883,12 @@ namespace ldx12
 		resource.type_ = desc.type;
 		resource.memory_ = desc.memory;
 		resource.desc_ = BufferResource::CreateNativeDesc( resourceSize );
+		if( desc.unorderedAccess )
+		{
+			resource.desc_.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+		}
 
-		if( desc.memory == BufferMemory::CpuToGpu )
-		{
-			resource.currentState_ = D3D12_RESOURCE_STATE_GENERIC_READ;
-		}
-		else
-		{
-			switch( desc.type )
-			{
-			case BufferType::Vertex:
-			case BufferType::Constant:
-				resource.currentState_ = D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
-				break;
-			case BufferType::Index:
-				resource.currentState_ = D3D12_RESOURCE_STATE_INDEX_BUFFER;
-				break;
-			case BufferType::Structured:
-			case BufferType::Raw:
-				resource.currentState_ = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-				break;
-			case BufferType::Indirect:
-				resource.currentState_ = D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT;
-				break;
-			case BufferType::Generic:
-				resource.currentState_ = D3D12_RESOURCE_STATE_COMMON;
-				break;
-			}
-		}
+		resource.currentState_ = desc.memory == BufferMemory::CpuToGpu ? D3D12_RESOURCE_STATE_GENERIC_READ : D3D12_RESOURCE_STATE_COMMON;
 
 		const D3D12_HEAP_TYPE heapType = desc.memory == BufferMemory::CpuToGpu ? D3D12_HEAP_TYPE_UPLOAD : D3D12_HEAP_TYPE_DEFAULT;
 		const CD3DX12_HEAP_PROPERTIES heapProps( heapType );
@@ -911,6 +933,29 @@ namespace ldx12
 			}
 
 			manager_->device_->CreateShaderResourceView( resource.resource_.Get(), &srvDesc, resource.srvHandle_ );
+		}
+
+		if( desc.unorderedAccess )
+		{
+			resource.uavIndex_ = manager_->AllocateBindlessDescriptor();
+			resource.uavHandle_ = manager_->MakeBindlessCpuHandle( resource.uavIndex_ );
+
+			D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
+			uavDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+			if( desc.type == BufferType::Raw )
+			{
+				uavDesc.Format = DXGI_FORMAT_R32_TYPELESS;
+				uavDesc.Buffer.NumElements = static_cast<UINT>( desc.size / sizeof( uint32_t ) );
+				uavDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_RAW;
+			}
+			else
+			{
+				uavDesc.Format = DXGI_FORMAT_UNKNOWN;
+				uavDesc.Buffer.StructureByteStride = desc.stride;
+				uavDesc.Buffer.NumElements = static_cast<UINT>( desc.size / desc.stride );
+			}
+
+			manager_->device_->CreateUnorderedAccessView( resource.resource_.Get(), nullptr, &uavDesc, resource.uavHandle_ );
 		}
 
 		if( desc.type == BufferType::Constant )
@@ -1020,16 +1065,12 @@ namespace ldx12
 		{
 			throw std::invalid_argument( "Sampler minLod cannot be greater than maxLod." );
 		}
-		if( manager_->slotMapSamplers_.NumObjects() == ourCustomSamplerCount )
-		{
-			throw std::length_error( "All four custom sampler slots are already in use." );
-		}
-
-		const SamplerHandle handle = manager_->slotMapSamplers_.Create( SamplerResource{} );
-		SamplerResource* resource = manager_->slotMapSamplers_.Get( handle );
-		assert( resource != nullptr );
-		resource->descriptorIndex_ = LDX12_CUSTOM_SAMPLER_SLOT_FIRST + handle.Index();
-		manager_->WriteSamplerDescriptor( resource->descriptorIndex_, desc );
+		manager_->ProcessDeferredReleases();
+		const uint32_t descriptorIndex = manager_->AllocateSamplerDescriptor();
+		SamplerResource resource{};
+		resource.descriptorIndex_ = descriptorIndex;
+		const SamplerHandle handle = manager_->slotMapSamplers_.Create( std::move( resource ) );
+		manager_->WriteSamplerDescriptor( descriptorIndex, desc );
 		return handle;
 	}
 
@@ -1073,6 +1114,11 @@ namespace ldx12
 		return ToPublicDescriptorIndex( manager_->GetBufferResource( buffer ).srvIndex_ );
 	}
 
+	uint32_t RenderDevice::GetUnorderedAccessIndex( BufferHandle buffer ) const
+	{
+		return ToPublicDescriptorIndex( manager_->GetBufferResource( buffer ).uavIndex_ );
+	}
+
 	uint32_t RenderDevice::GetBindlessIndex( TextureHandle texture ) const
 	{
 		return ToPublicDescriptorIndex( manager_->GetTextureResource( texture ).srvIndex_ );
@@ -1081,6 +1127,11 @@ namespace ldx12
 	uint32_t RenderDevice::GetUnorderedAccessIndex( TextureHandle texture ) const
 	{
 		return ToPublicDescriptorIndex( manager_->GetTextureResource( texture ).uavIndex_ );
+	}
+
+	DXGI_FORMAT RenderDevice::GetTextureFormat( TextureHandle texture ) const
+	{
+		return manager_->GetTextureResource( texture ).format_;
 	}
 
 	uint32_t RenderDevice::GetSamplerIndex( SamplerHandle sampler ) const
@@ -1139,14 +1190,16 @@ namespace ldx12
 		ComPtr<ID3D12Resource> nativeResource = std::move( resource->resource_ );
 		const bool wasMapped = resource->mappedPtr_ != nullptr;
 		const uint32_t srvIndex = resource->srvIndex_;
+		const uint32_t uavIndex = resource->uavIndex_;
 		const uint32_t cbvIndex = resource->cbvIndex_;
 
 		resource->mappedPtr_ = nullptr;
 		resource->srvIndex_ = UINT32_MAX;
+		resource->uavIndex_ = UINT32_MAX;
 		resource->cbvIndex_ = UINT32_MAX;
 		manager.slotMapBuffers_.Destroy( buffer );
 
-		std::function<void()> release = [ &manager, nativeResource = std::move( nativeResource ), wasMapped, srvIndex, cbvIndex ]() mutable
+		std::function<void()> release = [ &manager, nativeResource = std::move( nativeResource ), wasMapped, srvIndex, uavIndex, cbvIndex ]() mutable
 		{
 			if( nativeResource != nullptr && wasMapped )
 			{
@@ -1154,6 +1207,7 @@ namespace ldx12
 			}
 
 			manager.FreeBindlessDescriptor( srvIndex );
+			manager.FreeBindlessDescriptor( uavIndex );
 			manager.FreeBindlessDescriptor( cbvIndex );
 			nativeResource.Reset();
 		};
@@ -1222,14 +1276,31 @@ namespace ldx12
 
 	bool RenderDevice::Destroy( SamplerHandle sampler )
 	{
-		if( !manager_->slotMapSamplers_.Contains( sampler ) )
+		DeviceManager& manager = *manager_;
+		SamplerResource* resource = manager.slotMapSamplers_.Get( sampler );
+		if( resource == nullptr )
 		{
 			ReportInvalidDestroy( "SamplerHandle", sampler.Index(), sampler.Gen() );
 			return false;
 		}
 
-		// The next CreateSampler() may overwrite this descriptor slot.
-		manager_->WaitIdle();
-		return manager_->slotMapSamplers_.Destroy( sampler );
+		DeviceManager::QueueContext& graphicsQueue = manager.GetGraphicsQueueContext();
+		const SubmitHandle releaseHandle =
+			graphicsQueue.immediateCommands_ != nullptr ? graphicsQueue.immediateCommands_->GetLastSubmitHandle() : SubmitHandle{};
+		const uint32_t descriptorIndex = resource->descriptorIndex_;
+		resource->descriptorIndex_ = UINT32_MAX;
+		manager.slotMapSamplers_.Destroy( sampler );
+
+		auto release = [ &manager, descriptorIndex ] { manager.FreeSamplerDescriptor( descriptorIndex ); };
+		if( graphicsQueue.immediateCommands_ == nullptr || releaseHandle.Empty() || graphicsQueue.immediateCommands_->IsReady( releaseHandle ) )
+		{
+			release();
+		}
+		else
+		{
+			manager.AddDeferredRelease( releaseHandle, std::move( release ) );
+		}
+
+		return true;
 	}
 } // namespace ldx12

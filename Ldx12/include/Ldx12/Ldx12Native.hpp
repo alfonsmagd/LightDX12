@@ -11,9 +11,15 @@ namespace ldx12
 	public:
 		[[nodiscard]] ID3D12Device* GetDevice() const noexcept;
 		[[nodiscard]] ID3D12CommandQueue* GetCommandQueue() const noexcept;
-		[[nodiscard]] ID3D12GraphicsCommandList* GetCommandList( ICommandBuffer& commandBuffer ) const noexcept;
+		[[nodiscard]] ID3D12GraphicsCommandList* GetCommandList( CommandBuffer& commandBuffer ) const noexcept;
 		[[nodiscard]] ID3D12Resource* GetResource( BufferHandle buffer ) const;
 		[[nodiscard]] ID3D12Resource* GetResource( TextureHandle texture ) const;
+
+		// Retains a reference to a single-mip, non-MSAA RGBA8/BGRA8 texture on
+		// this device, initially in COMMON. Exposes an SRV only. The caller must
+		// synchronize external writes and return the texture to COMMON before
+		// handing it back. Release the returned handle with RenderDevice::Destroy.
+		[[nodiscard]] TextureHandle ImportSampledTexture2D( ID3D12Resource* texture ) const;
 
 	private:
 		friend class RenderDevice;

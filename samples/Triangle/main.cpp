@@ -60,7 +60,7 @@ float4 main(float4 position : SV_Position, float3 color : COLOR0) : SV_Target0
 		desc.fragmentShader.source = ourPixelShader;
 		desc.fragmentShader.entryPoint = "main";
 		desc.fragmentShader.profile = "ps_6_6";
-		desc.colorFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+		desc.color[ 0 ].format = DXGI_FORMAT_R8G8B8A8_UNORM;
 		desc.depthFormat = DXGI_FORMAT_UNKNOWN;
 		desc.depthStencilState.DepthEnable = FALSE;
 		desc.depthStencilState.StencilEnable = FALSE;
@@ -110,7 +110,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 				continue;
 			}
 
-			ICommandBuffer& buffer = device.AcquireCommandBuffer();
+			CommandBuffer& buffer = device.AcquireCommandBuffer();
 			const TextureHandle currentTexture = device.GetCurrentSwapchainTexture();
 
 			RenderPass renderPass{};

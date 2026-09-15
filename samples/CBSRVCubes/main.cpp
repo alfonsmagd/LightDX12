@@ -238,7 +238,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 				UpdateSceneCbv( gfx );
 				UpdateCubeSrv( gfx, animationTime );
 
-				ICommandBuffer& commands = device.AcquireCommandBuffer();
+				CommandBuffer& commands = device.AcquireCommandBuffer();
 				const TextureHandle backbuffer = device.GetCurrentSwapchainTexture();
 
 				RenderPass renderPass{};

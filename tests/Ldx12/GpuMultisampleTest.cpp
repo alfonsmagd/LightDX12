@@ -78,7 +78,7 @@ float4 PSMain() : SV_Target0
 		pipelineDesc.vertexShader.entryPoint = "VSMain";
 		pipelineDesc.fragmentShader.source = pixelShader;
 		pipelineDesc.fragmentShader.entryPoint = "PSMain";
-		pipelineDesc.colorFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+		pipelineDesc.color[ 0 ].format = device.GetTextureFormat( multisampleColor );
 		pipelineDesc.depthFormat = DXGI_FORMAT_D32_FLOAT;
 		pipelineDesc.sampleCount = sampleCount;
 		RenderPipelineState pipeline = device.CreateRenderPipeline( pipelineDesc );
@@ -92,7 +92,7 @@ float4 PSMain() : SV_Target0
 		framebuffer.color[ 0 ].texture = multisampleColor;
 		framebuffer.depthStencil.texture = multisampleDepth;
 
-		ICommandBuffer& commands = device.AcquireCommandBuffer();
+		CommandBuffer& commands = device.AcquireCommandBuffer();
 		commands.CmdBeginRendering( renderPass, framebuffer );
 		commands.CmdBindRenderPipeline( pipeline );
 		commands.CmdEndRendering();

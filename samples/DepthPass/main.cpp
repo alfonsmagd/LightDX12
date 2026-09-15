@@ -53,7 +53,7 @@ namespace
 		RenderPipelineDesc desc{};
 		desc.vertexShader = HLSLLoader::LoadStage( "shaders/DepthPass.hlsl", "vs_6_6", "VSMain" );
 		desc.fragmentShader = HLSLLoader::LoadStage( "shaders/DepthPass.hlsl", "ps_6_6", "PSDepth" );
-		desc.colorFormat = DXGI_FORMAT_UNKNOWN;
+		desc.color[ 0 ].format = DXGI_FORMAT_UNKNOWN;
 		desc.depthFormat = DXGI_FORMAT_D32_FLOAT;
 		desc.inputElements[ 0 ].semanticName = "POSITION";
 		desc.inputElements[ 0 ].format = DXGI_FORMAT_R32G32B32_FLOAT;
@@ -73,7 +73,6 @@ namespace
 		desc.vertexShader = HLSLLoader::LoadStage( "shaders/DepthPass.hlsl", "vs_6_6", "VSMain" );
 		desc.fragmentShader = HLSLLoader::LoadStage( "shaders/DepthPass.hlsl", "ps_6_6", "PSColor" );
 		desc.color[ 0 ].format = DXGI_FORMAT_R8G8B8A8_UNORM;
-		desc.colorFormat = DXGI_FORMAT_UNKNOWN;
 		desc.depthFormat = DXGI_FORMAT_D32_FLOAT;
 		desc.inputElements[ 0 ].semanticName = "POSITION";
 		desc.inputElements[ 0 ].format = DXGI_FORMAT_R32G32B32_FLOAT;
@@ -112,7 +111,7 @@ namespace
 		return constants;
 	}
 
-	void DrawCubes( ICommandBuffer& commands,
+	void DrawCubes( CommandBuffer& commands,
 		const RenderPipelineState& pipeline,
 		const utils::GeometryBuffers& cubeGeometry,
 		const XMMATRIX& viewProjection,
@@ -125,7 +124,7 @@ namespace
 		for( const Cube& cube : ourCubes )
 		{
 			const PushConstants constants = BuildConstants( cube, viewProjection, time );
-			commands.CmdPushConstants( &constants, sizeof( constants ) );
+			commands.CmdPushConstants( constants );
 			commands.CmdDrawIndexed( cubeGeometry.indexCount );
 		}
 	}
@@ -228,7 +227,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 			ImGui_ImplWin32_NewFrame();
 	
 
-			ICommandBuffer& commands = device.AcquireCommandBuffer();
+			CommandBuffer& commands = device.AcquireCommandBuffer();
 
 			RenderPass depthPass{};
 			depthPass.depthStencil.depthLoadOp = LoadOp::Clear;

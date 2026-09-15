@@ -2,6 +2,36 @@
 
 This file lists the main user-visible changes in each Ldx12 version.
 
+## 0.3.0 - 2026-09-15
+
+### Added
+
+#### Features
+
+- Static glTF/GLB scene loading in `Ldx12Utils`, using vendored cgltf, with node transforms, geometry and metallic/roughness texture data.
+- Bindless unordered-access views for GPU-local `Structured` and `Raw` buffers, with separate SRV and UAV indices for shader reads and writes.
+- Explicit buffer state transitions and UAV barriers for compute-to-render workflows.
+- `RenderDevice::Discard()` for abandoning an acquired command buffer and immediately returning its slot to the pool without submitting GPU work.
+- `CmdPushConstants(const T&)` for sending an object directly, with a clear compile-time check for the 63-value limit.
+- `RenderDevice::GetTextureFormat()` for configuring render-pipeline attachments from the textures that will be rendered into.
+
+#### Examples
+
+- `18_GltfScene` loads DamagedHelmet and renders its five material maps with GGX PBR, prefiltered HDR environment lighting, per-texture glTF samplers, sRGB color maps and full mip chains. Diagnostic views expose material channels and selected mip levels.
+- The glTF sample renders at native client resolution with Per-Monitor V2 DPI awareness and optional MSAA x4, with toggles for image-quality comparisons.
+- `17_ComputeParticles` updates and renders 8,388,608 particles entirely on the GPU. The particles form a cyan sphere and react to a radial impulse when the user clicks.
+
+### Fixed
+
+- Replaced internal exception-handler cleanup with `DeferredRelease::OnFailure` for device initialization, swapchain creation and native texture imports. It performs CPU cleanup during exception unwinding; GPU retirement continues to wait for its submission. Shutdown remains non-throwing and reports queue-fence failures to the debugger instead of silently swallowing them.
+- Destroying a custom sampler now invalidates its handle immediately and defers descriptor reuse until earlier GPU submissions complete, without an implicit `WaitIdle`. Descriptor allocation is independent of handle slots, so pending releases continue to consume sampler capacity safely.
+- Added a dedicated sampler retirement regression test that holds a GPU submission pending, verifies that its retired descriptor cannot be reused, and checks descriptor recycling and stale-handle invalidation after completion. Verified in Debug and Release.
+- Replaced the `ICommandBuffer`/`CommandBufferImpl` split with one concrete `CommandBuffer`, removing virtual command dispatch and interface-to-implementation conversion during submission.
+- Default-heap buffers now start in their real D3D12 `COMMON` state and use implicit read-state promotion, removing ignored-initial-state validation warnings. Pipelines driven entirely by `SV_VertexID` now pass a null input layout instead of an empty descriptor array.
+- Binding a render pipeline now reports debugger warnings when its color formats do not match the active framebuffer. `RenderPipelineDesc::colorFormat` is deprecated in favor of `color[i].format` and remains available throughout `0.3.x`.
+- Submission fixups now collect all required buffer and texture transitions and issue them through a single D3D12 `ResourceBarrier` call.
+- `AppLdx` now initializes OLE for the lifetime of its Win32 window, preventing `MSCTF.dll` from reporting `CO_E_NOTINITIALIZED` when Windows activates text and handwriting services.
+
 ## 0.2.0 - 2026-08-30
 
 ### Added

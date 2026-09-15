@@ -14,9 +14,9 @@ namespace ldx12
 		ImmediateCommands( const ImmediateCommands& ) = delete;
 		ImmediateCommands& operator=( const ImmediateCommands& ) = delete;
 
-		CommandBufferImpl& AcquireCommandBuffer( DeviceManager& manager );
-		CommandBufferImpl* FindActiveCommandBuffer( ICommandBuffer* commandBuffer ) noexcept;
-		void ReleaseCommandBuffer( CommandBufferImpl& commandBuffer ) noexcept;
+		CommandBuffer& AcquireCommandBuffer( DeviceManager& manager );
+		void DiscardCommandBuffer( DeviceManager& manager, CommandBuffer& commandBuffer );
+		void ReleaseCommandBuffer( CommandBuffer& commandBuffer ) noexcept;
 		void ReleaseAllCommandBuffers() noexcept;
 		CommandListWrapper& Acquire();
 		SubmitHandle Submit( CommandListWrapper& wrapper );
@@ -25,7 +25,7 @@ namespace ldx12
 		SubmitHandle GetNextSubmitHandle() const noexcept;
 		bool IsReady( SubmitHandle handle, bool fastCheckNoD3D12 = false ) const;
 		void Wait( SubmitHandle handle );
-		void WaitAll();
+		void WaitAll() noexcept;
 
 	private:
 		CommandListWrapper* FindOldestSubmittedBuffer() noexcept;
@@ -36,7 +36,7 @@ namespace ldx12
 		ID3D12Device* device_ = nullptr;
 		ID3D12CommandQueue* queue_ = nullptr;
 		std::array<CommandListWrapper, ourMaxImmediateCommandBuffers> buffers_ = {};
-		std::array<CommandBufferImpl, ourMaxActiveCommandBuffers> commandBuffers_ = {};
+		std::array<CommandBuffer, ourMaxActiveCommandBuffers> commandBuffers_ = {};
 		uint32_t bufferCount_ = 0;
 		SubmitHandle lastSubmitHandle_ = {};
 		SubmitHandle nextSubmitHandle_ = {};

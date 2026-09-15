@@ -5,6 +5,7 @@ project(Ldx12Utils LANGUAGES CXX)
 if(PROJECT_IS_TOP_LEVEL)
     include(GNUInstallDirs)
     find_package(Ldx12 CONFIG REQUIRED)
+    option(LDX12_BUILD_THIRD_PARTY "Build bundled third-party integrations and samples" ON)
 endif()
 
 set(LDX12_UTILS_ROOT "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -25,6 +26,18 @@ set(LDX12_UTILS_SOURCES
     "${LDX12_UTILS_ROOT}/src/TextureLoader.cpp"
 )
 
+if(LDX12_BUILD_THIRD_PARTY)
+    list(APPEND LDX12_UTILS_PUBLIC_HEADERS "${LDX12_UTILS_ROOT}/include/Ldx12Utils/GltfLoader.hpp")
+    list(APPEND LDX12_UTILS_SOURCES "${LDX12_UTILS_ROOT}/src/GltfLoader.cpp")
+    add_library(cgltf INTERFACE
+        "${LDX12_UTILS_ROOT}/../../third_party/cgltf/cgltf.h"
+        "${LDX12_UTILS_ROOT}/../../third_party/cgltf/LICENSE"
+    )
+    add_library(Ldx12::cgltf ALIAS cgltf)
+    target_include_directories(cgltf INTERFACE "${LDX12_UTILS_ROOT}/../../third_party/cgltf")
+    set_target_properties(cgltf PROPERTIES FOLDER "ThirdParty")
+endif()
+
 add_library(Ldx12Utils STATIC
     ${LDX12_UTILS_PUBLIC_HEADERS}
     ${LDX12_UTILS_SOURCES}
@@ -38,6 +51,9 @@ target_include_directories(Ldx12Utils
         "$<BUILD_INTERFACE:${LDX12_UTILS_ROOT}/include>"
         "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
 )
+if(LDX12_BUILD_THIRD_PARTY)
+    target_include_directories(Ldx12Utils PRIVATE "${LDX12_UTILS_ROOT}/../../third_party/cgltf")
+endif()
 target_link_libraries(Ldx12Utils
     PUBLIC Ldx12::Ldx12
     PRIVATE windowscodecs ole32

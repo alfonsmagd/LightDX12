@@ -101,7 +101,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 			const float aspectRatio = static_cast<float>( gfx.deviceManager->GetWidth() ) / static_cast<float>( gfx.deviceManager->GetHeight() );
 			const PushConstants constants = BuildPushConstants( animationTime, aspectRatio );
 
-			ICommandBuffer& commands = device.AcquireCommandBuffer();
+			CommandBuffer& commands = device.AcquireCommandBuffer();
 			const TextureHandle backbuffer = device.GetCurrentSwapchainTexture();
 
 			RenderPass renderPass{};

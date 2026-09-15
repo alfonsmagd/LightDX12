@@ -41,8 +41,19 @@ namespace ldx12::utils
 		void SetDeviceManager( DeviceManager& deviceManager ) noexcept;
 
 	private:
+		class OleInitialization final
+		{
+		public:
+			OleInitialization();
+			~OleInitialization();
+
+			OleInitialization( const OleInitialization& ) = delete;
+			OleInitialization& operator=( const OleInitialization& ) = delete;
+		};
+
 		static LRESULT CALLBACK WindowProc( HWND window, UINT message, WPARAM wParam, LPARAM lParam );
 
+		OleInitialization oleInitialization_;
 		HINSTANCE instance_ = nullptr;
 		const wchar_t* className_ = nullptr;
 		HWND window_ = nullptr;

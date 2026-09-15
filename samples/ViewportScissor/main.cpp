@@ -90,13 +90,13 @@ float4 main() : SV_Target0
 		desc.vertexShader.profile = "vs_6_6";
 		desc.fragmentShader.source = ourPixelShader;
 		desc.fragmentShader.profile = "ps_6_6";
-		desc.colorFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+		desc.color[ 0 ].format = DXGI_FORMAT_R8G8B8A8_UNORM;
 		desc.depthStencilState.DepthEnable = FALSE;
 		desc.depthStencilState.StencilEnable = FALSE;
 		return device.CreateRenderPipeline( desc );
 	}
 
-	void DrawShape( ICommandBuffer& commands, uint32_t colorIndex, Shape shape )
+	void DrawShape( CommandBuffer& commands, uint32_t colorIndex, Shape shape )
 	{
 		const DrawConstants constants{ colorIndex, shape == Shape::FullscreenTriangle ? 1u : 0u };
 		commands.CmdPushConstants( &constants, sizeof( constants ) );
@@ -117,7 +117,7 @@ float4 main() : SV_Target0
 		Framebuffer framebuffer{};
 		framebuffer.color[ 0 ].texture = backbuffer;
 
-		ICommandBuffer& commands = device.AcquireCommandBuffer();
+		CommandBuffer& commands = device.AcquireCommandBuffer();
 		commands.CmdBeginRendering( renderPass, framebuffer );
 		commands.CmdBindRenderPipeline( gfx.pipeline );
 

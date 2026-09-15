@@ -3,9 +3,12 @@
 
 #include <cstdlib>
 #include <cassert>
+#include <cstdio>
 #include <cstring>
 #include <filesystem>
 #include <mutex>
+
+#include <d3d12sdklayers.h>
 
 #if defined( LDX12_ENABLE_PIX )
 	#define LDX12_INTERNAL_PIX_ENABLED 1
@@ -17,6 +20,18 @@ namespace ldx12
 {
 	namespace
 	{
+		void ReportValidationWarning( ID3D12Device* device, const char* message ) noexcept
+		{
+			ComPtr<ID3D12InfoQueue> infoQueue;
+			if( device != nullptr && SUCCEEDED( device->QueryInterface( IID_PPV_ARGS( infoQueue.GetAddressOf() ) ) ) &&
+				SUCCEEDED( infoQueue->AddApplicationMessage( D3D12_MESSAGE_SEVERITY_WARNING, message ) ) )
+			{
+				return;
+			}
+
+			OutputDebugStringA( message );
+		}
+
 #if LDX12_INTERNAL_PIX_ENABLED
 		std::array<uint32_t, 4> ParseVersionComponents( const std::wstring& versionText )
 		{
@@ -281,7 +296,7 @@ namespace ldx12
 		}
 	}
 
-	void CommandBufferImpl::Begin( DeviceManager& manager, CommandListWrapper& wrapper ) noexcept
+	void CommandBuffer::Begin( DeviceManager& manager, CommandListWrapper& wrapper ) noexcept
 	{
 		assert( !active_ );
 		manager_ = &manager;
@@ -289,6 +304,8 @@ namespace ldx12
 		isRendering_ = false;
 		active_ = true;
 		debugGroupDepth_ = 0;
+		framebufferColorFormats_ = {};
+		trackedBufferCount_ = 0;
 		trackedTextureCount_ = 0;
 
 		ID3D12DescriptorHeap* heaps[] = { manager_->bindlessHeap_.Get(), manager_->samplerHeap_.Get() };
@@ -299,7 +316,7 @@ namespace ldx12
 		wrapper_->commandList_->SetComputeRootSignature( rootSignature );
 	}
 
-	void CommandBufferImpl::Release() noexcept
+	void CommandBuffer::Release() noexcept
 	{
 		assert( active_ );
 		assert( !isRendering_ );
@@ -307,10 +324,37 @@ namespace ldx12
 		wrapper_ = nullptr;
 		active_ = false;
 		debugGroupDepth_ = 0;
+		framebufferColorFormats_ = {};
+		trackedBufferCount_ = 0;
 		trackedTextureCount_ = 0;
 	}
 
-	CommandBufferImpl::TrackedTextureState& CommandBufferImpl::GetTrackedTextureState( TextureHandle texture )
+	CommandBuffer::TrackedBufferState& CommandBuffer::GetTrackedBufferState( BufferHandle buffer )
+	{
+		for( uint32_t index = 0; index < trackedBufferCount_; ++index )
+		{
+			TrackedBufferState& trackedBuffer = trackedBuffers_[ index ];
+			if( trackedBuffer.handle_ == buffer )
+			{
+				return trackedBuffer;
+			}
+		}
+
+		const BufferResource& resource = manager_->GetBufferResource( buffer );
+		TrackedBufferState trackedBuffer;
+		trackedBuffer.handle_ = buffer;
+		trackedBuffer.initialState_ = resource.currentState_;
+		trackedBuffer.currentState_ = resource.currentState_;
+		if( trackedBufferCount_ == trackedBuffers_.size() )
+		{
+			throw std::length_error( "A command buffer cannot track more than 256 buffers." );
+		}
+
+		trackedBuffers_[ trackedBufferCount_ ] = trackedBuffer;
+		return trackedBuffers_[ trackedBufferCount_++ ];
+	}
+
+	CommandBuffer::TrackedTextureState& CommandBuffer::GetTrackedTextureState( TextureHandle texture )
 	{
 		for( uint32_t index = 0; index < trackedTextureCount_; ++index )
 		{
@@ -335,7 +379,7 @@ namespace ldx12
 		return trackedTextures_[ trackedTextureCount_++ ];
 	}
 
-	void CommandBufferImpl::TransitionTexture( TextureHandle texture, TextureResource& resource, D3D12_RESOURCE_STATES newState )
+	void CommandBuffer::TransitionTexture( TextureHandle texture, TextureResource& resource, D3D12_RESOURCE_STATES newState )
 	{
 		TrackedTextureState& trackedTexture = GetTrackedTextureState( texture );
 		if( trackedTexture.currentState_ == newState )
@@ -348,14 +392,47 @@ namespace ldx12
 		trackedTexture.currentState_ = newState;
 	}
 
-	CommandListWrapper* CommandBufferImpl::BuildSubmitFixup( CommandBufferImpl* const* previousCommandBuffers, uint32_t previousCommandBufferCount )
+	void CommandBuffer::TransitionBuffer( BufferHandle buffer, BufferResource& resource, D3D12_RESOURCE_STATES newState )
 	{
-		const auto getCurrentState = [ this, previousCommandBuffers, previousCommandBufferCount ]( TextureHandle texture )
+		TrackedBufferState& trackedBuffer = GetTrackedBufferState( buffer );
+		if( trackedBuffer.currentState_ == newState )
+		{
+			return;
+		}
+
+		const D3D12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition( resource.resource_.Get(), trackedBuffer.currentState_, newState );
+		wrapper_->commandList_->ResourceBarrier( 1, &barrier );
+		trackedBuffer.currentState_ = newState;
+	}
+
+	CommandListWrapper* CommandBuffer::BuildSubmitFixup( CommandBuffer* const* previousCommandBuffers, uint32_t previousCommandBufferCount )
+	{
+		const auto getCurrentBufferState = [ this, previousCommandBuffers, previousCommandBufferCount ]( BufferHandle buffer )
 		{
 			for( uint32_t commandBufferIndex = previousCommandBufferCount; commandBufferIndex > 0; --commandBufferIndex )
 			{
 				assert( previousCommandBuffers != nullptr );
-				const CommandBufferImpl* previousCommandBuffer = previousCommandBuffers[ commandBufferIndex - 1 ];
+				const CommandBuffer* previousCommandBuffer = previousCommandBuffers[ commandBufferIndex - 1 ];
+				assert( previousCommandBuffer != nullptr );
+				const TrackedBufferState* trackedBuffers = previousCommandBuffer->GetTrackedBuffers();
+				for( uint32_t bufferIndex = 0; bufferIndex < previousCommandBuffer->GetTrackedBufferCount(); ++bufferIndex )
+				{
+					if( trackedBuffers[ bufferIndex ].handle_ == buffer )
+					{
+						return trackedBuffers[ bufferIndex ].currentState_;
+					}
+				}
+			}
+
+			return manager_->GetBufferResource( buffer ).currentState_;
+		};
+
+		const auto getCurrentTextureState = [ this, previousCommandBuffers, previousCommandBufferCount ]( TextureHandle texture )
+		{
+			for( uint32_t commandBufferIndex = previousCommandBufferCount; commandBufferIndex > 0; --commandBufferIndex )
+			{
+				assert( previousCommandBuffers != nullptr );
+				const CommandBuffer* previousCommandBuffer = previousCommandBuffers[ commandBufferIndex - 1 ];
 				assert( previousCommandBuffer != nullptr );
 				const TrackedTextureState* trackedTextures = previousCommandBuffer->GetTrackedTextures();
 				for( uint32_t textureIndex = 0; textureIndex < previousCommandBuffer->GetTrackedTextureCount(); ++textureIndex )
@@ -370,43 +447,57 @@ namespace ldx12
 			return manager_->GetTextureResource( texture ).currentState_;
 		};
 
-		bool requiresFixup = false;
-		for( uint32_t index = 0; index < trackedTextureCount_; ++index )
+		std::array<D3D12_RESOURCE_BARRIER, ourMaxTrackedBuffersPerCommandBuffer + ourMaxTrackedTexturesPerCommandBuffer> barriers{};
+		uint32_t barrierCount = 0;
+
+		for( uint32_t index = 0; index < trackedBufferCount_; ++index )
 		{
-			const TrackedTextureState& trackedTexture = trackedTextures_[ index ];
-			if( getCurrentState( trackedTexture.handle_ ) != trackedTexture.initialState_ )
+			const TrackedBufferState& trackedBuffer = trackedBuffers_[ index ];
+			const D3D12_RESOURCE_STATES currentState = getCurrentBufferState( trackedBuffer.handle_ );
+			if( currentState == trackedBuffer.initialState_ )
 			{
-				requiresFixup = true;
-				break;
+				continue;
 			}
-		}
 
-		if( !requiresFixup )
-		{
-			return nullptr;
+			const BufferResource& resource = manager_->GetBufferResource( trackedBuffer.handle_ );
+			barriers[ barrierCount++ ] =
+				CD3DX12_RESOURCE_BARRIER::Transition( resource.resource_.Get(), currentState, trackedBuffer.initialState_ );
 		}
-
-		CommandListWrapper& fixup = manager_->GetGraphicsQueueContext().immediateCommands_->Acquire();
 
 		for( uint32_t index = 0; index < trackedTextureCount_; ++index )
 		{
 			const TrackedTextureState& trackedTexture = trackedTextures_[ index ];
-			const TextureResource& resource = manager_->GetTextureResource( trackedTexture.handle_ );
-			const D3D12_RESOURCE_STATES currentState = getCurrentState( trackedTexture.handle_ );
+			const D3D12_RESOURCE_STATES currentState = getCurrentTextureState( trackedTexture.handle_ );
 			if( currentState == trackedTexture.initialState_ )
 			{
 				continue;
 			}
 
-			const D3D12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition( resource.resource_.Get(), currentState, trackedTexture.initialState_ );
-			fixup.commandList_->ResourceBarrier( 1, &barrier );
+			const TextureResource& resource = manager_->GetTextureResource( trackedTexture.handle_ );
+			barriers[ barrierCount++ ] =
+				CD3DX12_RESOURCE_BARRIER::Transition( resource.resource_.Get(), currentState, trackedTexture.initialState_ );
 		}
+
+		if( barrierCount == 0 )
+		{
+			return nullptr;
+		}
+
+		CommandListWrapper& fixup = manager_->GetGraphicsQueueContext().immediateCommands_->Acquire();
+		fixup.commandList_->ResourceBarrier( barrierCount, barriers.data() );
 
 		return &fixup;
 	}
 
-	void CommandBufferImpl::CommitSubmittedTextureStates()
+	void CommandBuffer::CommitSubmittedResourceStates()
 	{
+		for( uint32_t index = 0; index < trackedBufferCount_; ++index )
+		{
+			const TrackedBufferState& trackedBuffer = trackedBuffers_[ index ];
+			BufferResource& resource = manager_->GetBufferResource( trackedBuffer.handle_ );
+			resource.currentState_ = trackedBuffer.currentState_;
+		}
+
 		for( uint32_t index = 0; index < trackedTextureCount_; ++index )
 		{
 			const TrackedTextureState& trackedTexture = trackedTextures_[ index ];
@@ -415,7 +506,35 @@ namespace ldx12
 		}
 	}
 
-	void CommandBufferImpl::CmdBeginRendering( const RenderPass& renderPass, const Framebuffer& framebuffer )
+	void CommandBuffer::ValidateRenderPipelineFramebuffer( const RenderPipelineState& pipeline ) const noexcept
+	{
+		if( manager_ == nullptr || !manager_->desc_.enableDebugLayer || !isRendering_ )
+		{
+			return;
+		}
+
+		char message[ 256 ]{};
+		for( uint32_t index = 0; index < ourMaxColorAttachments; ++index )
+		{
+			const DXGI_FORMAT pipelineFormat = pipeline.colorFormats_[ index ];
+			const DXGI_FORMAT framebufferFormat = framebufferColorFormats_[ index ];
+			if( pipelineFormat == framebufferFormat )
+			{
+				continue;
+			}
+
+			std::snprintf( message,
+				sizeof( message ),
+				"Ldx12 warning: render pipeline color[%u] format (%u) does not match the framebuffer texture format (%u). "
+				"Use RenderDevice::GetTextureFormat() when creating the pipeline.\n",
+				index,
+				static_cast<uint32_t>( pipelineFormat ),
+				static_cast<uint32_t>( framebufferFormat ) );
+			ReportValidationWarning( manager_->device_.Get(), message );
+		}
+	}
+
+	void CommandBuffer::CmdBeginRendering( const RenderPass& renderPass, const Framebuffer& framebuffer )
 	{
 		if( isRendering_ )
 		{
@@ -423,6 +542,7 @@ namespace ldx12
 		}
 
 		std::array<D3D12_RENDER_PASS_RENDER_TARGET_DESC, ourMaxColorAttachments> renderTargetDescs{};
+		std::array<DXGI_FORMAT, ourMaxColorAttachments> framebufferColorFormats{};
 		uint32_t numRenderTargets = 0;
 		uint32_t framebufferSampleCount = 0;
 
@@ -451,9 +571,12 @@ namespace ldx12
 
 			TransitionTexture( framebuffer.color[ index ].texture, colorTexture, D3D12_RESOURCE_STATE_RENDER_TARGET );
 
+			const DXGI_FORMAT colorFormat =
+				colorTexture.formats_.rtv_ != DXGI_FORMAT_UNKNOWN ? colorTexture.formats_.rtv_ : colorTexture.format_;
+			framebufferColorFormats[ numRenderTargets ] = colorFormat;
 			renderTargetDescs[ numRenderTargets ].cpuDescriptor = colorTexture.rtvHandle_;
 			renderTargetDescs[ numRenderTargets ].BeginningAccess = CreateBeginningAccess( renderPass.color[ index ].loadOp,
-				colorTexture.formats_.rtv_ != DXGI_FORMAT_UNKNOWN ? colorTexture.formats_.rtv_ : colorTexture.format_,
+				colorFormat,
 				renderPass.color[ index ].clearColor );
 			renderTargetDescs[ numRenderTargets ].EndingAccess = CreateEndingAccess( renderPass.color[ index ].storeOp );
 			numRenderTargets++;
@@ -485,21 +608,35 @@ namespace ldx12
 
 			TransitionTexture( framebuffer.depthStencil.texture, depthTexture, D3D12_RESOURCE_STATE_DEPTH_WRITE );
 
+			const DXGI_FORMAT depthStencilFormat =
+				depthTexture.formats_.dsv_ != DXGI_FORMAT_UNKNOWN ? depthTexture.formats_.dsv_ : depthTexture.format_;
+
 			depthStencilDesc.cpuDescriptor = depthTexture.dsvHandle_;
-			depthStencilDesc.DepthBeginningAccess =
-				depthTexture.isDepthFormat_ ? CreateDepthBeginningAccess( renderPass.depthStencil.depthLoadOp,
-												  depthTexture.formats_.dsv_ != DXGI_FORMAT_UNKNOWN ? depthTexture.formats_.dsv_ : depthTexture.format_,
-												  renderPass.depthStencil.clearDepth )
-											: CreateNoAccessBeginningAccess();
-			depthStencilDesc.DepthEndingAccess =
-				depthTexture.isDepthFormat_ ? CreateEndingAccess( renderPass.depthStencil.depthStoreOp ) : CreateNoAccessEndingAccess();
-			depthStencilDesc.StencilBeginningAccess =
-				depthTexture.isStencilFormat_ ? CreateStencilBeginningAccess( renderPass.depthStencil.stencilLoadOp,
-													depthTexture.formats_.dsv_ != DXGI_FORMAT_UNKNOWN ? depthTexture.formats_.dsv_ : depthTexture.format_,
-													renderPass.depthStencil.clearStencil )
-											  : CreateNoAccessBeginningAccess();
-			depthStencilDesc.StencilEndingAccess =
-				depthTexture.isStencilFormat_ ? CreateEndingAccess( renderPass.depthStencil.stencilStoreOp ) : CreateNoAccessEndingAccess();
+			depthStencilDesc.DepthBeginningAccess = CreateNoAccessBeginningAccess();
+			depthStencilDesc.DepthEndingAccess = CreateNoAccessEndingAccess();
+			depthStencilDesc.StencilBeginningAccess = CreateNoAccessBeginningAccess();
+			depthStencilDesc.StencilEndingAccess = CreateNoAccessEndingAccess();
+
+			if( depthTexture.isDepthFormat_ )
+			{
+				depthStencilDesc.DepthBeginningAccess =
+					CreateDepthBeginningAccess( renderPass.depthStencil.depthLoadOp,
+						depthStencilFormat,
+						renderPass.depthStencil.clearDepth );
+				depthStencilDesc.DepthEndingAccess =
+					CreateEndingAccess( renderPass.depthStencil.depthStoreOp );
+			}
+
+			if( depthTexture.isStencilFormat_ )
+			{
+				depthStencilDesc.StencilBeginningAccess =
+					CreateStencilBeginningAccess( renderPass.depthStencil.stencilLoadOp,
+						depthStencilFormat,
+						renderPass.depthStencil.clearStencil );
+				depthStencilDesc.StencilEndingAccess =
+					CreateEndingAccess( renderPass.depthStencil.stencilStoreOp );
+			}
+
 			depthStencilDescPtr = &depthStencilDesc;
 
 			if( viewportTexture == nullptr )
@@ -513,6 +650,8 @@ namespace ldx12
 			throw std::runtime_error( "Framebuffer does not contain any attachments." );
 		}
 
+		framebufferColorFormats_ = framebufferColorFormats;
+
 		wrapper_->commandList_->BeginRenderPass( numRenderTargets,
 			numRenderTargets > 0 ? renderTargetDescs.data() : nullptr,
 			depthStencilDescPtr,
@@ -523,7 +662,7 @@ namespace ldx12
 		isRendering_ = true;
 	}
 
-	void CommandBufferImpl::CmdEndRendering()
+	void CommandBuffer::CmdEndRendering()
 	{
 		if( !isRendering_ )
 		{
@@ -532,9 +671,10 @@ namespace ldx12
 
 		wrapper_->commandList_->EndRenderPass();
 		isRendering_ = false;
+		framebufferColorFormats_ = {};
 	}
 
-	void CommandBufferImpl::CmdSetViewport( float x, float y, float width, float height, float minDepth, float maxDepth )
+	void CommandBuffer::CmdSetViewport( float x, float y, float width, float height, float minDepth, float maxDepth )
 	{
 		assert( width >= 0.0f && height >= 0.0f );
 		assert( minDepth >= 0.0f && minDepth <= maxDepth && maxDepth <= 1.0f );
@@ -543,7 +683,7 @@ namespace ldx12
 		wrapper_->commandList_->RSSetViewports( 1, &viewport );
 	}
 
-	void CommandBufferImpl::CmdSetScissor( int32_t left, int32_t top, int32_t right, int32_t bottom )
+	void CommandBuffer::CmdSetScissor( int32_t left, int32_t top, int32_t right, int32_t bottom )
 	{
 		assert( right >= left && bottom >= top );
 
@@ -551,13 +691,34 @@ namespace ldx12
 		wrapper_->commandList_->RSSetScissorRects( 1, &scissor );
 	}
 
-	void CommandBufferImpl::CmdTransitionTexture( TextureHandle texture, D3D12_RESOURCE_STATES newState )
+	void CommandBuffer::CmdTransitionBuffer( BufferHandle buffer, D3D12_RESOURCE_STATES newState )
+	{
+		BufferResource& resource = manager_->GetBufferResource( buffer );
+		if( ( newState & D3D12_RESOURCE_STATE_UNORDERED_ACCESS ) != 0 && resource.uavIndex_ == UINT32_MAX )
+		{
+			throw std::runtime_error( "CmdTransitionBuffer requires an unordered-access buffer for the UAV state." );
+		}
+		TransitionBuffer( buffer, resource, newState );
+	}
+
+	void CommandBuffer::CmdUavBarrier( BufferHandle buffer )
+	{
+		const BufferResource& resource = manager_->GetBufferResource( buffer );
+		if( resource.uavIndex_ == UINT32_MAX )
+		{
+			throw std::runtime_error( "CmdUavBarrier requires an unordered-access buffer." );
+		}
+		const D3D12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::UAV( resource.resource_.Get() );
+		wrapper_->commandList_->ResourceBarrier( 1, &barrier );
+	}
+
+	void CommandBuffer::CmdTransitionTexture( TextureHandle texture, D3D12_RESOURCE_STATES newState )
 	{
 		TextureResource& resource = manager_->GetTextureResource( texture );
 		TransitionTexture( texture, resource, newState );
 	}
 
-	void CommandBufferImpl::CmdResolveTexture( TextureHandle source, TextureHandle destination )
+	void CommandBuffer::CmdResolveTexture( TextureHandle source, TextureHandle destination )
 	{
 		if( isRendering_ )
 		{
@@ -592,18 +753,19 @@ namespace ldx12
 		wrapper_->commandList_->ResolveSubresource( destinationResource.resource_.Get(), 0, sourceResource.resource_.Get(), 0, sourceResource.format_ );
 	}
 
-	void CommandBufferImpl::CmdBindRenderPipeline( const RenderPipelineState& pipeline )
+	void CommandBuffer::CmdBindRenderPipeline( const RenderPipelineState& pipeline )
 	{
 		wrapper_->commandList_->SetPipelineState( pipeline.pipelineState_.Get() );
 		wrapper_->commandList_->IASetPrimitiveTopology( pipeline.topology_ );
+		ValidateRenderPipelineFramebuffer( pipeline );
 	}
 
-	void CommandBufferImpl::CmdBindComputePipeline( const ComputePipelineState& pipeline )
+	void CommandBuffer::CmdBindComputePipeline( const ComputePipelineState& pipeline )
 	{
 		wrapper_->commandList_->SetPipelineState( pipeline.pipelineState_.Get() );
 	}
 
-	void CommandBufferImpl::CmdBindVertexBuffer( BufferHandle buffer, uint32_t stride, uint32_t offset, uint32_t slot )
+	void CommandBuffer::CmdBindVertexBuffer( BufferHandle buffer, uint32_t stride, uint32_t offset, uint32_t slot )
 	{
 		const BufferResource& resource = manager_->GetBufferResource( buffer );
 		if( resource.type_ != BufferType::Vertex )
@@ -620,7 +782,7 @@ namespace ldx12
 		wrapper_->commandList_->IASetVertexBuffers( slot, 1, &view );
 	}
 
-	void CommandBufferImpl::CmdBindIndexBuffer( BufferHandle buffer, DXGI_FORMAT format, uint32_t offset )
+	void CommandBuffer::CmdBindIndexBuffer( BufferHandle buffer, DXGI_FORMAT format, uint32_t offset )
 	{
 		const BufferResource& resource = manager_->GetBufferResource( buffer );
 		if( resource.type_ != BufferType::Index )
@@ -637,7 +799,7 @@ namespace ldx12
 		wrapper_->commandList_->IASetIndexBuffer( &view );
 	}
 
-	void CommandBufferImpl::CmdPushConstants( const void* data, uint32_t sizeBytes, uint32_t offset32BitValues )
+	void CommandBuffer::CmdPushConstants( const void* data, uint32_t sizeBytes, uint32_t offset32BitValues )
 	{
 		if( sizeBytes == 0 )
 		{
@@ -662,7 +824,7 @@ namespace ldx12
 		wrapper_->commandList_->SetComputeRoot32BitConstants( 0, valueCount, data, offset32BitValues );
 	}
 
-	void CommandBufferImpl::CmdPushDebugGroupLabel( const char* label, uint32_t color )
+	void CommandBuffer::CmdPushDebugGroupLabel( const char* label, uint32_t color )
 	{
 		if( label != nullptr && label[ 0 ] != '\0' )
 		{
@@ -675,7 +837,7 @@ namespace ldx12
 		}
 	}
 
-	void CommandBufferImpl::CmdPopDebugGroupLabel()
+	void CommandBuffer::CmdPopDebugGroupLabel()
 	{
 		if( debugGroupDepth_ > 0 )
 		{
@@ -686,17 +848,17 @@ namespace ldx12
 		}
 	}
 
-	void CommandBufferImpl::CmdDraw( uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance )
+	void CommandBuffer::CmdDraw( uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance )
 	{
 		wrapper_->commandList_->DrawInstanced( vertexCount, instanceCount, firstVertex, firstInstance );
 	}
 
-	void CommandBufferImpl::CmdDrawIndexed( uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex, int32_t vertexOffset, uint32_t firstInstance )
+	void CommandBuffer::CmdDrawIndexed( uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex, int32_t vertexOffset, uint32_t firstInstance )
 	{
 		wrapper_->commandList_->DrawIndexedInstanced( indexCount, instanceCount, firstIndex, vertexOffset, firstInstance );
 	}
 
-	void CommandBufferImpl::CmdDrawIndexedIndirect( BufferHandle indirectBuffer, uint32_t drawCount, uint64_t byteOffset )
+	void CommandBuffer::CmdDrawIndexedIndirect( BufferHandle indirectBuffer, uint32_t drawCount, uint64_t byteOffset )
 	{
 		const BufferResource& resource = manager_->GetBufferResource( indirectBuffer );
 		if( resource.type_ != BufferType::Indirect )
@@ -712,12 +874,12 @@ namespace ldx12
 		wrapper_->commandList_->ExecuteIndirect( manager_->commandSignature_.Get(), drawCount, resource.resource_.Get(), byteOffset, nullptr, 0 );
 	}
 
-	void CommandBufferImpl::CmdDispatch( uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ )
+	void CommandBuffer::CmdDispatch( uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ )
 	{
 		wrapper_->commandList_->Dispatch( groupCountX, groupCountY, groupCountZ );
 	}
 
-	ID3D12GraphicsCommandList* CommandBufferImpl::GetNativeGraphicsCommandList()
+	ID3D12GraphicsCommandList* CommandBuffer::GetNativeGraphicsCommandList()
 	{
 		return wrapper_->commandList_.Get();
 	}

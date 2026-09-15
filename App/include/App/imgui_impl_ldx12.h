@@ -17,7 +17,7 @@ struct ImGui_ImplLdx12_InitInfo
 IMGUI_IMPL_API bool ImGui_ImplLdx12_Init( const ImGui_ImplLdx12_InitInfo& info );
 IMGUI_IMPL_API void ImGui_ImplLdx12_Shutdown();
 IMGUI_IMPL_API void ImGui_ImplLdx12_NewFrame();
-IMGUI_IMPL_API void ImGui_ImplLdx12_RenderDrawData( ImDrawData* drawData, ldx12::ICommandBuffer& commandBuffer );
+IMGUI_IMPL_API void ImGui_ImplLdx12_RenderDrawData( ImDrawData* drawData, ldx12::CommandBuffer& commandBuffer );
 IMGUI_IMPL_API ImTextureRef ImGui_ImplLdx12_Texture( ldx12::TextureHandle texture );
 
 namespace ImGui

@@ -16,7 +16,7 @@ namespace App
 		ImGuiLayer& operator=( const ImGuiLayer& ) = delete;
 
 		void NewFrame();
-		void Render( ldx12::ICommandBuffer& commandBuffer );
+		void Render( ldx12::CommandBuffer& commandBuffer );
 		static bool HandleMessage( HWND window, UINT message, WPARAM wParam, LPARAM lParam );
 
 	private:

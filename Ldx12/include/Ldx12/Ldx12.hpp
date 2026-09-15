@@ -8,6 +8,7 @@
 #include <memory>
 #include <string>
 #include <string_view>
+#include <type_traits>
 
 #ifndef WIN32_LEAN_AND_MEAN
 	#define WIN32_LEAN_AND_MEAN
@@ -37,6 +38,7 @@ namespace ldx12
 	static constexpr uint32_t ourMaxActiveCommandBuffers = 64;
 	static constexpr uint32_t ourMaxCommandBufferBatch = 4;
 	static constexpr uint32_t ourMaxImmediateCommandBuffers = ourMaxActiveCommandBuffers + ourMaxCommandBufferBatch;
+	static constexpr uint32_t ourMaxTrackedBuffersPerCommandBuffer = 256;
 	static constexpr uint32_t ourMaxTrackedTexturesPerCommandBuffer = 256;
 	static constexpr uint32_t ourMaxPushConstant32BitValues = 63;
 	static constexpr uint32_t ourCubeMapFaceCount = 6;
@@ -45,12 +47,14 @@ namespace ldx12
 	static constexpr uint32_t ourMaxSamplers = LDX12_SAMPLER_COUNT;
 
 	struct BufferResource;
+	struct CommandListWrapper;
 	struct SamplerResource;
 	struct TextureResource;
 	struct SwapchainResource;
 	class BaseMips;
-	class CommandBufferImpl;
+	class CommandBuffer;
 	class D3D12Native;
+	class DeviceManager;
 	class ImmediateCommands;
 	class StagingDevice;
 	class Swapchain;
@@ -217,7 +221,8 @@ namespace ldx12
 	{
 		RenderPipelineDesc() noexcept;
 
-		std::array<RenderPipelineColorAttachmentDesc, ourMaxColorAttachments> color = {};
+		std::array<RenderPipelineColorAttachmentDesc, ourMaxColorAttachments> color = { RenderPipelineColorAttachmentDesc{
+			DXGI_FORMAT_R8G8B8A8_UNORM } };
 		std::array<VertexInputElementDesc, ourMaxVertexInputElements> inputElements = {};
 		ShaderStageSource vertexShader = {};
 		ShaderStageSource fragmentShader = {};
@@ -226,6 +231,7 @@ namespace ldx12
 		D3D12_DEPTH_STENCIL_DESC depthStencilState = {};
 		D3D12_PRIMITIVE_TOPOLOGY_TYPE primitiveType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 		D3D_PRIMITIVE_TOPOLOGY topology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+		[[deprecated( "Use color[0].format. colorFormat will be removed in Ldx12 0.4.0." )]]
 		DXGI_FORMAT colorFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
 		DXGI_FORMAT depthFormat = DXGI_FORMAT_UNKNOWN;
 		uint32_t sampleCount = 1;
@@ -261,6 +267,7 @@ namespace ldx12
 		BufferType type = BufferType::Generic;
 		BufferMemory memory = BufferMemory::GpuLocal;
 		const void* initialData = nullptr;
+		bool unorderedAccess = false;
 	};
 
 	enum class TextureUsage : uint32_t
@@ -413,8 +420,10 @@ namespace ldx12
 		D3D12_RESOURCE_DESC desc_ = {};
 		BufferMemory memory_ = BufferMemory::GpuLocal;
 		D3D12_CPU_DESCRIPTOR_HANDLE srvHandle_{ 0 };
+		D3D12_CPU_DESCRIPTOR_HANDLE uavHandle_{ 0 };
 		D3D12_CPU_DESCRIPTOR_HANDLE cbvHandle_{ 0 };
 		uint32_t srvIndex_ = UINT32_MAX;
+		uint32_t uavIndex_ = UINT32_MAX;
 		uint32_t cbvIndex_ = UINT32_MAX;
 		void* mappedPtr_ = nullptr;
 	};
@@ -508,10 +517,11 @@ namespace ldx12
 	private:
 		friend class Context;
 		friend class RenderDevice;
-		friend class CommandBufferImpl;
+		friend class CommandBuffer;
 
 		ComPtr<ID3D12PipelineState> pipelineState_;
 		D3D_PRIMITIVE_TOPOLOGY topology_ = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+		std::array<DXGI_FORMAT, ourMaxColorAttachments> colorFormats_ = {};
 	};
 
 	class ComputePipelineState
@@ -529,48 +539,125 @@ namespace ldx12
 	private:
 		friend class Context;
 		friend class RenderDevice;
-		friend class CommandBufferImpl;
+		friend class CommandBuffer;
 
 		ComPtr<ID3D12PipelineState> pipelineState_;
 	};
 
-	class ICommandBuffer
+	class CommandBuffer final
 	{
 	public:
-		virtual ~ICommandBuffer() = default;
+		CommandBuffer( const CommandBuffer& ) = delete;
+		CommandBuffer& operator=( const CommandBuffer& ) = delete;
 
-		virtual void CmdBeginRendering( const RenderPass& renderPass, const Framebuffer& framebuffer ) = 0;
-		virtual void CmdEndRendering() = 0;
-		virtual void CmdSetViewport( float x, float y, float width, float height, float minDepth = 0.0f, float maxDepth = 1.0f ) = 0;
-		virtual void CmdSetScissor( int32_t left, int32_t top, int32_t right, int32_t bottom ) = 0;
-		virtual void CmdTransitionTexture( TextureHandle texture, D3D12_RESOURCE_STATES newState ) = 0;
-		virtual void CmdResolveTexture( TextureHandle source, TextureHandle destination ) = 0;
-		virtual void CmdBindRenderPipeline( const RenderPipelineState& pipeline ) = 0;
-		virtual void CmdBindComputePipeline( const ComputePipelineState& pipeline ) = 0;
-		virtual void CmdBindVertexBuffer( BufferHandle buffer, uint32_t stride = 0, uint32_t offset = 0, uint32_t slot = 0 ) = 0;
-		virtual void CmdBindIndexBuffer( BufferHandle buffer, DXGI_FORMAT format = DXGI_FORMAT_R32_UINT, uint32_t offset = 0 ) = 0;
-		virtual void CmdPushConstants( const void* data, uint32_t sizeBytes, uint32_t offset32BitValues = 0 ) = 0;
-		virtual void CmdPushDebugGroupLabel( const char* label, uint32_t color ) = 0;
-		virtual void CmdPopDebugGroupLabel() = 0;
-		virtual void CmdDraw( uint32_t vertexCount, uint32_t instanceCount = 1, uint32_t firstVertex = 0, uint32_t firstInstance = 0 ) = 0;
-		virtual void CmdDrawIndexed( uint32_t indexCount,
-			uint32_t instanceCount = 1,
-			uint32_t firstIndex = 0,
-			int32_t vertexOffset = 0,
-			uint32_t firstInstance = 0 ) = 0;
-		virtual void CmdDrawIndexedIndirect( BufferHandle indirectBuffer, uint32_t drawCount, uint64_t byteOffset = 0 ) = 0;
-		virtual void CmdDispatch( uint32_t groupCountX, uint32_t groupCountY = 1, uint32_t groupCountZ = 1 ) = 0;
+		void CmdBeginRendering( const RenderPass& renderPass, const Framebuffer& framebuffer );
+		void CmdEndRendering();
+		void CmdSetViewport( float x, float y, float width, float height, float minDepth = 0.0f, float maxDepth = 1.0f );
+		void CmdSetScissor( int32_t left, int32_t top, int32_t right, int32_t bottom );
+		void CmdTransitionBuffer( BufferHandle buffer, D3D12_RESOURCE_STATES newState );
+		void CmdUavBarrier( BufferHandle buffer );
+		void CmdTransitionTexture( TextureHandle texture, D3D12_RESOURCE_STATES newState );
+		void CmdResolveTexture( TextureHandle source, TextureHandle destination );
+		void CmdBindRenderPipeline( const RenderPipelineState& pipeline );
+		void CmdBindComputePipeline( const ComputePipelineState& pipeline );
+		void CmdBindVertexBuffer( BufferHandle buffer, uint32_t stride = 0, uint32_t offset = 0, uint32_t slot = 0 );
+		void CmdBindIndexBuffer( BufferHandle buffer, DXGI_FORMAT format = DXGI_FORMAT_R32_UINT, uint32_t offset = 0 );
+		void CmdPushConstants( const void* data, uint32_t sizeBytes, uint32_t offset32BitValues = 0 );
+
+		template<typename T>
+		void CmdPushConstants( const T& data )
+		{
+			static_assert( !std::is_pointer_v<T>, "Pass the object directly, not a pointer." );
+			static_assert( sizeof( T ) <= ourMaxPushConstant32BitValues * sizeof( uint32_t ), "Push constants cannot exceed 63 32-bit values (252 bytes)." );
+			CmdPushConstants( &data, static_cast<uint32_t>( sizeof( data ) ) );
+		}
+
+		void CmdPushDebugGroupLabel( const char* label, uint32_t color );
+		void CmdPopDebugGroupLabel();
+		void CmdDraw( uint32_t vertexCount, uint32_t instanceCount = 1, uint32_t firstVertex = 0, uint32_t firstInstance = 0 );
+		void CmdDrawIndexed( uint32_t indexCount, uint32_t instanceCount = 1, uint32_t firstIndex = 0, int32_t vertexOffset = 0, uint32_t firstInstance = 0 );
+		void CmdDrawIndexedIndirect( BufferHandle indirectBuffer, uint32_t drawCount, uint64_t byteOffset = 0 );
+		void CmdDispatch( uint32_t groupCountX, uint32_t groupCountY = 1, uint32_t groupCountZ = 1 );
 
 	private:
 		friend class D3D12Native;
+		friend class ImmediateCommands;
+		friend SubmitHandle SubmitCommandBufferBatch( DeviceManager& manager,
+			CommandBuffer* const* commandBuffers,
+			uint32_t commandBufferCount,
+			TextureHandle presentTexture );
 
-		virtual ID3D12GraphicsCommandList* GetNativeGraphicsCommandList() = 0;
+		CommandBuffer() = default;
+
+		struct TrackedBufferState final
+		{
+			BufferHandle handle_ = {};
+			D3D12_RESOURCE_STATES initialState_ = D3D12_RESOURCE_STATE_COMMON;
+			D3D12_RESOURCE_STATES currentState_ = D3D12_RESOURCE_STATE_COMMON;
+		};
+
+		struct TrackedTextureState final
+		{
+			TextureHandle handle_ = {};
+			D3D12_RESOURCE_STATES initialState_ = D3D12_RESOURCE_STATE_COMMON;
+			D3D12_RESOURCE_STATES currentState_ = D3D12_RESOURCE_STATE_COMMON;
+		};
+
+		void Begin( DeviceManager& manager, CommandListWrapper& wrapper ) noexcept;
+		void Release() noexcept;
+		CommandListWrapper& Wrapper() noexcept
+		{
+			return *wrapper_;
+		}
+		bool IsActive() const noexcept
+		{
+			return active_;
+		}
+		bool IsRendering() const noexcept
+		{
+			return isRendering_;
+		}
+		const TrackedBufferState* GetTrackedBuffers() const noexcept
+		{
+			return trackedBuffers_.data();
+		}
+		uint32_t GetTrackedBufferCount() const noexcept
+		{
+			return trackedBufferCount_;
+		}
+		const TrackedTextureState* GetTrackedTextures() const noexcept
+		{
+			return trackedTextures_.data();
+		}
+		uint32_t GetTrackedTextureCount() const noexcept
+		{
+			return trackedTextureCount_;
+		}
+		ID3D12GraphicsCommandList* GetNativeGraphicsCommandList();
+		TrackedBufferState& GetTrackedBufferState( BufferHandle buffer );
+		TrackedTextureState& GetTrackedTextureState( TextureHandle texture );
+		void TransitionBuffer( BufferHandle buffer, BufferResource& resource, D3D12_RESOURCE_STATES newState );
+		void TransitionTexture( TextureHandle texture, TextureResource& resource, D3D12_RESOURCE_STATES newState );
+		void ValidateRenderPipelineFramebuffer( const RenderPipelineState& pipeline ) const noexcept;
+		CommandListWrapper* BuildSubmitFixup( CommandBuffer* const* previousCommandBuffers = nullptr, uint32_t previousCommandBufferCount = 0 );
+		void CommitSubmittedResourceStates();
+
+		DeviceManager* manager_ = nullptr;
+		CommandListWrapper* wrapper_ = nullptr;
+		bool isRendering_ = false;
+		bool active_ = false;
+		uint32_t debugGroupDepth_ = 0;
+		std::array<DXGI_FORMAT, ourMaxColorAttachments> framebufferColorFormats_ = {};
+		std::array<TrackedBufferState, ourMaxTrackedBuffersPerCommandBuffer> trackedBuffers_ = {};
+		uint32_t trackedBufferCount_ = 0;
+		std::array<TrackedTextureState, ourMaxTrackedTexturesPerCommandBuffer> trackedTextures_ = {};
+		uint32_t trackedTextureCount_ = 0;
 	};
 
 	class ScopedCommandDebugGroup final
 	{
 	public:
-		ScopedCommandDebugGroup( ICommandBuffer& commandBuffer, std::string label, uint32_t color = 0xff4cc9f0u )
+		ScopedCommandDebugGroup( CommandBuffer& commandBuffer, std::string label, uint32_t color = 0xff4cc9f0u )
 			: commandBuffer_( &commandBuffer ), label_( std::move( label ) ), active_( !label_.empty() )
 		{
 			if( active_ )
@@ -579,7 +666,7 @@ namespace ldx12
 			}
 		}
 
-		ScopedCommandDebugGroup( ICommandBuffer& commandBuffer, const char* label, uint32_t color = 0xff4cc9f0u )
+		ScopedCommandDebugGroup( CommandBuffer& commandBuffer, const char* label, uint32_t color = 0xff4cc9f0u )
 			: ScopedCommandDebugGroup( commandBuffer, label != nullptr ? std::string( label ) : std::string{}, color )
 		{
 		}
@@ -596,24 +683,24 @@ namespace ldx12
 		ScopedCommandDebugGroup& operator=( const ScopedCommandDebugGroup& ) = delete;
 
 	private:
-		ICommandBuffer* commandBuffer_ = nullptr;
+		CommandBuffer* commandBuffer_ = nullptr;
 		std::string label_;
 		bool active_ = false;
 	};
 
-	class DeviceManager;
-
 	class RenderDevice
 	{
 	public:
-		ICommandBuffer& AcquireCommandBuffer();
+		CommandBuffer& AcquireCommandBuffer();
+		// Abandons an active recording and immediately returns its slot to the pool.
+		void Discard( CommandBuffer& commandBuffer ) const;
 		TextureHandle GetCurrentSwapchainTexture( SwapchainHandle swapchain = {} ) const;
 		// Submits commandBuffers[0..commandBufferCount) in array order as one queue batch.
 		// If presentTexture is valid, the last command buffer transitions and presents it.
-		SubmitHandle SubmitBatch( ICommandBuffer* const* commandBuffers, uint32_t commandBufferCount, TextureHandle presentTexture = {} ) const;
-		SubmitHandle Submit( ICommandBuffer& buffer, TextureHandle presentTexture );
-		SubmitHandle Submit( ICommandBuffer& buffer ) const;
-		SubmitHandle SubmitAndPresent( ICommandBuffer& buffer, SwapchainHandle swapchain );
+		SubmitHandle SubmitBatch( CommandBuffer* const* commandBuffers, uint32_t commandBufferCount, TextureHandle presentTexture = {} ) const;
+		SubmitHandle Submit( CommandBuffer& buffer, TextureHandle presentTexture );
+		SubmitHandle Submit( CommandBuffer& buffer ) const;
+		SubmitHandle SubmitAndPresent( CommandBuffer& buffer, SwapchainHandle swapchain );
 		void Present( SwapchainHandle swapchain ) const;
 		bool IsReady( SubmitHandle submission ) const;
 		void Wait( SubmitHandle submission ) const;
@@ -632,8 +719,10 @@ namespace ldx12
 		ReadWriteResourceSlot GetAvailableReadWriteResource();
 		uint32_t GetConstantBufferIndex( BufferHandle buffer ) const;
 		uint32_t GetBindlessIndex( BufferHandle buffer ) const;
+		uint32_t GetUnorderedAccessIndex( BufferHandle buffer ) const;
 		uint32_t GetBindlessIndex( TextureHandle texture ) const;
 		uint32_t GetUnorderedAccessIndex( TextureHandle texture ) const;
+		DXGI_FORMAT GetTextureFormat( TextureHandle texture ) const;
 		uint32_t GetSamplerIndex( SamplerHandle sampler ) const;
 		bool SupportsSampleCount( DXGI_FORMAT format, uint32_t sampleCount ) const noexcept;
 		[[nodiscard]] D3D12Native GetNative() noexcept;
@@ -642,6 +731,9 @@ namespace ldx12
 		bool IsAlive( TextureHandle texture ) const noexcept;
 		bool IsAlive( SamplerHandle sampler ) const noexcept;
 		void WaitIdle();
+		// Submit or discard every command buffer that may use a resource before destroying it.
+		// A successful Destroy invalidates the CPU handle immediately and retires its GPU data
+		// and descriptors after submissions issued before this call have completed.
 		bool Destroy( BufferHandle buffer );
 		bool Destroy( TextureHandle texture );
 		bool Destroy( SamplerHandle sampler );
@@ -698,9 +790,13 @@ namespace ldx12
 
 		struct DeferredRelease final
 		{
+			// CPU cleanup on exception; defined internally, independent of GPU retirement.
+			template <typename Function> class OnFailure;
+
 			SubmitHandle handle_;
 			std::function<void()> release_;
 		};
+		friend struct DeferredReleaseTestAccess;
 
 		struct QueueContext final
 		{
@@ -754,11 +850,13 @@ namespace ldx12
 		uint32_t AllocateBindlessDescriptor();
 		uint32_t AllocateBindlessDescriptorRange( uint32_t count );
 		uint32_t AllocateFixedBindlessDescriptor( uint32_t index );
+		uint32_t AllocateSamplerDescriptor();
 		uint32_t AllocateRtvDescriptor();
 		uint32_t AllocateDsvDescriptor();
 		void FreeBindlessDescriptor( uint32_t index );
 		void FreeBindlessDescriptorRange( uint32_t index, uint32_t count );
 		void EraseFreeBindlessRange( uint32_t rangeIndex ) noexcept;
+		void FreeSamplerDescriptor( uint32_t index ) noexcept;
 		void FreeRtvDescriptor( uint32_t index );
 		void FreeDsvDescriptor( uint32_t index );
 		BufferResource& GetBufferResource( BufferHandle handle );
@@ -770,6 +868,7 @@ namespace ldx12
 		void ProcessDeferredReleases( QueueContext& context );
 		void WaitForQueueIdle();
 		void WaitForQueueIdle( QueueContext& context );
+		void WaitForQueueIdleNoThrow( QueueContext& context ) noexcept;
 		void Shutdown() noexcept;
 		void ReportLiveObjects() noexcept;
 		void CreateCommittedTextureResource( const TextureDesc& desc, TextureResource& resource );
@@ -783,11 +882,11 @@ namespace ldx12
 		friend class RenderDevice;
 		friend class D3D12Native;
 		friend class BaseMips;
-		friend class CommandBufferImpl;
+		friend class CommandBuffer;
 		friend class StagingDevice;
 		friend class Swapchain;
 		friend SubmitHandle SubmitCommandBufferBatch( DeviceManager& manager,
-			ICommandBuffer* const* commandBuffers,
+			CommandBuffer* const* commandBuffers,
 			uint32_t commandBufferCount,
 			TextureHandle presentTexture );
 
@@ -807,9 +906,11 @@ namespace ldx12
 		uint32_t dsvDescriptorSize_ = 0;
 		std::array<DescriptorRange, ourMaxBindlessDescriptors> freeBindlessRanges_ = {};
 		std::array<uint8_t, LDX12_BINDLESS_DYNAMIC_SLOT_FIRST> fixedBindlessDescriptorUsed_ = {};
+		std::array<uint32_t, ourCustomSamplerCount> freeSamplerDescriptors_ = {};
 		std::array<uint32_t, ourMaxRtvDescriptors> freeRtvDescriptors_ = {};
 		std::array<uint32_t, ourMaxDsvDescriptors> freeDsvDescriptors_ = {};
 		uint32_t freeBindlessRangeCount_ = 0;
+		uint32_t freeSamplerCount_ = 0;
 		uint32_t freeRtvDescriptorCount_ = 0;
 		uint32_t freeDsvDescriptorCount_ = 0;
 		ComPtr<ID3D12RootSignature> rootSignature_;

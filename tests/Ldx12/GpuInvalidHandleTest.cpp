@@ -57,6 +57,8 @@ namespace ldx12::tests
 			"A replacement texture did not reuse the slot with a new generation." );
 		Require( !device.Destroy( staleTexture ), "A stale texture handle destroyed its replacement." );
 		Require( device.IsAlive( replacementTexture ), "A stale texture operation invalidated the replacement." );
+		RequireThrows<std::runtime_error>( [ &device, staleTexture ] { static_cast<void>( device.GetTextureFormat( staleTexture ) ); },
+			"A stale texture handle was accepted by GetTextureFormat." );
 		RequireThrows<std::runtime_error>( [ &native, staleTexture ] { static_cast<void>( native.GetResource( staleTexture ) ); },
 			"A stale texture handle was accepted by a resource query." );
 

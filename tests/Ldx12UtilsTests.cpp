@@ -14,7 +14,7 @@ namespace
 {
 	void RenderFrame( RenderDevice& device, DebugRenderer& debugRenderer, const World& world, const Camera& camera, TextureHandle color, TextureHandle depth )
 	{
-		ICommandBuffer& commands = device.AcquireCommandBuffer();
+		CommandBuffer& commands = device.AcquireCommandBuffer();
 		RenderPass renderPass{};
 		renderPass.color[ 0 ].loadOp = LoadOp::Clear;
 		renderPass.depthStencil.depthLoadOp = LoadOp::Clear;

@@ -1,6 +1,11 @@
 #include "TestTemplate.hpp"
+#include "Ldx12/Ldx12Native.hpp"
 
 #include <array>
+#include <string_view>
+#include <vector>
+
+#include <d3d12sdklayers.h>
 
 namespace ldx12::tests
 {
@@ -86,7 +91,7 @@ float4 PSMain(float4 position : SV_Position) : SV_Target0
 		pipelineDesc.vertexShader.entryPoint = "VSMain";
 		pipelineDesc.fragmentShader.source = pixelShader;
 		pipelineDesc.fragmentShader.entryPoint = "PSMain";
-		pipelineDesc.colorFormat = targetDesc.format;
+		pipelineDesc.color[ 0 ].format = device.GetTextureFormat( target );
 		pipelineDesc.depthFormat = DXGI_FORMAT_UNKNOWN;
 		pipelineDesc.depthStencilState.DepthEnable = FALSE;
 		pipelineDesc.depthStencilState.StencilEnable = FALSE;
@@ -100,7 +105,7 @@ float4 PSMain(float4 position : SV_Position) : SV_Target0
 		Framebuffer framebuffer{};
 		framebuffer.color[ 0 ].texture = target;
 
-		ICommandBuffer& commands = device.AcquireCommandBuffer();
+		CommandBuffer& commands = device.AcquireCommandBuffer();
 		commands.CmdBeginRendering( renderPass, framebuffer );
 		commands.CmdBindRenderPipeline( pipeline );
 		commands.CmdPushConstants( constants.data(), sizeof( constants ) );
@@ -114,6 +119,38 @@ float4 PSMain(float4 position : SV_Position) : SV_Target0
 		Require( result[ 0 ] == 0u && result[ 1 ] == 255u && result[ 2 ] == 0u && result[ 3 ] == 255u,
 			"Texture2DArray SRV did not sample the requested array slice." );
 		Require( result[ 4 ] == 255u && result[ 5 ] == 0u && result[ 6 ] == 0u && result[ 7 ] == 255u, "TextureCube SRV did not sample the +X face." );
+
+		ComPtr<ID3D12InfoQueue> infoQueue;
+		device.GetNative().GetDevice()->QueryInterface( IID_PPV_ARGS( infoQueue.GetAddressOf() ) );
+		const UINT64 firstValidationMessage = infoQueue != nullptr ? infoQueue->GetNumStoredMessages() : 0;
+
+		RenderPipelineDesc mismatchedPipelineDesc = pipelineDesc;
+		mismatchedPipelineDesc.color[ 0 ].format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+		RenderPipelineState mismatchedPipeline = device.CreateRenderPipeline( mismatchedPipelineDesc );
+		CommandBuffer& validationCommands = device.AcquireCommandBuffer();
+		validationCommands.CmdBeginRendering( renderPass, framebuffer );
+		validationCommands.CmdBindRenderPipeline( mismatchedPipeline );
+		validationCommands.CmdEndRendering();
+		device.Discard( validationCommands );
+
+		if( infoQueue != nullptr )
+		{
+			bool foundFormatWarning = false;
+			for( UINT64 index = firstValidationMessage; index < infoQueue->GetNumStoredMessages(); ++index )
+			{
+				SIZE_T messageSize = 0;
+				infoQueue->GetMessage( index, nullptr, &messageSize );
+				std::vector<uint8_t> storage( messageSize );
+				D3D12_MESSAGE* message = reinterpret_cast<D3D12_MESSAGE*>( storage.data() );
+				if( SUCCEEDED( infoQueue->GetMessage( index, message, &messageSize ) ) && message->pDescription != nullptr &&
+					std::string_view( message->pDescription ).find( "Ldx12 warning: render pipeline color[0] format" ) != std::string_view::npos )
+				{
+					foundFormatWarning = true;
+					break;
+				}
+			}
+			Require( foundFormatWarning, "Binding a pipeline with a mismatched color format did not report an Ldx12 warning." );
+		}
 
 		device.Destroy( target );
 		device.Destroy( cubeTexture );

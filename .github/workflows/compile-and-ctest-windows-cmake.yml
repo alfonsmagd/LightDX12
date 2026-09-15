@@ -69,13 +69,14 @@ jobs:
           $engineChanged = Test-PathChange @(
               "Ldx12/*",
               "CMakeLists.txt",
-              "cmake/Ldx12BaseMipsShader.hpp.in",
+              "cmake/*",
               "GenerateSolution.bat",
               ".github/workflows/compile-and-ctest-windows-cmake.yml"
           )
           $testsChanged = Test-PathChange @(
               "tests/Ldx12/*",
               "tests/Ldx12Tests.cpp",
+              "tests/Ldx12NativeImportTests.cpp",
               "tests/Ldx12StressTests.cpp",
               "tests/Ldx12FrameStressTests.cpp",
               "tests/Ldx12CommandStreamStressTests.cpp",
@@ -91,7 +92,7 @@ jobs:
               "Utils/Ldx12/*"
           )
           $cmakeChanged = Test-PathChange @(
-              "cmake/Ldx12Config.cmake.in",
+              "cmake/*",
               "examples/InstalledLdx12/*",
               "Utils/Ldx12/CMakeLists.txt",
               "tests/cmake/*"
@@ -101,9 +102,16 @@ jobs:
               "tests/nuget/*",
               "LICENSE*"
           )
-          $utilsChanged = Test-PathChange @(
-              "Utils/Ldx12/*",
-              "tests/Ldx12UtilsTests.cpp"
+            $utilsChanged = Test-PathChange @(
+                "Utils/Ldx12/*",
+                "third_party/cgltf/*",
+                "media/gltf/*",
+                "media/gltfMesh/*",
+                "media/pbr/*",
+                "samples/GltfScene/*",
+                "tests/Ldx12GltfTests.cpp",
+                "tests/Ldx12GltfMaterialTests.cpp",
+                "tests/Ldx12UtilsTests.cpp"
           )
 
           "engine=$($engineChanged.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
@@ -136,7 +144,7 @@ jobs:
           -DLDX12_INSTALL=OFF
 
       - name: Build core tests
-        run: cmake --build build-core-tests --config Debug --target Ldx12Tests Ldx12StressTests Ldx12FrameStressTests Ldx12CommandStreamStressTests Ldx12FullCapacityTests --parallel
+        run: cmake --build build-core-tests --config Debug --parallel
 
       - name: Run core tests
         run: ctest --test-dir build-core-tests -C Debug --output-on-failure
@@ -236,10 +244,10 @@ jobs:
           -DLDX12_INSTALL=OFF
 
       - name: Build Utils tests
-        run: cmake --build build-utils-tests --config Debug --target Ldx12UtilsTests --parallel
+        run: cmake --build build-utils-tests --config Debug --target Ldx12UtilsTests Ldx12GltfTests Ldx12GltfMaterialTests --parallel
 
       - name: Run Utils tests
-        run: ctest --test-dir build-utils-tests -C Debug -R "^Ldx12UtilsTests$" --output-on-failure
+        run: ctest --test-dir build-utils-tests -C Debug -R "^Ldx12(Utils|Gltf|GltfMaterial)Tests$" --output-on-failure
 
   nuget-package:
     name: NuGet Package and VS2022 Consumer
@@ -266,7 +274,7 @@ jobs:
           if ( $env:GITHUB_REF_TYPE -eq "tag" ) {
               $version = $env:GITHUB_REF_NAME -replace '^v', ''
           } else {
-              $version = "0.2.0-ci.$env:GITHUB_RUN_NUMBER"
+              $version = "0.3.0-ci.$env:GITHUB_RUN_NUMBER"
           }
 
           ./nuget/Pack.ps1 -Version $version -NuGetExe ( Get-Command nuget.exe ).Source

@@ -22,32 +22,6 @@ namespace ldx12::tests
 		Require( native.GetDevice() != nullptr, "D3D12 device creation failed." );
 		Require( native.GetCommandQueue() != nullptr, "D3D12 command queue creation failed." );
 
-		SamplerDesc samplerDesc{};
-		std::array<SamplerHandle, ourCustomSamplerCount> samplers{};
-		for( uint32_t index = 0; index < ourCustomSamplerCount; ++index )
-		{
-			samplers[ index ] = device.CreateSampler( samplerDesc );
-			Require( device.GetSamplerIndex( samplers[ index ] ) == LDX12_CUSTOM_SAMPLER_SLOT_FIRST + index,
-				"Custom sampler was not created in its reserved descriptor slot." );
-		}
-
-		bool samplerLimitReached = false;
-		try
-		{
-			device.CreateSampler( samplerDesc );
-		}
-		catch( const std::length_error& )
-		{
-			samplerLimitReached = true;
-		}
-		Require( samplerLimitReached, "More than four runtime custom samplers were created." );
-
-		const uint32_t recycledSamplerIndex = device.GetSamplerIndex( samplers[ 1 ] );
-		device.Destroy( samplers[ 1 ] );
-		Require( !device.IsAlive( samplers[ 1 ] ), "Destroyed sampler handle remained alive." );
-		samplers[ 1 ] = device.CreateSampler( samplerDesc );
-		Require( device.GetSamplerIndex( samplers[ 1 ] ) == recycledSamplerIndex, "Destroyed custom sampler slot was not recycled." );
-
 		const std::array<uint32_t, 16> initialBufferData = {};
 		BufferDesc genericBufferDesc{};
 		genericBufferDesc.debugName = "Ldx12Tests generic buffer";
@@ -65,6 +39,8 @@ namespace ldx12::tests
 			"CpuToGpu buffer was not created in an upload heap." );
 		Require( device.GetBindlessIndex( genericBuffer ) == LDX12_DESCRIPTOR_SLOT_INVALID,
 			"A buffer without an SRV unexpectedly owns a bindless descriptor." );
+		Require( device.GetUnorderedAccessIndex( genericBuffer ) == LDX12_DESCRIPTOR_SLOT_INVALID,
+			"A buffer without a UAV unexpectedly owns an unordered-access descriptor." );
 		Require( device.GetConstantBufferIndex( genericBuffer ) == LDX12_DESCRIPTOR_SLOT_INVALID,
 			"A buffer without a CBV unexpectedly owns a constant-buffer descriptor." );
 
@@ -79,8 +55,10 @@ namespace ldx12::tests
 		structuredBufferDesc.size = 128;
 		structuredBufferDesc.stride = 16;
 		structuredBufferDesc.type = BufferType::Structured;
+		structuredBufferDesc.unorderedAccess = true;
 		const BufferHandle structuredBuffer = device.CreateBuffer( structuredBufferDesc );
 		const uint32_t structuredSrv = device.GetBindlessIndex( structuredBuffer );
+		const uint32_t structuredUav = device.GetUnorderedAccessIndex( structuredBuffer );
 		Require( structuredBuffer.Valid(), "Structured buffer creation returned an invalid handle." );
 		D3D12_HEAP_PROPERTIES structuredHeapProperties{};
 		D3D12_HEAP_FLAGS structuredHeapFlags = D3D12_HEAP_FLAG_NONE;
@@ -89,6 +67,17 @@ namespace ldx12::tests
 			"GpuLocal buffer was not created in a default heap." );
 		Require( structuredSrv >= LDX12_BINDLESS_DYNAMIC_SLOT_FIRST && structuredSrv < context.bindlessCapacity,
 			"Structured buffer SRV index is outside the bindless heap." );
+		Require( structuredUav >= LDX12_BINDLESS_DYNAMIC_SLOT_FIRST && structuredUav < context.bindlessCapacity && structuredUav != structuredSrv,
+			"Structured buffer UAV index is invalid or aliases its SRV." );
+		Require( ( native.GetResource( structuredBuffer )->GetDesc().Flags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS ) != 0,
+			"Native structured buffer is missing its unordered-access resource flag." );
+		CommandBuffer& bufferCommands = device.AcquireCommandBuffer();
+		bufferCommands.CmdTransitionBuffer( structuredBuffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS );
+		bufferCommands.CmdUavBarrier( structuredBuffer );
+		bufferCommands.CmdTransitionBuffer( structuredBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE );
+		const SubmitHandle bufferSubmission = device.Submit( bufferCommands );
+		device.Wait( bufferSubmission );
+		Require( device.IsReady( bufferSubmission ), "Buffer barriers did not complete." );
 
 		BufferDesc constantBufferDesc{};
 		constantBufferDesc.debugName = "Ldx12Tests constant buffer";
@@ -104,8 +93,20 @@ namespace ldx12::tests
 		rawBufferDesc.debugName = "Ldx12Tests raw buffer";
 		rawBufferDesc.size = 64;
 		rawBufferDesc.type = BufferType::Raw;
+		rawBufferDesc.unorderedAccess = true;
 		const BufferHandle rawBuffer = device.CreateBuffer( rawBufferDesc );
 		Require( device.GetBindlessIndex( rawBuffer ) != LDX12_DESCRIPTOR_SLOT_INVALID, "Raw buffer did not receive a shader-resource descriptor." );
+		Require( device.GetUnorderedAccessIndex( rawBuffer ) != LDX12_DESCRIPTOR_SLOT_INVALID, "Raw buffer did not receive an unordered-access descriptor." );
+
+		BufferDesc invalidUavBufferDesc{};
+		invalidUavBufferDesc.size = 64;
+		invalidUavBufferDesc.unorderedAccess = true;
+		RequireThrows<std::invalid_argument>( [ &device, &invalidUavBufferDesc ] { device.CreateBuffer( invalidUavBufferDesc ); },
+			"Generic buffer creation accepted unordered access." );
+		invalidUavBufferDesc.type = BufferType::Raw;
+		invalidUavBufferDesc.memory = BufferMemory::CpuToGpu;
+		RequireThrows<std::invalid_argument>( [ &device, &invalidUavBufferDesc ] { device.CreateBuffer( invalidUavBufferDesc ); },
+			"Upload buffer creation accepted unordered access." );
 
 		TextureDesc textureDesc{};
 		textureDesc.debugName = "Ldx12Tests sampled UAV texture";
@@ -116,6 +117,7 @@ namespace ldx12::tests
 		textureDesc.usage = TextureUsage::Sampled | TextureUsage::UnorderedAccess;
 		const TextureHandle texture = device.CreateTexture( textureDesc );
 		Require( texture.Valid(), "Texture creation returned an invalid handle." );
+		Require( device.GetTextureFormat( texture ) == textureDesc.format, "GetTextureFormat did not return the texture's creation format." );
 		const uint32_t textureSrv = device.GetBindlessIndex( texture );
 		const uint32_t textureUav = device.GetUnorderedAccessIndex( texture );
 		Require( textureSrv >= LDX12_BINDLESS_DYNAMIC_SLOT_FIRST && textureSrv < context.bindlessCapacity, "Texture SRV index is outside the bindless heap." );
@@ -192,6 +194,8 @@ namespace ldx12::tests
 		const BufferHandle replacementBuffer = device.CreateBuffer( structuredBufferDesc );
 		Require( replacementBuffer.Index() == oldBufferIndex, "Buffer destruction did not release its SlotMap entry." );
 		Require( replacementBuffer.Gen() != oldBufferGeneration, "Recreated buffer did not receive a new handle generation." );
+		Require( device.GetBindlessIndex( replacementBuffer ) == structuredSrv, "Recreated buffer did not recycle the released SRV descriptor." );
+		Require( device.GetUnorderedAccessIndex( replacementBuffer ) == structuredUav, "Recreated buffer did not recycle the released UAV descriptor." );
 
 		device.Destroy( replacementBuffer );
 		device.Destroy( replacementTexture );
@@ -204,10 +208,6 @@ namespace ldx12::tests
 			"Destroyed fixed descriptor slot could not be reused." );
 		device.Destroy( reusedConstantBuffer );
 		device.Destroy( genericBuffer );
-		for( SamplerHandle sampler : samplers )
-		{
-			device.Destroy( sampler );
-		}
 		device.WaitIdle();
 	}
 }

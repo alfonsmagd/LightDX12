@@ -170,7 +170,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 				framebuffer.color[ 0 ].texture = backbuffer;
 				framebuffer.depthStencil.texture = depthTarget.GetTexture();
 
-				ICommandBuffer& commands = device.AcquireCommandBuffer();
+				CommandBuffer& commands = device.AcquireCommandBuffer();
 				commands.CmdBeginRendering( renderPass, framebuffer );
 				commands.CmdPushConstants( &constants, sizeof( constants ) );
 
