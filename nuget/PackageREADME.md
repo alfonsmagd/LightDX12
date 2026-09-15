@@ -1,6 +1,6 @@
-![Ldx12](https://raw.githubusercontent.com/alfonsmagd/LightDX12/v0.3.0/nuget/Ldx12Banner.png)
+![Ldx12](https://raw.githubusercontent.com/alfonsmagd/LightDX12/v0.3.1/nuget/Ldx12Banner.png)
 
-# Ldx12 0.3.0
+# Ldx12 0.3.1
 
 **Prototype Direct3D 12 bindless renderers quickly with a compact C++20 API.**
 
@@ -13,7 +13,7 @@ It is intended for graphics experiments, tools and renderer prototypes rather th
 From the Visual Studio Package Manager Console:
 
 ```powershell
-Install-Package Ldx12 -Version 0.3.0
+Install-Package Ldx12 -Version 0.3.1
 ```
 
 The package configures include paths automatically and selects the correct x64 static libraries for Debug or Release.
@@ -88,7 +88,7 @@ float4 PSMain(float2 uv : TEXCOORD0) : SV_Target0
 
 Changing a resource means changing an index. Ldx12 owns the heaps and bindless root signature; the application still controls pipelines, commands and synchronization points.
 
-![Ldx12 bindless layout and root signature](https://raw.githubusercontent.com/alfonsmagd/LightDX12/v0.3.0/Ldx12/docs/images/bindless-layout.png)
+![Ldx12 bindless layout and root signature](https://raw.githubusercontent.com/alfonsmagd/LightDX12/v0.3.1/Ldx12/docs/images/bindless-layout.png)
 
 ## Multiple render targets in 0.3.0
 
@@ -180,5 +180,5 @@ Advanced integrations can include `Ldx12Native.hpp` to access borrowed native D3
 
 - [Source and full documentation](https://github.com/alfonsmagd/LightDX12)
 - [Samples](https://github.com/alfonsmagd/LightDX12/tree/v0.3.0/samples)
-- [Changelog](https://github.com/alfonsmagd/LightDX12/blob/v0.3.0/CHANGELOG.md)
-- [Third-party notices](https://github.com/alfonsmagd/LightDX12/blob/v0.3.0/THIRD_PARTY_NOTICES.md)
+- [Changelog](https://github.com/alfonsmagd/LightDX12/blob/v0.3.1/CHANGELOG.md)
+- [Third-party notices](https://github.com/alfonsmagd/LightDX12/blob/v0.3.1/THIRD_PARTY_NOTICES.md)

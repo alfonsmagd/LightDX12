@@ -60,7 +60,7 @@ target_link_libraries(Ldx12Utils
 )
 
 if(MSVC)
-    target_compile_options(Ldx12Utils PRIVATE /W4 /EHsc /permissive- /MP)
+    target_compile_options(Ldx12Utils PRIVATE /W4 /EHsc /permissive- /MP "$<$<CONFIG:Debug>:/Z7>")
 endif()
 
 if(NOT PROJECT_IS_TOP_LEVEL)

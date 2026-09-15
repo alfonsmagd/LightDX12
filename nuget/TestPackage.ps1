@@ -1,7 +1,9 @@
 [CmdletBinding()]
 param(
     [ValidatePattern( '^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$' )]
-    [string] $Version = '0.3.0-local',
+    [string] $Version = '0.3.1-local',
+    [ValidatePattern( '^\d+\.\d+\.\d+(?:\.\d+)?$' )]
+    [string] $MsvcToolsetVersion = '14.38.33130',
     [string] $NuGetExe = ''
 )
 
@@ -20,6 +22,22 @@ function Invoke-Checked( [string] $Program, [string[]] $Arguments )
     if( $LASTEXITCODE -ne 0 )
     {
         throw "Command failed with exit code $LASTEXITCODE`: $Program $($Arguments -join ' ')"
+    }
+}
+
+function Invoke-MSBuildWithoutMissingPdbWarnings( [string] $Program, [string[]] $Arguments )
+{
+    $output = & $Program @Arguments 2>&1
+    $exitCode = $LASTEXITCODE
+    $output | ForEach-Object { Write-Host $_ }
+
+    if( $exitCode -ne 0 )
+    {
+        throw "Command failed with exit code $exitCode`: $Program $($Arguments -join ' ')"
+    }
+    if( $output | Select-String -Quiet -SimpleMatch 'LNK4099' )
+    {
+        throw 'The NuGet consumer emitted LNK4099 because a packaged static library depends on a missing compiler PDB.'
     }
 }
 
@@ -72,12 +90,13 @@ if( -not ( Test-Path -LiteralPath $extractedPackage -PathType Container ) )
 
 foreach( $configuration in @( 'Debug', 'Release' ) )
 {
-    Invoke-Checked $msbuild @(
+    Invoke-MSBuildWithoutMissingPdbWarnings $msbuild @(
         $testProject,
         '/m',
         '/t:Rebuild',
         "/p:Configuration=$configuration",
         '/p:Platform=x64',
+        "/p:VCToolsVersion=$MsvcToolsetVersion",
         "/p:Ldx12ExtractedPackageRoot=$extractedPackage",
         '/verbosity:minimal'
     )
