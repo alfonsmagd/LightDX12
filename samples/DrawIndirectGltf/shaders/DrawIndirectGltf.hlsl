@@ -273,7 +273,10 @@ float4 PSMain(VertexOutput input, bool frontFace : SV_IsFrontFace) : SV_Target0
     float3 emission = material.emissive * ReadTexture(material.emissiveTexture, input.uv, 1.xxxx).rgb;
 
     float3 color = GetIBLRadianceContributionGGX(pbr) + GetIBLRadianceLambertian(pbr);
-    color += CalculatePBRLightContribution(pbr, normalize(float3(0, 0, -5) - input.worldPosition), 1.xxx);
+    // Keep the direction toward the light fixed in world space.
+    const float3 directionToLight = normalize( float3( -0.4, 1.0, -0.6 ) );
+
+    color += CalculatePBRLightContribution( pbr, directionToLight, 1.xxx );
     color *= occlusion < 0.01 ? 1 : occlusion;
     color += emission;
 
