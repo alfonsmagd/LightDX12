@@ -1,9 +1,11 @@
 #include "Ldx12/HLSLLoader.hpp"
 #include "Ldx12/Ldx12.hpp"
 #include "Ldx12Utils/AppLdx.hpp"
+#include "../CubeTexture.hpp"
 
 #include <DirectXMath.h>
 
+#include <array>
 #include <chrono>
 #include <cstdint>
 #include <exception>
@@ -17,9 +19,12 @@ namespace
 	struct alignas( 16 ) PushConstants
 	{
 		XMFLOAT4X4 mvp;
+		uint32_t textureIndex = 0;
+		uint32_t samplerIndex = 0;
+		std::array<uint32_t, 2> padding{};
 	};
 
-	static_assert( sizeof( PushConstants ) == 64 );
+	static_assert( sizeof( PushConstants ) == 80 );
 
 	struct GraphicsState
 	{
@@ -87,6 +92,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		RenderDevice& device = *gfx.deviceManager->GetRenderDevice();
 		gfx.solidPipeline = CreatePipeline( device, contextDesc.swapchainFormat, "VSMainSolid", D3D12_FILL_MODE_SOLID );
 		gfx.wireframePipeline = CreatePipeline( device, contextDesc.swapchainFormat, "VSMainWireframe", D3D12_FILL_MODE_WIREFRAME );
+		const TextureHandle cubeTexture = samples::LoadCubeTexture( device );
 
 		const std::chrono::steady_clock::time_point animationStart = std::chrono::steady_clock::now();
 		while( app.PumpMessages() )
@@ -99,14 +105,16 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 
 			const float animationTime = std::chrono::duration<float>( std::chrono::steady_clock::now() - animationStart ).count();
 			const float aspectRatio = static_cast<float>( gfx.deviceManager->GetWidth() ) / static_cast<float>( gfx.deviceManager->GetHeight() );
-			const PushConstants constants = BuildPushConstants( animationTime, aspectRatio );
+			PushConstants constants = BuildPushConstants( animationTime, aspectRatio );
+			constants.textureIndex = device.GetBindlessIndex( cubeTexture );
+			constants.samplerIndex = ToSamplerIndex( SamplerSlot::LinearClamp );
 
 			CommandBuffer& commands = device.AcquireCommandBuffer();
 			const TextureHandle backbuffer = device.GetCurrentSwapchainTexture();
 
 			RenderPass renderPass{};
 			renderPass.color[ 0 ].loadOp = LoadOp::Clear;
-			renderPass.color[ 0 ].clearColor = { 1.0f, 1.0f, 1.0f, 1.0f };
+			renderPass.color[ 0 ].clearColor = { 0.40f, 0.40f, 0.40f, 1.0f };
 
 			Framebuffer framebuffer{};
 			framebuffer.color[ 0 ].texture = backbuffer;
@@ -127,6 +135,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		}
 
 		gfx.deviceManager->WaitIdle();
+		device.Destroy( cubeTexture );
 		gfx.solidPipeline = {};
 		gfx.wireframePipeline = {};
 		DeviceManager::ShutdownSingleton();

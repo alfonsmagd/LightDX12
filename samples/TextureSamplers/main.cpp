@@ -122,7 +122,7 @@ float4 PSMain(PixelInput input) : SV_Target0
 
 		RenderPass renderPass{};
 		renderPass.color[ 0 ].loadOp = LoadOp::Clear;
-		renderPass.color[ 0 ].clearColor = { 0.025f, 0.03f, 0.045f, 1.0f };
+		renderPass.color[ 0 ].clearColor = { 0.40f, 0.40f, 0.40f, 1.0f };
 		Framebuffer framebuffer{};
 		framebuffer.color[ 0 ].texture = backBuffer;
 

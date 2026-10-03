@@ -1,7 +1,7 @@
 #include "Ldx12/Ldx12.hpp"
 #include "Ldx12Utils/AppLdx.hpp"
 #include "Ldx12Utils/Geometry.hpp"
-#include "Ldx12Utils/TextureLoader.hpp"
+#include "../CubeTexture.hpp"
 
 #include <DirectXMath.h>
 
@@ -141,7 +141,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 
 		RenderDevice& device = *gfx.deviceManager->GetRenderDevice();
 		gfx.pipeline = CreatePipeline( device );
-		gfx.texture = utils::CreateCheckerTexture( device, 0xffa0a0a0u, 0xff101010u );
+		gfx.texture = samples::LoadCubeTexture( device );
 		gfx.cube = utils::CreateCube( device );
 
 		const std::chrono::steady_clock::time_point animationStart = std::chrono::steady_clock::now();
@@ -160,7 +160,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 
 			RenderPass renderPass{};
 			renderPass.color[ 0 ].loadOp = LoadOp::Clear;
-			renderPass.color[ 0 ].clearColor = { 0.12f, 0.12f, 0.14f, 1.0f };
+			renderPass.color[ 0 ].clearColor = { 0.40f, 0.40f, 0.40f, 1.0f };
 			Framebuffer framebuffer{};
 			framebuffer.color[ 0 ].texture = backbuffer;
 

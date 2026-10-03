@@ -3,6 +3,7 @@
 #include "Ldx12/Ldx12.hpp"
 #include "Ldx12Utils/AppLdx.hpp"
 #include "Ldx12Utils/Geometry.hpp"
+#include "../CubeTexture.hpp"
 
 #include "imgui.h"
 #include "backends/imgui_impl_win32.h"
@@ -30,6 +31,8 @@ namespace
 	{
 		XMFLOAT4X4 modelViewProjection = {};
 		XMFLOAT4 color = {};
+		uint32_t textureIndex = 0;
+		uint32_t samplerIndex = 0;
 	};
 
 	struct Cube
@@ -57,6 +60,9 @@ namespace
 		desc.depthFormat = DXGI_FORMAT_D32_FLOAT;
 		desc.inputElements[ 0 ].semanticName = "POSITION";
 		desc.inputElements[ 0 ].format = DXGI_FORMAT_R32G32B32_FLOAT;
+		desc.inputElements[ 1 ].semanticName = "TEXCOORD";
+		desc.inputElements[ 1 ].format = DXGI_FORMAT_R32G32_FLOAT;
+		desc.inputElements[ 1 ].alignedByteOffset = sizeof( XMFLOAT3 ) * 2;
 		desc.rasterizerState.CullMode = D3D12_CULL_MODE_BACK;
 		desc.rasterizerState.FrontCounterClockwise = TRUE;
 		desc.depthStencilState.DepthEnable = TRUE;
@@ -76,6 +82,9 @@ namespace
 		desc.depthFormat = DXGI_FORMAT_D32_FLOAT;
 		desc.inputElements[ 0 ].semanticName = "POSITION";
 		desc.inputElements[ 0 ].format = DXGI_FORMAT_R32G32B32_FLOAT;
+		desc.inputElements[ 1 ].semanticName = "TEXCOORD";
+		desc.inputElements[ 1 ].format = DXGI_FORMAT_R32G32_FLOAT;
+		desc.inputElements[ 1 ].alignedByteOffset = sizeof( XMFLOAT3 ) * 2;
 		desc.rasterizerState.CullMode = D3D12_CULL_MODE_BACK;
 		desc.rasterizerState.FrontCounterClockwise = TRUE;
 		desc.depthStencilState.DepthEnable = TRUE;
@@ -115,7 +124,8 @@ namespace
 		const RenderPipelineState& pipeline,
 		const utils::GeometryBuffers& cubeGeometry,
 		const XMMATRIX& viewProjection,
-		float time )
+		float time,
+		uint32_t textureIndex )
 	{
 		commands.CmdBindRenderPipeline( pipeline );
 		commands.CmdBindVertexBuffer( cubeGeometry.vertexBuffer );
@@ -123,7 +133,9 @@ namespace
 
 		for( const Cube& cube : ourCubes )
 		{
-			const PushConstants constants = BuildConstants( cube, viewProjection, time );
+			PushConstants constants = BuildConstants( cube, viewProjection, time );
+			constants.textureIndex = textureIndex;
+			constants.samplerIndex = ToSamplerIndex( SamplerSlot::LinearClamp );
 			commands.CmdPushConstants( constants );
 			commands.CmdDrawIndexed( cubeGeometry.indexCount );
 		}
@@ -170,6 +182,8 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		RenderPipelineState depthPipeline = CreateDepthPipeline( device );
 		RenderPipelineState colorPipeline = CreateColorPipeline( device );
 		utils::GeometryBuffers cubeGeometry = utils::CreateCube( device );
+		const TextureHandle cubeTexture = samples::LoadCubeTexture( device );
+		const uint32_t cubeTextureIndex = device.GetBindlessIndex( cubeTexture );
 		uint32_t depthWidth = manager.GetWidth();
 		uint32_t depthHeight = manager.GetHeight();
 		TextureHandle depthTarget = CreateDepthTarget( device, depthWidth, depthHeight );
@@ -225,7 +239,6 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 
 			ImGui_ImplLdx12_NewFrame();
 			ImGui_ImplWin32_NewFrame();
-	
 
 			CommandBuffer& commands = device.AcquireCommandBuffer();
 
@@ -238,14 +251,14 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 			//Depth pass
 			{
 				commands.CmdBeginRendering( depthPass, depthFramebuffer );
-				DrawCubes( commands, depthPipeline, cubeGeometry, viewProjection, time );
+				DrawCubes( commands, depthPipeline, cubeGeometry, viewProjection, time, cubeTextureIndex );
 				commands.CmdEndRendering();
 			}
 
 			const TextureHandle backbuffer = device.GetCurrentSwapchainTexture();
 			RenderPass colorPass{};
 			colorPass.color[ 0 ].loadOp = LoadOp::Clear;
-			colorPass.color[ 0 ].clearColor = { 0.025f, 0.03f, 0.045f, 1.0f };
+			colorPass.color[ 0 ].clearColor = { 0.40f, 0.40f, 0.40f, 1.0f };
 			colorPass.depthStencil.depthLoadOp = LoadOp::Load;
 			Framebuffer colorFramebuffer{};
 			colorFramebuffer.color[ 0 ].texture = backbuffer;
@@ -253,7 +266,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 
 			{ //Color pass
 				commands.CmdBeginRendering( colorPass, colorFramebuffer );
-				DrawCubes( commands, colorPipeline, cubeGeometry, viewProjection, time );
+				DrawCubes( commands, colorPipeline, cubeGeometry, viewProjection, time, cubeTextureIndex );
 				commands.CmdEndRendering();
 			}
 
@@ -292,6 +305,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 
 		device.Destroy( depthTarget );
 
+		device.Destroy( cubeTexture );
 		utils::DestroyGeometry( device, cubeGeometry );
 		colorPipeline = {};
 		depthPipeline = {};

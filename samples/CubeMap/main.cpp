@@ -5,6 +5,7 @@
 #include "Ldx12Utils/Geometry.hpp"
 #include "Ldx12Utils/OrbitCamera.hpp"
 #include "Ldx12Utils/TextureLoader.hpp"
+#include "../CubeTexture.hpp"
 
 #include <DirectXMath.h>
 
@@ -27,7 +28,8 @@ namespace
 		XMFLOAT4 cameraPosition = {};
 		uint32_t cubeMapIndex = 0;
 		uint32_t samplerIndex = 0;
-		std::array<uint32_t, 2> padding = {};
+		uint32_t textureIndex = 0;
+		uint32_t useLogo = 0;
 	};
 
 	static_assert( sizeof( PushConstants ) == 224 );
@@ -45,6 +47,9 @@ namespace
 		desc.inputElements[ 1 ].semanticName = "NORMAL";
 		desc.inputElements[ 1 ].format = DXGI_FORMAT_R32G32B32_FLOAT;
 		desc.inputElements[ 1 ].alignedByteOffset = sizeof( XMFLOAT3 );
+		desc.inputElements[ 2 ].semanticName = "TEXCOORD";
+		desc.inputElements[ 2 ].format = DXGI_FORMAT_R32G32_FLOAT;
+		desc.inputElements[ 2 ].alignedByteOffset = sizeof( XMFLOAT3 ) * 2;
 		desc.rasterizerState.CullMode = D3D12_CULL_MODE_NONE;
 		desc.depthStencilState.DepthEnable = TRUE;
 		desc.depthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
@@ -127,6 +132,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		RenderPipelineState skyboxPipeline = CreateSkyboxPipeline( device, context.swapchainFormat );
 		const std::filesystem::path cubeMapDirectory = std::filesystem::path( LDX12_MEDIA_DIRECTORY ) / "sky_129_cubemap_2k";
 		const TextureHandle cubeMap = utils::LoadCubeMap( device, cubeMapDirectory );
+		const TextureHandle cubeTexture = samples::LoadCubeTexture( device );
 		utils::GeometryBuffers cube = utils::CreateCube( device );
 		utils::GeometryBuffers sphere = utils::CreateSphere( device );
 
@@ -156,13 +162,15 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 				depthTarget.Resize( width, height );
 
 				const float time = std::chrono::duration<float>( std::chrono::steady_clock::now() - animationStart ).count();
-				const PushConstants constants = BuildPushConstants( device, camera, cubeMap, width, height, time );
+				PushConstants constants = BuildPushConstants( device, camera, cubeMap, width, height, time );
+				constants.textureIndex = device.GetBindlessIndex( cubeTexture );
+				constants.useLogo = showSphere ? 0u : 1u;
 
 				const TextureHandle backbuffer = device.GetCurrentSwapchainTexture();
 
 				RenderPass renderPass{};
 				renderPass.color[ 0 ].loadOp = LoadOp::Clear;
-				renderPass.color[ 0 ].clearColor = { 0.02f, 0.025f, 0.04f, 1.0f };
+				renderPass.color[ 0 ].clearColor = { 0.40f, 0.40f, 0.40f, 1.0f };
 				renderPass.depthStencil.depthLoadOp = LoadOp::Clear;
 				renderPass.depthStencil.clearDepth = 1.0f;
 
@@ -192,6 +200,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		utils::DestroyGeometry( device, sphere );
 		utils::DestroyGeometry( device, cube );
 
+		device.Destroy( cubeTexture );
 		device.Destroy( cubeMap );
 		skyboxPipeline = {};
 		objectPipeline = {};

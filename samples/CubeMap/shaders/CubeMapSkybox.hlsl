@@ -41,5 +41,8 @@ float4 PSMain(VertexOutput input) : SV_Target0
 {
     TextureCube<float4> environment = ResourceDescriptorHeap[cubeMapIndex];
     SamplerState environmentSampler = SamplerDescriptorHeap[samplerIndex];
-    return environment.Sample(environmentSampler, input.direction);
+    const float3 skyColor = environment.Sample(environmentSampler, input.direction).rgb;
+    const float3 backgroundColor = lerp(float3(0.40, 0.40, 0.40), skyColor, 0.15);
+
+    return float4(backgroundColor, 1.0);
 }

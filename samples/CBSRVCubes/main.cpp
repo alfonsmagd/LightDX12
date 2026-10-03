@@ -2,6 +2,7 @@
 #include "Ldx12/HLSLLoader.hpp"
 #include "Ldx12Utils/AppLdx.hpp"
 #include "Ldx12Utils/DepthTarget.hpp"
+#include "../CubeTexture.hpp"
 
 #include <array>
 #include <chrono>
@@ -35,7 +36,8 @@ namespace
 	{
 		float aspectRatio = 1.0f;
 		float viewDistance = kViewDistance;
-		std::array<float, 2> padding = {};
+		uint32_t textureIndex = 0;
+		uint32_t samplerIndex = 0;
 		std::array<float, 4> lightDirection = { -0.35f, 0.8f, -0.45f, 0.0f };
 	};
 
@@ -62,6 +64,7 @@ namespace
 		RenderPipelineState pipeline;
 		BufferHandle sceneBuffer = {};
 		BufferHandle cubeBuffer = {};
+		TextureHandle cubeTexture = {};
 	};
 
 	constexpr std::array<std::array<float, 4>, 8> kCubeColors = { std::array<float, 4>{ 0.12f, 0.55f, 1.00f, 1.0f },
@@ -139,6 +142,7 @@ namespace
 		desc.color[ 0 ].format = colorFormat;
 		desc.depthFormat = depthFormat;
 		desc.rasterizerState.CullMode = D3D12_CULL_MODE_BACK;
+		desc.rasterizerState.FrontCounterClockwise = FALSE;
 		desc.depthStencilState.DepthEnable = TRUE;
 		desc.depthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
 		desc.depthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
@@ -159,6 +163,8 @@ namespace
 		}
 
 		SceneConstants scene{};
+		scene.textureIndex = device.GetBindlessIndex( gfx.cubeTexture );
+		scene.samplerIndex = ToSamplerIndex( SamplerSlot::LinearClamp );
 		scene.aspectRatio = static_cast<float>( gfx.deviceManager->GetWidth() ) / static_cast<float>( gfx.deviceManager->GetHeight() );
 		device.WriteBuffer( gfx.sceneBuffer, 0, &scene, sizeof( scene ) );
 	}
@@ -222,6 +228,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		app.SetDeviceManager( *gfx.deviceManager );
 		RenderDevice& device = *gfx.deviceManager->GetRenderDevice();
 		gfx.pipeline = CreatePipeline( device, contextDesc.swapchainFormat, DXGI_FORMAT_D32_FLOAT );
+		gfx.cubeTexture = samples::LoadCubeTexture( device );
 		{
 			utils::DepthTarget depthTarget( device );
 			const std::chrono::steady_clock::time_point animationStart = std::chrono::steady_clock::now();
@@ -243,7 +250,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 
 				RenderPass renderPass{};
 				renderPass.color[ 0 ].loadOp = LoadOp::Clear;
-				renderPass.color[ 0 ].clearColor = { 0.035f, 0.045f, 0.065f, 1.0f };
+				renderPass.color[ 0 ].clearColor = { 0.40f, 0.40f, 0.40f, 1.0f };
 				renderPass.depthStencil.depthLoadOp = LoadOp::Clear;
 				renderPass.depthStencil.clearDepth = 1.0f;
 
@@ -261,6 +268,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 			gfx.deviceManager->WaitIdle();
 		}
 
+		device.Destroy( gfx.cubeTexture );
 		DestroyBuffer( device, gfx.sceneBuffer );
 		DestroyBuffer( device, gfx.cubeBuffer );
 		gfx.pipeline = {};

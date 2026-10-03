@@ -2,6 +2,7 @@
 #include "Ldx12/HLSLLoader.hpp"
 #include "Ldx12Utils/AppLdx.hpp"
 #include "Ldx12Utils/DepthTarget.hpp"
+#include "../CubeTexture.hpp"
 
 #include <DirectXMath.h>
 
@@ -23,6 +24,7 @@ namespace
 		XMFLOAT3 position;
 		XMFLOAT3 normal;
 		uint32_t colorByteOffset = 0;
+		XMFLOAT2 uv{};
 	};
 
 	struct alignas( 16 ) SceneConstants
@@ -31,9 +33,12 @@ namespace
 		XMFLOAT4X4 model{};
 		std::array<float, 4> lightColor = { 1.0f, 1.0f, 1.0f, 1.0f };
 		XMFLOAT4 lightDirection{};
+		uint32_t textureIndex = 0;
+		uint32_t samplerIndex = 0;
+		std::array<uint32_t, 2> padding{};
 	};
 
-	static_assert( sizeof( SceneConstants ) == 160 );
+	static_assert( sizeof( SceneConstants ) == 176 );
 
 	// Clockwise faces with outward normals. Color offsets are assigned on the CPU.
 	const std::array<Vertex, 36> kCubeVertices = {
@@ -146,6 +151,10 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		pipelineDesc.inputElements[ 2 ].semanticName = "TEXCOORD";
 		pipelineDesc.inputElements[ 2 ].format = DXGI_FORMAT_R32_UINT;
 		pipelineDesc.inputElements[ 2 ].alignedByteOffset = offsetof( Vertex, colorByteOffset );
+		pipelineDesc.inputElements[ 3 ].semanticName = "TEXCOORD";
+		pipelineDesc.inputElements[ 3 ].semanticIndex = 1;
+		pipelineDesc.inputElements[ 3 ].format = DXGI_FORMAT_R32G32_FLOAT;
+		pipelineDesc.inputElements[ 3 ].alignedByteOffset = offsetof( Vertex, uv );
 		pipelineDesc.rasterizerState.CullMode = D3D12_CULL_MODE_BACK;
 		pipelineDesc.rasterizerState.FrontCounterClockwise = FALSE;
 		pipelineDesc.depthStencilState.DepthEnable = TRUE;
@@ -154,6 +163,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		pipelineDesc.depthStencilState.StencilEnable = FALSE;
 
 		RenderPipelineState pipeline = device.CreateRenderPipeline( pipelineDesc );
+		const TextureHandle cubeTexture = samples::LoadCubeTexture( device );
 
 		std::array<Vertex, 36> vertices = kCubeVertices;
 
@@ -161,7 +171,31 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		{
 			const uint32_t faceIndex = vertexIndex / 6;
 
-			vertices[ vertexIndex ].colorByteOffset = faceIndex * sizeof( kFaceColors[ 0 ] );
+			Vertex& vertex = vertices[ vertexIndex ];
+			vertex.colorByteOffset = faceIndex * sizeof( kFaceColors[ 0 ] );
+
+			// Orient the logo consistently on each outward-facing cube face.
+			switch( faceIndex )
+			{
+			case 0:
+				vertex.uv = { ( vertex.position.x + 1.0f ) * 0.5f, ( 1.0f - vertex.position.y ) * 0.5f };
+				break;
+			case 1:
+				vertex.uv = { ( 1.0f - vertex.position.x ) * 0.5f, ( 1.0f - vertex.position.y ) * 0.5f };
+				break;
+			case 2:
+				vertex.uv = { ( vertex.position.x + 1.0f ) * 0.5f, ( vertex.position.z + 1.0f ) * 0.5f };
+				break;
+			case 3:
+				vertex.uv = { ( vertex.position.x + 1.0f ) * 0.5f, ( 1.0f - vertex.position.z ) * 0.5f };
+				break;
+			case 4:
+				vertex.uv = { ( vertex.position.z + 1.0f ) * 0.5f, ( 1.0f - vertex.position.y ) * 0.5f };
+				break;
+			case 5:
+				vertex.uv = { ( 1.0f - vertex.position.z ) * 0.5f, ( 1.0f - vertex.position.y ) * 0.5f };
+				break;
+			}
 		}
 
 		BufferDesc vertexDesc{};
@@ -219,6 +253,8 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 				XMStoreFloat4x4( &scene.model, XMMatrixTranspose( model ) );
 				XMStoreFloat4( &scene.lightDirection, lightDirection );
 				scene.lightColor = { redGreen, redGreen, 1.0f, 1.0f };
+				scene.textureIndex = device.GetBindlessIndex( cubeTexture );
+				scene.samplerIndex = ToSamplerIndex( SamplerSlot::LinearClamp );
 
 				device.WriteBuffer( sceneBuffer, 0, &scene, sizeof( scene ) );
 				depthTarget.Resize( deviceManager.GetWidth(), deviceManager.GetHeight() );
@@ -228,7 +264,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 
 				RenderPass renderPass{};
 				renderPass.color[ 0 ].loadOp = LoadOp::Clear;
-				renderPass.color[ 0 ].clearColor = { 0.035f, 0.045f, 0.065f, 1.0f };
+				renderPass.color[ 0 ].clearColor = { 0.40f, 0.40f, 0.40f, 1.0f };
 				renderPass.depthStencil.depthLoadOp = LoadOp::Clear;
 				renderPass.depthStencil.clearDepth = 1.0f;
 
@@ -247,6 +283,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 			deviceManager.WaitIdle();
 		}
 
+		device.Destroy( cubeTexture );
 		device.Destroy( vertexBuffer );
 		device.Destroy( colorBuffer );
 		device.Destroy( sceneBuffer );

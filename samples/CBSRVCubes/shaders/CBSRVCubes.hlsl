@@ -15,7 +15,8 @@ struct SceneConstants
 {
     float aspectRatio;
     float viewDistance;
-    float2 padding;
+    uint textureIndex;
+    uint samplerIndex;
     float4 lightDirection;
 };
 
@@ -29,6 +30,7 @@ struct VSOutput
 {
     float4 position : SV_Position;
     float3 normal : NORMAL0;
+    float2 uv : TEXCOORD0;
     nointerpolation float3 color : COLOR0;
 };
 
@@ -52,25 +54,26 @@ float3 TransformNormal(MatrixRows matrix, float3 localNormal)
 
 VSOutput VSMain(uint vertexID : SV_VertexID, uint instanceID : SV_InstanceID)
 {
+    // Clockwise front faces with outward-facing normals.
     static const float3 positions[36] =
     {
-        float3(-1.0, -1.0, -1.0), float3( 1.0, -1.0, -1.0), float3( 1.0,  1.0, -1.0),
-        float3(-1.0, -1.0, -1.0), float3( 1.0,  1.0, -1.0), float3(-1.0,  1.0, -1.0),
+        float3(-1.0, -1.0, -1.0), float3( 1.0,  1.0, -1.0), float3( 1.0, -1.0, -1.0),
+        float3(-1.0, -1.0, -1.0), float3(-1.0,  1.0, -1.0), float3( 1.0,  1.0, -1.0),
 
-        float3(-1.0, -1.0,  1.0), float3( 1.0,  1.0,  1.0), float3( 1.0, -1.0,  1.0),
-        float3(-1.0, -1.0,  1.0), float3(-1.0,  1.0,  1.0), float3( 1.0,  1.0,  1.0),
+        float3(-1.0, -1.0,  1.0), float3( 1.0, -1.0,  1.0), float3( 1.0,  1.0,  1.0),
+        float3(-1.0, -1.0,  1.0), float3( 1.0,  1.0,  1.0), float3(-1.0,  1.0,  1.0),
 
-        float3(-1.0, -1.0,  1.0), float3( 1.0, -1.0,  1.0), float3( 1.0, -1.0, -1.0),
-        float3(-1.0, -1.0,  1.0), float3( 1.0, -1.0, -1.0), float3(-1.0, -1.0, -1.0),
+        float3(-1.0, -1.0,  1.0), float3( 1.0, -1.0, -1.0), float3( 1.0, -1.0,  1.0),
+        float3(-1.0, -1.0,  1.0), float3(-1.0, -1.0, -1.0), float3( 1.0, -1.0, -1.0),
 
-        float3(-1.0,  1.0, -1.0), float3( 1.0,  1.0, -1.0), float3( 1.0,  1.0,  1.0),
-        float3(-1.0,  1.0, -1.0), float3( 1.0,  1.0,  1.0), float3(-1.0,  1.0,  1.0),
+        float3(-1.0,  1.0, -1.0), float3( 1.0,  1.0,  1.0), float3( 1.0,  1.0, -1.0),
+        float3(-1.0,  1.0, -1.0), float3(-1.0,  1.0,  1.0), float3( 1.0,  1.0,  1.0),
 
-        float3( 1.0, -1.0, -1.0), float3( 1.0, -1.0,  1.0), float3( 1.0,  1.0,  1.0),
-        float3( 1.0, -1.0, -1.0), float3( 1.0,  1.0,  1.0), float3( 1.0,  1.0, -1.0),
+        float3( 1.0, -1.0, -1.0), float3( 1.0,  1.0,  1.0), float3( 1.0, -1.0,  1.0),
+        float3( 1.0, -1.0, -1.0), float3( 1.0,  1.0, -1.0), float3( 1.0,  1.0,  1.0),
 
-        float3(-1.0, -1.0,  1.0), float3(-1.0, -1.0, -1.0), float3(-1.0,  1.0, -1.0),
-        float3(-1.0, -1.0,  1.0), float3(-1.0,  1.0, -1.0), float3(-1.0,  1.0,  1.0)
+        float3(-1.0, -1.0,  1.0), float3(-1.0,  1.0, -1.0), float3(-1.0, -1.0, -1.0),
+        float3(-1.0, -1.0,  1.0), float3(-1.0,  1.0,  1.0), float3(-1.0,  1.0, -1.0)
     };
 
     static const float3 normals[36] =
@@ -111,6 +114,21 @@ VSOutput VSMain(uint vertexID : SV_VertexID, uint instanceID : SV_InstanceID)
     output.position = float4(clipXY, clipZ, 1.0);
     output.normal = TransformNormal(cube.model, normals[vertexID]);
     output.color = cube.color.rgb;
+
+    const float3 localPosition = positions[vertexID];
+    const float3 localNormal = normals[vertexID];
+    if (abs(localNormal.z) > 0.5)
+    {
+        output.uv = float2(-localNormal.z * localPosition.x, -localPosition.y) * 0.5 + 0.5;
+    }
+    else if (abs(localNormal.x) > 0.5)
+    {
+        output.uv = float2(localNormal.x * localPosition.z, -localPosition.y) * 0.5 + 0.5;
+    }
+    else
+    {
+        output.uv = float2(localPosition.x, -localNormal.y * localPosition.z) * 0.5 + 0.5;
+    }
     return output;
 }
 
@@ -119,5 +137,9 @@ float4 PSMain(VSOutput input) : SV_Target0
     ConstantBuffer<SceneConstants> scene = ResourceDescriptorHeap[SAMPLE_SCENE_CBV_SLOT];
     const float3 lightDirection = normalize(scene.lightDirection.xyz);
     const float lighting = saturate(dot(normalize(input.normal), lightDirection)) * 0.72 + 0.28;
-    return float4(input.color * lighting, 1.0);
+    Texture2D<float4> logo = ResourceDescriptorHeap[scene.textureIndex];
+    SamplerState logoSampler = SamplerDescriptorHeap[scene.samplerIndex];
+    const float3 surfaceColor = logo.Sample(logoSampler, input.uv).rgb * (0.5 + 0.5 * input.color);
+
+    return float4(surfaceColor * lighting, 1.0);
 }

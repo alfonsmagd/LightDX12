@@ -6,4 +6,6 @@ cbuffer PushConstants : register(b0)
     float4 cameraPosition;
     uint cubeMapIndex;
     uint samplerIndex;
+    uint textureIndex;
+    uint useLogo;
 };

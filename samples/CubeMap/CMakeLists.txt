@@ -1,6 +1,7 @@
 ldx12_add_example(10_CubeMap CubeMap
-    SOURCES shaders/CubeMapCommon.hlsli shaders/CubeMapObject.hlsl shaders/CubeMapSkybox.hlsl
+    SOURCES ../CubeTexture.hpp shaders/CubeMapCommon.hlsli shaders/CubeMapObject.hlsl shaders/CubeMapSkybox.hlsl
     ROOT_ASSETS
+        media/ldx12-cube.png
         media/sky_129_cubemap_2k/cubemap_layout.png
         media/sky_129_cubemap_2k/px.png
         media/sky_129_cubemap_2k/nx.png

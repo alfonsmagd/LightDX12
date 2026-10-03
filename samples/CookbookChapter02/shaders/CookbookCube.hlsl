@@ -1,12 +1,16 @@
 cbuffer PushConstants : register(b0)
 {
     float4x4 mvp;
+    uint textureIndex;
+    uint samplerIndex;
 };
 
 struct VSOutput
 {
     float4 position : SV_Position;
     float3 color : COLOR0;
+    float2 uv : TEXCOORD0;
+    nointerpolation uint wireframe : TEXCOORD1;
 };
 
 static const float3 positions[8] =
@@ -41,7 +45,26 @@ VSOutput BuildCubeVertex(uint vertexID, bool wireframe)
 
     VSOutput output;
     output.position = mul(mvp, float4(positions[index], 1.0));
-    output.color = wireframe ? float3(0.0, 0.0, 0.0) : colors[index];
+    output.color = colors[index];
+    output.wireframe = wireframe ? 1u : 0u;
+
+    const float3 localPosition = positions[index];
+    const uint faceIndex = vertexID / 6;
+    if (faceIndex == 0 || faceIndex == 2)
+    {
+        const float direction = faceIndex == 0 ? -1.0 : 1.0;
+        output.uv = float2(direction * localPosition.x, -localPosition.y) * 0.5 + 0.5;
+    }
+    else if (faceIndex == 1 || faceIndex == 3)
+    {
+        const float direction = faceIndex == 1 ? 1.0 : -1.0;
+        output.uv = float2(direction * localPosition.z, -localPosition.y) * 0.5 + 0.5;
+    }
+    else
+    {
+        const float direction = faceIndex == 4 ? 1.0 : -1.0;
+        output.uv = float2(localPosition.x, direction * localPosition.z) * 0.5 + 0.5;
+    }
     return output;
 }
 
@@ -57,5 +80,14 @@ VSOutput VSMainWireframe(uint vertexID : SV_VertexID)
 
 float4 PSMain(VSOutput input) : SV_Target0
 {
-    return float4(input.color, 1.0);
+    if (input.wireframe != 0)
+    {
+        return float4(0.0, 0.0, 0.0, 1.0);
+    }
+
+    Texture2D<float4> logo = ResourceDescriptorHeap[textureIndex];
+    SamplerState logoSampler = SamplerDescriptorHeap[samplerIndex];
+    const float3 surfaceColor = logo.Sample(logoSampler, input.uv).rgb * (0.5 + 0.5 * input.color);
+
+    return float4(surfaceColor, 1.0);
 }
