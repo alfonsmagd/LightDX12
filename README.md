@@ -12,6 +12,102 @@ Its philosophy is conceptually inspired by [lightweightvk](https://github.com/co
 
 It is intended for graphics experiments, tools and renderer prototypes—not as a full game engine.
 
+## Minimal setup
+
+Draw a triangle starting from an existing Win32 window (`hwnd`). The vertex shader generates its three vertices, so no vertex buffer is needed:
+
+```cpp
+#include "Ldx12/Ldx12.hpp"
+
+using namespace ldx12;
+
+// Initialize the device and swapchain.
+ContextDesc contextDesc{};
+
+SwapchainDesc swapchainDesc{};
+swapchainDesc.window = MakeWin32WindowHandle( hwnd );
+swapchainDesc.width = 1280;
+swapchainDesc.height = 720;
+swapchainDesc.vsync = true;
+
+DeviceManager& manager = DeviceManager::Initialize( contextDesc, swapchainDesc );
+RenderDevice& device = *manager.GetRenderDevice();
+
+// Create the triangle pipeline.
+constexpr char vertexShader[] = R"(
+float4 main( uint vertexId : SV_VertexID ) : SV_Position
+{
+    const float2 positions[ 3 ] =
+    {
+        float2( 0.0, 0.55 ),
+        float2( 0.5, -0.45 ),
+        float2( -0.5, -0.45 )
+    };
+
+    return float4( positions[ vertexId ], 0.0, 1.0 );
+}
+)";
+
+constexpr char pixelShader[] = R"(
+float4 main() : SV_Target0
+{
+    return float4( 0.2, 0.6, 1.0, 1.0 );
+}
+)";
+
+RenderPipelineDesc pipelineDesc{};
+pipelineDesc.vertexShader.source = vertexShader;
+pipelineDesc.vertexShader.entryPoint = "main";
+pipelineDesc.vertexShader.profile = "vs_6_6";
+pipelineDesc.fragmentShader.source = pixelShader;
+pipelineDesc.fragmentShader.entryPoint = "main";
+pipelineDesc.fragmentShader.profile = "ps_6_6";
+pipelineDesc.color[ 0 ].format = DXGI_FORMAT_R8G8B8A8_UNORM;
+pipelineDesc.depthFormat = DXGI_FORMAT_UNKNOWN;
+pipelineDesc.depthStencilState.DepthEnable = FALSE;
+pipelineDesc.depthStencilState.StencilEnable = FALSE;
+
+RenderPipelineState pipeline = device.CreateRenderPipeline( pipelineDesc );
+
+// Record and present one frame.
+TextureHandle backbuffer = device.GetCurrentSwapchainTexture();
+
+RenderPass renderPass{};
+renderPass.color[ 0 ].loadOp = LoadOp::Clear;
+renderPass.color[ 0 ].clearColor = { 0.05f, 0.05f, 0.05f, 1.0f };
+
+Framebuffer framebuffer{};
+framebuffer.color[ 0 ].texture = backbuffer;
+
+CommandBuffer& commands = device.AcquireCommandBuffer();
+
+commands.CmdBeginRendering( renderPass, framebuffer );
+commands.CmdBindRenderPipeline( pipeline );
+commands.CmdDraw( 3 );
+commands.CmdEndRendering();
+
+device.Submit( commands, backbuffer );
+
+// Release resources after the GPU has finished.
+manager.WaitIdle();
+pipeline = {};
+DeviceManager::ShutdownSingleton();
+```
+
+Ldx12 manages the device, swapchain, descriptor heaps, root signature, command-list recycling, fences, resource states and deferred resource releases. You provide shaders, resources and draw commands. See [Triangle](samples/Triangle/main.cpp) for the complete application with a window, message loop and error handling.
+
+If an acquired recording will not be submitted, return it to the pool explicitly:
+
+```cpp
+CommandBuffer& commands = device.AcquireCommandBuffer();
+
+if( !PrepareFrame() )
+{
+    device.Discard( commands );
+    return;
+}
+```
+
 ## Highlights
 
 - Compact command recording and explicit submission.
@@ -21,36 +117,6 @@ It is intended for graphics experiments, tools and renderer prototypes—not as 
 - Typed resource handles instead of exposed ownership.
 - Optional access to native D3D12 objects when required.
 
-## A frame at a glance
-
-With the device, swapchain and graphics pipeline already initialized:
-
-```cpp
-TextureHandle backbuffer = device.GetCurrentSwapchainTexture();
-Framebuffer framebuffer{};
-framebuffer.color[ 0 ].texture = backbuffer;
-
-CommandBuffer& commands = device.AcquireCommandBuffer();
-commands.CmdBeginRendering( {}, framebuffer );
-commands.CmdBindRenderPipeline( pipeline );
-commands.CmdDraw( 3 );
-commands.CmdEndRendering();
-device.Submit( commands, backbuffer );
-```
-
-Ldx12 manages the device, swapchain, descriptor heaps, root signature, command-list recycling, fences, resource states and deferred resource releases behind this flow.
-
-If an acquired recording will not be submitted, return it to the pool explicitly:
-
-```cpp
-CommandBuffer& commands = device.AcquireCommandBuffer();
-if( !PrepareFrame() )
-{
-    device.Discard( commands );
-    return;
-}
-```
-
 ## Bindless: pass indices, not resource bindings
 
 ### Before: binding resources
@@ -58,8 +124,8 @@ if( !PrepareFrame() )
 With conventional descriptor tables, selecting a texture and a buffer can look like this (illustrative native D3D12):
 
 ```cpp
-commandList->SetGraphicsRootDescriptorTable(0, textureDescriptor);
-commandList->SetGraphicsRootDescriptorTable(1, bufferDescriptor);
+commandList->SetGraphicsRootDescriptorTable( 0, textureDescriptor );
+commandList->SetGraphicsRootDescriptorTable( 1, bufferDescriptor );
 ```
 
 The shader uses fixed registers matched by the root signature. Here the sampler is configured as a static sampler at `s0`:
@@ -80,11 +146,13 @@ float4 PSMain(float2 uv : TEXCOORD0) : SV_Target0
 With Ldx12, pass their indices instead. Here `texture` is an existing sampled texture and `buffer` is a structured buffer of `float4` colors:
 
 ```cpp
-const uint32_t indices[] = {
-    device.GetBindlessIndex(texture),
-    device.GetBindlessIndex(buffer)
+const uint32_t indices[] =
+{
+    device.GetBindlessIndex( texture ),
+    device.GetBindlessIndex( buffer )
 };
-commands.CmdPushConstants(indices, sizeof(indices));
+
+commands.CmdPushConstants( indices, sizeof( indices ) );
 ```
 
 The shader reads both directly from the shared heap:
@@ -105,26 +173,6 @@ float4 PSMain(float2 uv : TEXCOORD0) : SV_Target0
 ```
 
 Changing either resource means changing an index, not binding another resource table. Ldx12 configures the heaps and root signature for you. The snippets assume a prepared render pass, pipeline and resource states; bindless does not remove draws or synchronization.
-
-## Minimal setup
-
-Starting from an existing Win32 window:
-
-```cpp
-using namespace ldx12;
-
-ContextDesc context{};
-SwapchainDesc swapchain{};
-swapchain.window = MakeWin32WindowHandle(hwnd);
-swapchain.width = 1280;
-swapchain.height = 720;
-swapchain.vsync = true;
-
-DeviceManager& manager = DeviceManager::Initialize(context, swapchain);
-RenderDevice& device = *manager.GetRenderDevice();
-```
-
-Without Ldx12, you would configure the DXGI factory and adapter, D3D12 device and queue, swapchain, descriptor heaps, bindless root signature and fence tracking yourself. Here that infrastructure is initialized behind `DeviceManager`; you provide resources, shaders and draw commands. See [Triangle](samples/Triangle/main.cpp) for the complete lifecycle.
 
 ## Bindless layout
 <picture>
@@ -250,7 +298,8 @@ Ldx12 began inside **IFNITY** and later became a standalone project.
 
 Ldx12 is available under the [MIT License](LICENSE). Third-party attribution is documented in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-## Samples
+<details>
+<summary>Samples</summary>
 
 | Sample |
 | --- |
@@ -269,3 +318,7 @@ Ldx12 is available under the [MIT License](LICENSE). Third-party attribution is 
 | **13. [CookbookChapter02](samples/CookbookChapter02)** |
 | **14. [ImGuiDemoNative](samples/ImGuiDemoNative)** |
 | **15. [DepthPass](samples/DepthPass)**<br>[![Depth prepass](examples/images/15-depth-prepass.png)](samples/DepthPass) |
+| **20. [TriplanarMapping](samples/TriplanarMapping)** — sixteen animated icosahedra textured without UV coordinates. |
+| **21. Skinning** — animated BrainStem character with GPU skinning and playback controls. |
+
+</details>
