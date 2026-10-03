@@ -2,6 +2,7 @@
 add_subdirectory(Triangle)
 add_subdirectory(ViewportScissor)
 add_subdirectory(CBSRVCubes)
+add_subdirectory(ByteAddressBuffer)
 if(LDX12_BUILD_APP)
     add_subdirectory(ImGuiNodeEditor)
 endif()
