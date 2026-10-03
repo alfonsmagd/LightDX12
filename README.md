@@ -243,10 +243,10 @@ Ldx12 is available under the [MIT License](LICENSE). Third-party attribution is 
 | --- |
 | **1. [Triangle](samples/Triangle)**<br>[![Triangle](examples/images/01-triangle.png)](samples/Triangle) |
 | **2. [ViewportScissor](samples/ViewportScissor)**<br>[![ViewportScissor](examples/images/02-viewport-scissor.png)](samples/ViewportScissor) |
-| **3. [CBSRVCubes](samples/CBSRVCubes)**<br>[![CBSRVCubes](examples/images/03-cbsrv-cubes.png)](samples/CBSRVCubes) |
+| **3. [CBSRVCubes](samples/CBSRVCubes)**<br>[![CBSRVCubes](examples/images/03-cbsrv-cubes-0.4.0.png)](samples/CBSRVCubes) |
 | **4. [ImGuiNodeEditor](samples/ImGuiNodeEditor)**<br>[![ImGuiNodeEditor](examples/images/04-imgui-node-editor.png)](samples/ImGuiNodeEditor) |
 | **5. [Z-buffer + MSAA x4](samples/ZFighting)**<br>[![Z-buffer and MSAA x4](examples/images/05-zbuffer-msaa4.png)](samples/ZFighting) |
-| **6. [TexturedCube](samples/TexturedCube)**<br>[![TexturedCube](examples/images/06-textured-cube.png)](samples/TexturedCube) |
+| **6. [TexturedCube](samples/TexturedCube)**<br>[![TexturedCube](examples/images/06-textured-cube-0.4.0.png)](samples/TexturedCube) |
 | **7. [TextureSamplers](samples/TextureSamplers)**<br>[![TextureSamplers](examples/images/07-texture-samplers.png)](samples/TextureSamplers) |
 | **8. [Ldx12 + Dear ImGui](samples/ImGuiDemo)**<br>[![Ldx12 + Dear ImGui](examples/images/08-imgui-demo.png)](samples/ImGuiDemo) |
 | **9. [WorldGeometry](samples/WorldGeometry)**<br>[![WorldGeometry](examples/images/09-world-geometry.png)](samples/WorldGeometry) |
@@ -255,8 +255,8 @@ Ldx12 is available under the [MIT License](LICENSE). Third-party attribution is 
 | **12. [Transparency](samples/Transparency)**<br>[![Transparency](examples/images/12-transparency.png)](samples/Transparency) |
 | **13. [CookbookChapter02](samples/CookbookChapter02)** |
 | **14. [ImGuiDemoNative](samples/ImGuiDemoNative)** |
-| **15. [DepthPass (depth buffer)](samples/DepthPass)**<br>[![Depth buffer visualization](examples/images/15-depth-prepass.png)](samples/DepthPass) |
-| **19. [MultiDrawIndirect glTF](samples/DrawIndirectGltf)**<br>[![MultiDrawIndirect glTF](examples/images/19-multidraw-indirect-gltf.png)](samples/DrawIndirectGltf) |
+| **15. [DepthPass (depth buffer)](samples/DepthPass)**<br>[![Depth buffer visualization](examples/images/15-depth-prepass-0.4.0.png)](samples/DepthPass) |
+| **19. [MultiDrawIndirect glTF](samples/DrawIndirectGltf)**<br>[![MultiDrawIndirect glTF](examples/images/19-multidraw-indirect-gltf-0.4.0.png)](samples/DrawIndirectGltf) |
 | **20. [TriplanarMapping](samples/TriplanarMapping)** — sixteen animated icosahedra textured without UV coordinates. |
 | **21. Skinning** — animated BrainStem character with GPU skinning and playback controls. |
 

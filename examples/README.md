@@ -20,7 +20,7 @@ Multiple viewport regions and a visibly clipped scissor region rendered in the s
 
 Instanced cubes using fixed bindless CBV/SRV positions, push constants and depth rendering.
 
-![3. CBSRVCubes](images/03-cbsrv-cubes.png)
+![3. CBSRVCubes](images/03-cbsrv-cubes-0.4.0.png)
 
 [View source](../samples/CBSRVCubes)
 
@@ -40,7 +40,7 @@ Interactive ImGui node graph with typed links, texture processing and live textu
 
 ## 6. Textured cube
 
-![6. Textured cube](images/06-textured-cube.png)
+![6. Textured cube](images/06-textured-cube-0.4.0.png)
 
 [View source](../samples/TexturedCube)
 
@@ -100,6 +100,14 @@ Three moving cubes at different distances rendered into the backbuffer after a d
 
 Inspecting the depth buffer makes scene depth visible and can help identify incorrect clockwise/counter-clockwise winding, unexpected face culling and badly oriented primitives.
 
-![15. Depth prepass](images/15-depth-prepass.png)
+![15. Depth prepass](images/15-depth-prepass-0.4.0.png)
 
 [View source](../samples/DepthPass)
+
+## 19. MultiDrawIndirect glTF
+
+glTF scene rendered with indexed indirect draws in one ExecuteIndirect batch.
+
+![19. MultiDrawIndirect glTF](images/19-multidraw-indirect-gltf-0.4.0.png)
+
+[View source](../samples/DrawIndirectGltf)
