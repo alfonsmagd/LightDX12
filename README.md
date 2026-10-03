@@ -255,7 +255,8 @@ Ldx12 is available under the [MIT License](LICENSE). Third-party attribution is 
 | **12. [Transparency](samples/Transparency)**<br>[![Transparency](examples/images/12-transparency.png)](samples/Transparency) |
 | **13. [CookbookChapter02](samples/CookbookChapter02)** |
 | **14. [ImGuiDemoNative](samples/ImGuiDemoNative)** |
-| **15. [DepthPass](samples/DepthPass)**<br>[![Depth prepass](examples/images/15-depth-prepass.png)](samples/DepthPass) |
+| **15. [DepthPass (depth buffer)](samples/DepthPass)**<br>[![Depth buffer visualization](examples/images/15-depth-prepass.png)](samples/DepthPass) |
+| **19. [MultiDrawIndirect glTF](samples/DrawIndirectGltf)**<br>[![MultiDrawIndirect glTF](examples/images/19-multidraw-indirect-gltf.png)](samples/DrawIndirectGltf) |
 | **20. [TriplanarMapping](samples/TriplanarMapping)** — sixteen animated icosahedra textured without UV coordinates. |
 | **21. Skinning** — animated BrainStem character with GPU skinning and playback controls. |
 
