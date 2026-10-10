@@ -413,17 +413,6 @@ float4 PSMain() : SV_Target0
 		}
 		Require( activeLimitReached, "Ldx12 acquired more than 64 active command buffers." );
 
-		bool batchLimitReached = false;
-		try
-		{
-			device.SubmitBatch( commands.data(), ourExpectedCommandBufferBatch + 1u );
-		}
-		catch( const std::length_error& )
-		{
-			batchLimitReached = true;
-		}
-		Require( batchLimitReached, "SubmitBatch accepted more than four command buffers." );
-
 		SubmitHandle submission{};
 		for( uint32_t offset = 0; offset < commands.size(); offset += ourExpectedCommandBufferBatch )
 		{

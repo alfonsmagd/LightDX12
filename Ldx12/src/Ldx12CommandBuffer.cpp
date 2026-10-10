@@ -304,6 +304,7 @@ namespace ldx12
 		isRendering_ = false;
 		active_ = true;
 		debugGroupDepth_ = 0;
+		constantBufferOffsets_ = 0;
 		framebufferColorFormats_ = {};
 		trackedBufferCount_ = 0;
 		trackedTextureCount_ = 0;
@@ -316,8 +317,8 @@ namespace ldx12
 		wrapper_->commandList_->SetComputeRootSignature( rootSignature );
 
 		// Reset both packed ring-buffer offsets for this recording.
-		wrapper_->commandList_->SetGraphicsRoot32BitConstant( 2, 0, 0 );
-		wrapper_->commandList_->SetComputeRoot32BitConstant( 2, 0, 0 );
+		wrapper_->commandList_->SetGraphicsRoot32BitConstant( 2, constantBufferOffsets_, 0 );
+		wrapper_->commandList_->SetComputeRoot32BitConstant( 2, constantBufferOffsets_, 0 );
 	}
 
 	void CommandBuffer::Release() noexcept
@@ -826,6 +827,26 @@ namespace ldx12
 
 		wrapper_->commandList_->SetGraphicsRoot32BitConstants( 0, valueCount, data, offset32BitValues );
 		wrapper_->commandList_->SetComputeRoot32BitConstants( 0, valueCount, data, offset32BitValues );
+	}
+
+	void CommandBuffer::SetConstantBuffer( const void* data, uint32_t sizeBytes, uint32_t ringIndex )
+	{
+		assert( manager_ != nullptr && active_ );
+
+		const uint32_t offset = manager_->UploadConstantBuffer( *this, data, sizeBytes, ringIndex );
+
+		if( offset == UINT32_MAX )
+		{
+			return;
+		}
+
+		const uint32_t offsetShift = ringIndex * 16u;
+		const uint32_t offsetMask = 0xffffu << offsetShift;
+
+		constantBufferOffsets_ = ( constantBufferOffsets_ & ~offsetMask ) | ( offset << offsetShift );
+
+		wrapper_->commandList_->SetGraphicsRoot32BitConstant( 2, constantBufferOffsets_, 0 );
+		wrapper_->commandList_->SetComputeRoot32BitConstant( 2, constantBufferOffsets_, 0 );
 	}
 
 	void CommandBuffer::CmdPushDebugGroupLabel( const char* label, uint32_t color )

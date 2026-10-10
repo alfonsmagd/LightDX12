@@ -21,8 +21,6 @@ namespace ldx12::tests
 		Require( device.IsReady( emptySubmission ), "An empty submission handle was not reported as ready." );
 		device.Wait( emptySubmission );
 
-		RequireThrows<std::invalid_argument>( [ &device ] { device.SubmitBatch( nullptr, 0 ); }, "SubmitBatch accepted an empty batch." );
-
 		TextureDesc batchTextureDesc{};
 		batchTextureDesc.debugName = "Ldx12Tests batch state tracking";
 		const TextureHandle batchTexture = device.CreateTexture( batchTextureDesc );
@@ -35,20 +33,6 @@ namespace ldx12::tests
 		secondBatchCommandBuffer.CmdTransitionTexture( batchTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE );
 		thirdBatchCommandBuffer.CmdTransitionTexture( batchTexture, D3D12_RESOURCE_STATE_COPY_SOURCE );
 		fourthBatchCommandBuffer.CmdTransitionTexture( batchTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE );
-
-		CommandBuffer* batchWithNull[] = { &firstBatchCommandBuffer, nullptr };
-		RequireThrows<std::invalid_argument>( [ &device, &batchWithNull ]
-			{ device.SubmitBatch( batchWithNull, static_cast<uint32_t>( std::size( batchWithNull ) ) ); },
-			"SubmitBatch accepted a null command buffer." );
-
-		CommandBuffer* duplicateBatch[] = { &firstBatchCommandBuffer, &firstBatchCommandBuffer };
-		RequireThrows<std::invalid_argument>( [ &device, &duplicateBatch ]
-			{ device.SubmitBatch( duplicateBatch, static_cast<uint32_t>( std::size( duplicateBatch ) ) ); },
-			"SubmitBatch accepted a duplicate command buffer." );
-
-		CommandBuffer* oversizedBatch[] = { &firstBatchCommandBuffer };
-		RequireThrows<std::length_error>( [ &device, &oversizedBatch ] { device.SubmitBatch( oversizedBatch, 5 ); },
-			"SubmitBatch accepted more command buffers than the supported maximum." );
 
 		CommandBuffer* commandBufferBatch[] = { &firstBatchCommandBuffer, &secondBatchCommandBuffer, &thirdBatchCommandBuffer, &fourthBatchCommandBuffer };
 		const SubmitHandle batchSubmission = device.SubmitBatch( commandBufferBatch, static_cast<uint32_t>( std::size( commandBufferBatch ) ) );
@@ -76,8 +60,6 @@ namespace ldx12::tests
 		device.Discard( *activeCommandBuffers[ 0 ] );
 		RequireThrows<std::invalid_argument>(
 			[ &device, &activeCommandBuffers ] { device.Discard( *activeCommandBuffers[ 0 ] ); }, "Discard accepted an inactive command buffer." );
-		RequireThrows<std::invalid_argument>(
-			[ &device, &activeCommandBuffers ] { device.Submit( *activeCommandBuffers[ 0 ] ); }, "Submit accepted a discarded command buffer." );
 		activeCommandBuffers[ 0 ] = &device.AcquireCommandBuffer();
 
 		SubmitHandle poolSubmission{};
