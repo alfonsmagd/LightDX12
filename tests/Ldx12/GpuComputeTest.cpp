@@ -22,24 +22,29 @@ namespace ldx12::tests
 		const char* shader = R"(
 cbuffer Constants : register(b0)
 {
-    uint inputUav;
-    uint inputSrv;
-    uint outputUav;
-    uint count;
+    uint inputUav : packoffset(c0.x);
+    uint inputSrv : packoffset(c0.y);
+    uint outputUav : packoffset(c0.z);
+    uint count : packoffset(c0.w);
+    uint lastPushConstant : packoffset(c15.y);
+};
+cbuffer Ldx12ConstantBinding : register(b2)
+{
+    uint ldx12ConstantBufferOffsets;
 };
 [numthreads(64, 1, 1)]
 void Seed(uint3 id : SV_DispatchThreadID)
 {
     if (id.x >= count) return;
     RWStructuredBuffer<uint> values = ResourceDescriptorHeap[inputUav];
-    values[id.x] = id.x * 3 + 7;
+    values[id.x] = id.x * 3 + lastPushConstant + ldx12ConstantBufferOffsets;
 }
 [numthreads(64, 1, 1)]
 void Update(uint3 id : SV_DispatchThreadID)
 {
     if (id.x >= count) return;
     RWStructuredBuffer<uint> values = ResourceDescriptorHeap[inputUav];
-    values[id.x] = values[id.x] * 2 + 1;
+    values[id.x] = values[id.x] * 2 + 1 + (ldx12ConstantBufferOffsets ^ 0xfffc0020u);
 }
 [numthreads(64, 1, 1)]
 void Copy(uint3 id : SV_DispatchThreadID)
@@ -47,7 +52,7 @@ void Copy(uint3 id : SV_DispatchThreadID)
     if (id.x >= count) return;
     StructuredBuffer<uint> values = ResourceDescriptorHeap[inputSrv];
     RWByteAddressBuffer result = ResourceDescriptorHeap[outputUav];
-    result.Store(id.x * 4, values[count - 1 - id.x]);
+    result.Store(id.x * 4, values[count - 1 - id.x] + ldx12ConstantBufferOffsets);
 }
 )";
 		ComputePipelineDesc pipelineDesc{};
@@ -71,10 +76,11 @@ void Copy(uint3 id : SV_DispatchThreadID)
 		desc.type = BufferType::Raw;
 		desc.stride = 0;
 		const BufferHandle output = device.CreateBuffer( desc );
-		const std::array<uint32_t, 4> constants = { device.GetUnorderedAccessIndex( input ),
+		std::array<uint32_t, ourMaxPushConstant32BitValues> constants = { device.GetUnorderedAccessIndex( input ),
 			device.GetBindlessIndex( input ),
 			device.GetUnorderedAccessIndex( output ),
 			count };
+		constants.back() = 7;
 		Require( constants[ 0 ] != LDX12_DESCRIPTOR_SLOT_INVALID && constants[ 1 ] != LDX12_DESCRIPTOR_SLOT_INVALID &&
 				constants[ 2 ] != LDX12_DESCRIPTOR_SLOT_INVALID,
 			"Compute buffers did not receive valid UAV/SRV descriptors." );
@@ -103,10 +109,20 @@ void Copy(uint3 id : SV_DispatchThreadID)
 
 		CommandBuffer& producer = device.AcquireCommandBuffer();
 		producer.CmdTransitionBuffer( input, D3D12_RESOURCE_STATE_UNORDERED_ACCESS );
+		RequireThrows<std::length_error>(
+			[ &producer, &constants ] { producer.CmdPushConstants( constants.data(), static_cast<uint32_t>( sizeof( constants ) + sizeof( uint32_t ) ) ); },
+			"CmdPushConstants accepted a payload larger than 248 bytes." );
+		RequireThrows<std::length_error>(
+			[ &producer, &constants ] { producer.CmdPushConstants( constants.data(), sizeof( uint32_t ), ourMaxPushConstant32BitValues ); },
+			"CmdPushConstants accepted a write past the application constants." );
 		producer.CmdPushConstants( constants );
 		producer.CmdBindComputePipeline( seed );
 		producer.CmdDispatch( groups );
 		producer.CmdUavBarrier( input );
+
+		// A full application upload must preserve both packed offsets in b2.
+		native.GetCommandList( producer )->SetComputeRoot32BitConstant( 2, 0xfffc0020u, 0 );
+		producer.CmdPushConstants( constants );
 		producer.CmdBindComputePipeline( update );
 		producer.CmdDispatch( groups );
 

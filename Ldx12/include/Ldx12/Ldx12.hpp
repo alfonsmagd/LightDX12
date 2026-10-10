@@ -6,6 +6,7 @@
 #include <deque>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <string_view>
 #include <type_traits>
@@ -29,6 +30,8 @@
 namespace ldx12
 {
 	using Microsoft::WRL::ComPtr;
+	using lockGuard = std::lock_guard<std::mutex>;
+
 	static constexpr uint32_t ourMaxColorAttachments = D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT;
 	static constexpr uint32_t ourMaxShaderIncludeDirectories = 8;
 	static constexpr uint32_t ourMaxVertexInputElements = 16;
@@ -40,7 +43,7 @@ namespace ldx12
 	static constexpr uint32_t ourMaxImmediateCommandBuffers = ourMaxActiveCommandBuffers + ourMaxCommandBufferBatch;
 	static constexpr uint32_t ourMaxTrackedBuffersPerCommandBuffer = 256;
 	static constexpr uint32_t ourMaxTrackedTexturesPerCommandBuffer = 256;
-	static constexpr uint32_t ourMaxPushConstant32BitValues = 63;
+	static constexpr uint32_t ourMaxPushConstant32BitValues = 62;
 	static constexpr uint32_t ourCubeMapFaceCount = 6;
 	static constexpr uint32_t ourBuiltInSamplerCount = LDX12_BUILT_IN_SAMPLER_COUNT;
 	static constexpr uint32_t ourCustomSamplerCount = LDX12_CUSTOM_SAMPLER_COUNT;
@@ -568,8 +571,18 @@ namespace ldx12
 		void CmdPushConstants( const T& data )
 		{
 			static_assert( !std::is_pointer_v<T>, "Pass the object directly, not a pointer." );
-			static_assert( sizeof( T ) <= ourMaxPushConstant32BitValues * sizeof( uint32_t ), "Push constants cannot exceed 63 32-bit values (252 bytes)." );
+			static_assert( sizeof( T ) <= ourMaxPushConstant32BitValues * sizeof( uint32_t ), "Push constants cannot exceed 62 32-bit values (248 bytes)." );
 			CmdPushConstants( &data, static_cast<uint32_t>( sizeof( data ) ) );
+		}
+
+		void SetConstantBuffer( const void* data, uint32_t sizeBytes, uint32_t ringIndex = 0 );
+
+		template <typename T> void SetConstantBuffer( const T& data, uint32_t ringIndex = 0 )
+		{
+			static_assert( !std::is_pointer_v<T>, "Pass the object directly, not a pointer." );
+			static_assert( std::is_trivially_copyable_v<T>, "Constant data must be trivially copyable." );
+
+			SetConstantBuffer( &data, static_cast<uint32_t>( sizeof( data ) ), ringIndex );
 		}
 
 		void CmdPushDebugGroupLabel( const char* label, uint32_t color );
@@ -581,6 +594,7 @@ namespace ldx12
 
 	private:
 		friend class D3D12Native;
+		friend class DeviceManager;
 		friend class ImmediateCommands;
 		friend SubmitHandle SubmitCommandBufferBatch( DeviceManager& manager,
 			CommandBuffer* const* commandBuffers,
@@ -588,6 +602,12 @@ namespace ldx12
 			TextureHandle presentTexture );
 
 		CommandBuffer() = default;
+
+		struct ConstantBufferInternalRange final
+		{
+			uint64_t begin_ = 0;
+			uint64_t end_ = 0;
+		};
 
 		struct TrackedBufferState final
 		{
@@ -647,6 +667,10 @@ namespace ldx12
 		bool isRendering_ = false;
 		bool active_ = false;
 		uint32_t debugGroupDepth_ = 0;
+
+		uint32_t constantBufferOffsets_ = 0;
+		std::array<std::deque<ConstantBufferInternalRange>, 2> constantBufferRanges_ = {};
+
 		std::array<DXGI_FORMAT, ourMaxColorAttachments> framebufferColorFormats_ = {};
 		std::array<TrackedBufferState, ourMaxTrackedBuffersPerCommandBuffer> trackedBuffers_ = {};
 		uint32_t trackedBufferCount_ = 0;
@@ -826,6 +850,28 @@ namespace ldx12
 			uint32_t readWriteResource_ = 0;
 		};
 
+		using ConstantBufferInternalRange = CommandBuffer::ConstantBufferInternalRange;
+		using ConstantBufferRecordingRanges = std::array<std::deque<ConstantBufferInternalRange>, 2>;
+		using ConstantBufferBatchRanges = std::array<ConstantBufferRecordingRanges, ourMaxCommandBufferBatch>;
+
+		struct ConstantBufferRing final
+		{
+			struct RangeState final
+			{
+				ConstantBufferInternalRange range_ = {};
+				bool completed_ = false;
+			};
+
+			std::mutex mutex_;
+			ComPtr<ID3D12Resource> resource_;
+			uint8_t* mappedPtr_ = nullptr;
+			uint32_t descriptorIndex_ = UINT32_MAX;
+			uint64_t head_ = 0;
+			uint64_t tail_ = 0;
+			// Completed ranges behind pending ranges cannot advance the tail yet.
+			std::deque<RangeState> ranges_;
+		};
+
 		explicit DeviceManager( const ContextDesc& desc );
 		SwapchainHandle RequirePrimarySwapchain() const;
 		void Initialize();
@@ -838,6 +884,14 @@ namespace ldx12
 		void WriteSamplerDescriptor( uint32_t index, const SamplerDesc& desc );
 		void InitializeRootSignature();
 		void InitializeCommandSignature();
+
+		void InitializeConstantBufferRings();
+		uint32_t UploadConstantBuffer( CommandBuffer& commandBuffer, const void* data, uint32_t sizeBytes, uint32_t ringIndex );
+		void CommitConstantBufferRanges( CommandBuffer* const* commandBuffers, uint32_t commandBufferCount, SubmitHandle submission );
+		void DiscardConstantBufferRanges( CommandBuffer& commandBuffer ) noexcept;
+		void ReleaseConstantBufferRanges( uint32_t ringIndex, const std::deque<ConstantBufferInternalRange>& ranges ) noexcept;
+		void ReclaimConstantBufferRanges();
+
 		QueueContext& GetGraphicsQueueContext() noexcept;
 		const QueueContext& GetGraphicsQueueContext() const noexcept;
 		SwapchainHandle CreateSwapchainInternal( const SwapchainDesc& desc );
@@ -921,6 +975,7 @@ namespace ldx12
 		SlotMap<SamplerResource, ourCustomSamplerCount> slotMapSamplers_;
 		std::unique_ptr<StagingDevice> stagingDevice_;
 		std::unique_ptr<BaseMips> baseMips_;
+		std::array<ConstantBufferRing, 2> constantBufferRings_ = {};
 		BindingSlotMasks allocatedFreeBindingSlots_;
 		SwapchainHandle primarySwapchain_ = {};
 		RenderDevice renderDevice_;

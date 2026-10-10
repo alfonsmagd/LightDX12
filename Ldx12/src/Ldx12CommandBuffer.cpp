@@ -314,6 +314,10 @@ namespace ldx12
 		ID3D12RootSignature* rootSignature = manager_->rootSignature_.Get();
 		wrapper_->commandList_->SetGraphicsRootSignature( rootSignature );
 		wrapper_->commandList_->SetComputeRootSignature( rootSignature );
+
+		// Reset both packed ring-buffer offsets for this recording.
+		wrapper_->commandList_->SetGraphicsRoot32BitConstant( 2, 0, 0 );
+		wrapper_->commandList_->SetComputeRoot32BitConstant( 2, 0, 0 );
 	}
 
 	void CommandBuffer::Release() noexcept
@@ -817,7 +821,7 @@ namespace ldx12
 		const uint32_t valueCount = sizeBytes / sizeof( uint32_t );
 		if( offset32BitValues > ourMaxPushConstant32BitValues || valueCount > ourMaxPushConstant32BitValues - offset32BitValues )
 		{
-			throw std::length_error( "CmdPushConstants cannot exceed 63 32-bit values." );
+			throw std::length_error( "CmdPushConstants cannot exceed 62 32-bit values (248 bytes)." );
 		}
 
 		wrapper_->commandList_->SetGraphicsRoot32BitConstants( 0, valueCount, data, offset32BitValues );

@@ -38,6 +38,21 @@ namespace ldx12::tests
 		RequireThrows<std::runtime_error>( [ &device, &sampledDesc ] { device.CreateTexture( sampledDesc ); },
 			"The bindless heap accepted more dynamic SRVs than its capacity." );
 
+		BufferDesc rawBufferDesc{};
+		rawBufferDesc.size = sizeof( uint32_t );
+		rawBufferDesc.type = BufferType::Raw;
+
+		RequireThrows<std::runtime_error>( [ &device, &rawBufferDesc ] { device.CreateBuffer( rawBufferDesc ); },
+			"Buffers did not share the exhausted bindless heap with textures." );
+		Require( device.Destroy( sampledTextures[ 0 ] ), "Cannot release a descriptor from a full bindless heap." );
+		const BufferHandle sharedHeapBuffer = device.CreateBuffer( rawBufferDesc );
+
+		Require( device.GetBindlessIndex( sharedHeapBuffer ) == sampledIndices[ 0 ], "A buffer did not reuse a texture's freed descriptor." );
+		RequireThrows<std::runtime_error>( [ &device, &sampledDesc ] { device.CreateTexture( sampledDesc ); },
+			"Textures did not share the exhausted bindless heap with buffers." );
+		Require( device.Destroy( sharedHeapBuffer ), "Cannot release the shared bindless descriptor." );
+		sampledTextures[ 0 ] = device.CreateTexture( sampledDesc );
+
 		constexpr std::array<uint32_t, 4> fragmentedSlots = { 1u, 3u, 5u, 7u };
 		for( uint32_t slot : fragmentedSlots )
 		{
@@ -162,13 +177,36 @@ namespace ldx12::tests
 		fixedBufferDesc.type = BufferType::Constant;
 		fixedBufferDesc.memory = BufferMemory::CpuToGpu;
 		const BufferHandle fixedBuffer = device.CreateBuffer( fixedBufferDesc, ConstantBufferSlot::FreeCB1 );
-		RequireThrows<std::runtime_error>( [ &device, &fixedBufferDesc ] { device.CreateBuffer( fixedBufferDesc, ConstantBufferSlot::FreeCB1 ); },
-			"A fixed CBV slot was allocated twice." );
+		const BufferHandle duplicateFixedBuffer = device.CreateBuffer( fixedBufferDesc, ConstantBufferSlot::FreeCB1 );
+
+		Require( fixedBuffer.Valid(), "Failed to create a fixed CBV buffer." );
+		Require( !duplicateFixedBuffer.Valid(), "A fixed CBV slot was allocated twice." );
+		Require( device.GetConstantBufferIndex( fixedBuffer ) == ToSlotIndex( ConstantBufferSlot::FreeCB1 ),
+			"A rejected fixed CBV allocation changed the original buffer's descriptor index." );
 		Require( device.Destroy( fixedBuffer ), "Failed to release a fixed CBV descriptor." );
 		const BufferHandle recycledFixedBuffer = device.CreateBuffer( fixedBufferDesc, ConstantBufferSlot::FreeCB1 );
 		Require( device.GetConstantBufferIndex( recycledFixedBuffer ) == ToSlotIndex( ConstantBufferSlot::FreeCB1 ),
 			"A released fixed CBV descriptor was not recycled." );
 		Require( device.Destroy( recycledFixedBuffer ), "Failed to destroy the recycled fixed-CBV buffer." );
+
+		const BufferHandle ring0Conflict = device.CreateBuffer( fixedBufferDesc, ConstantBufferSlot::EngineRingBuffer0 );
+		const BufferHandle ring1Conflict = device.CreateBuffer( fixedBufferDesc, ConstantBufferSlot::EngineRingBuffer1 );
+
+		Require( !ring0Conflict.Valid(), "A user buffer replaced the engine ring 0 descriptor." );
+		Require( !ring1Conflict.Valid(), "A user buffer replaced the engine ring 1 descriptor." );
+
+		const BufferHandle fixedSrvBuffer = device.CreateBuffer( rawBufferDesc, ShaderResourceSlot::FreeSRV0 );
+		const BufferHandle duplicateFixedSrvBuffer = device.CreateBuffer( rawBufferDesc, ShaderResourceSlot::FreeSRV0 );
+
+		Require( fixedSrvBuffer.Valid(), "Failed to create a fixed SRV buffer." );
+		Require( !duplicateFixedSrvBuffer.Valid(), "A fixed SRV slot was allocated twice." );
+		Require( device.Destroy( fixedSrvBuffer ), "Failed to release a fixed SRV descriptor." );
+
+		const BufferHandle recycledFixedSrvBuffer = device.CreateBuffer( rawBufferDesc, ShaderResourceSlot::FreeSRV0 );
+
+		Require( device.GetBindlessIndex( recycledFixedSrvBuffer ) == ToSlotIndex( ShaderResourceSlot::FreeSRV0 ),
+			"A rejected fixed SRV allocation prevented reuse of the released slot." );
+		Require( device.Destroy( recycledFixedSrvBuffer ), "Failed to destroy the recycled fixed-SRV buffer." );
 
 		device.WaitIdle();
 	}

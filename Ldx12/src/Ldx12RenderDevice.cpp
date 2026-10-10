@@ -912,8 +912,7 @@ namespace ldx12
 	{
 		if( desc.type == BufferType::Structured || desc.type == BufferType::Raw )
 		{
-			resource.srvIndex_ =
-				shaderResourceSlot != UINT32_MAX ? manager_->AllocateFixedBindlessDescriptor( shaderResourceSlot ) : manager_->AllocateBindlessDescriptor();
+			resource.srvIndex_ = shaderResourceSlot != UINT32_MAX ? shaderResourceSlot : manager_->AllocateBindlessDescriptor();
 			resource.srvHandle_ = manager_->MakeBindlessCpuHandle( resource.srvIndex_ );
 
 			D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
@@ -960,8 +959,7 @@ namespace ldx12
 
 		if( desc.type == BufferType::Constant )
 		{
-			resource.cbvIndex_ =
-				constantBufferSlot != UINT32_MAX ? manager_->AllocateFixedBindlessDescriptor( constantBufferSlot ) : manager_->AllocateBindlessDescriptor();
+			resource.cbvIndex_ = constantBufferSlot != UINT32_MAX ? constantBufferSlot : manager_->AllocateBindlessDescriptor();
 			resource.cbvHandle_ = manager_->MakeBindlessCpuHandle( resource.cbvIndex_ );
 
 			D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc{};
@@ -974,6 +972,23 @@ namespace ldx12
 	BufferHandle RenderDevice::CreateBufferInternal( const BufferDesc& desc, uint32_t constantBufferSlot, uint32_t shaderResourceSlot )
 	{
 		ValidateBufferDesc( desc );
+
+		const uint32_t fixedSlot = constantBufferSlot != UINT32_MAX ? constantBufferSlot : shaderResourceSlot;
+		uint32_t fixedDescriptorIndex = UINT32_MAX;
+
+		if( fixedSlot != UINT32_MAX )
+		{
+			fixedDescriptorIndex = manager_->AllocateFixedBindlessDescriptor( fixedSlot );
+
+			if( fixedDescriptorIndex == UINT32_MAX )
+			{
+				return {};
+			}
+		}
+
+		DeviceManager::DeferredRelease::OnFailure cleanup(
+			[ this, fixedDescriptorIndex ]() noexcept { manager_->FreeBindlessDescriptor( fixedDescriptorIndex ); } );
+
 		BufferResource resource = CreateBufferResource( desc );
 		CreateBufferDescriptors( resource, desc, constantBufferSlot, shaderResourceSlot );
 

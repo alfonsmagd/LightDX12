@@ -7,6 +7,7 @@
 #include "Ldx12Swapchain.hpp"
 
 #include <algorithm>
+#include <cassert>
 #include <cstdio>
 #include <cstdlib>
 #include <cwchar>
@@ -269,6 +270,8 @@ namespace ldx12
 		InitializeDescriptorHeaps();
 		InitializeRootSignature();
 		InitializeCommandSignature();
+		InitializeConstantBufferRings();
+
 		baseMips_ = std::make_unique<BaseMips>( *this );
 		stagingDevice_ = std::make_unique<StagingDevice>( *this );
 	}
@@ -566,7 +569,7 @@ namespace ldx12
 
 	void DeviceManager::InitializeRootSignature()
 	{
-		D3D12_ROOT_PARAMETER1 parameters[ 2 ] = {};
+		D3D12_ROOT_PARAMETER1 parameters[ 3 ] = {};
 		parameters[ 0 ].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
 		parameters[ 0 ].Constants.Num32BitValues = ourMaxPushConstant32BitValues;
 		parameters[ 0 ].Constants.ShaderRegister = 0;
@@ -577,9 +580,15 @@ namespace ldx12
 		parameters[ 1 ].Constants.ShaderRegister = 1;
 		parameters[ 1 ].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
+		// Pack the two ring-buffer byte offsets into the low and high 16 bits.
+		parameters[ 2 ].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
+		parameters[ 2 ].Constants.Num32BitValues = 1;
+		parameters[ 2 ].Constants.ShaderRegister = 2;
+		parameters[ 2 ].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
 		D3D12_VERSIONED_ROOT_SIGNATURE_DESC rootDesc{};
 		rootDesc.Version = D3D_ROOT_SIGNATURE_VERSION_1_1;
-		rootDesc.Desc_1_1.NumParameters = 2;
+		rootDesc.Desc_1_1.NumParameters = static_cast<UINT>( std::size( parameters ) );
 		rootDesc.Desc_1_1.pParameters = parameters;
 		rootDesc.Desc_1_1.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT | D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED |
 								  D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED;
@@ -606,6 +615,193 @@ namespace ldx12
 
 		C_RESULT( device_->CreateCommandSignature( &signatureDesc, rootSignature_.Get(), IID_PPV_ARGS( commandSignature_.GetAddressOf() ) ),
 			"Failed to create command signature." );
+	}
+
+	void DeviceManager::InitializeConstantBufferRings()
+	{
+		constexpr std::array<ConstantBufferSlot, 2> ringSlots = { ConstantBufferSlot::EngineRingBuffer0, ConstantBufferSlot::EngineRingBuffer1 };
+		const CD3DX12_HEAP_PROPERTIES heapProperties( D3D12_HEAP_TYPE_UPLOAD );
+		const D3D12_RESOURCE_DESC resourceDesc = BufferResource::CreateNativeDesc( LDX12_CONSTANT_BUFFER_RING_SIZE_BYTES );
+		const D3D12_RANGE readRange{ 0, 0 };
+
+		for( size_t ringIndex = 0; ringIndex < constantBufferRings_.size(); ++ringIndex )
+		{
+			ConstantBufferRing& ring = constantBufferRings_[ ringIndex ];
+
+			ring.descriptorIndex_ = AllocateFixedBindlessDescriptor( ToSlotIndex( ringSlots[ ringIndex ] ) );
+
+			if( ring.descriptorIndex_ == UINT32_MAX )
+			{
+				continue;
+			}
+
+			C_RESULT( device_->CreateCommittedResource( &heapProperties,
+						  D3D12_HEAP_FLAG_NONE,
+						  &resourceDesc,
+						  D3D12_RESOURCE_STATE_GENERIC_READ,
+						  nullptr,
+						  IID_PPV_ARGS( ring.resource_.GetAddressOf() ) ),
+				"Failed to create constant buffer ring." );
+			detail::SetDebugName( ring.resource_.Get(), "Ldx12 EngineRingBuffer" + std::to_string( ringIndex ) );
+
+			void* mapped = nullptr;
+
+			C_RESULT( ring.resource_->Map( 0, &readRange, &mapped ), "Failed to map constant buffer ring." );
+			ring.mappedPtr_ = static_cast<uint8_t*>( mapped );
+
+			D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
+			srvDesc.Format = DXGI_FORMAT_R32_TYPELESS;
+			srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+			srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+			srvDesc.Buffer.NumElements = static_cast<UINT>( LDX12_CONSTANT_BUFFER_RING_SIZE_BYTES / sizeof( uint32_t ) );
+			srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_RAW;
+
+			device_->CreateShaderResourceView( ring.resource_.Get(), &srvDesc, MakeBindlessCpuHandle( ring.descriptorIndex_ ) );
+		}
+	}
+
+	uint32_t DeviceManager::UploadConstantBuffer( CommandBuffer& commandBuffer, const void* data, uint32_t sizeBytes, uint32_t ringIndex )
+	{
+		assert( data != nullptr );
+		assert( sizeBytes > 0 && sizeBytes <= LDX12_CONSTANT_BUFFER_RING_SIZE_BYTES );
+		assert( ringIndex < constantBufferRings_.size() );
+		assert( commandBuffer.manager_ == this && commandBuffer.active_ );
+
+		ConstantBufferRing& ring = constantBufferRings_[ ringIndex ];
+		const uint64_t allocationSize =
+			( static_cast<uint64_t>( sizeBytes ) + LDX12_CONSTANT_BUFFER_RING_ALIGNMENT - 1ull ) & ~( LDX12_CONSTANT_BUFFER_RING_ALIGNMENT - 1ull );
+
+		lockGuard lock( ring.mutex_ );
+
+		assert( ring.mappedPtr_ != nullptr && ring.descriptorIndex_ != UINT32_MAX );
+
+		uint64_t dataBegin = ring.head_;
+		const uint64_t physicalOffset = dataBegin % LDX12_CONSTANT_BUFFER_RING_SIZE_BYTES;
+
+		// we can lose some spaces of region, this is asimple ringbuffer without a allocation strategy, the idea is keep it simple and fast.
+		if( allocationSize > LDX12_CONSTANT_BUFFER_RING_SIZE_BYTES - physicalOffset )
+		{
+			dataBegin += LDX12_CONSTANT_BUFFER_RING_SIZE_BYTES - physicalOffset;
+		}
+
+		const bool ringWasEmpty = ring.ranges_.empty();
+		const uint64_t reusableTail = ringWasEmpty ? dataBegin : ring.tail_;
+		const uint64_t reservationEnd = dataBegin + allocationSize;
+
+		if( reservationEnd - reusableTail > LDX12_CONSTANT_BUFFER_RING_SIZE_BYTES )
+		{
+			OutputDebugStringA( "Ldx12: Constant buffer ring has no free space. Submit or discard pending commands and retire completed submissions.\n" );
+			return UINT32_MAX;
+		}
+
+		// Keep wrap padding reserved until the allocation that follows it completes.
+		const ConstantBufferInternalRange range{ .begin_ = ringWasEmpty ? dataBegin : ring.head_, .end_ = reservationEnd };
+		const uint32_t offset = static_cast<uint32_t>( dataBegin % LDX12_CONSTANT_BUFFER_RING_SIZE_BYTES );
+
+		ring.ranges_.push_back( { .range_ = range, .completed_ = false } );
+		DeferredRelease::OnFailure cleanup( [ &ring ]() noexcept { ring.ranges_.pop_back(); } );
+		commandBuffer.constantBufferRanges_[ ringIndex ].push_back( range );
+
+		std::memcpy( ring.mappedPtr_ + offset, data, sizeBytes );
+		ring.head_ = reservationEnd;
+
+		if( ringWasEmpty )
+		{
+			ring.tail_ = reusableTail;
+		}
+
+		return offset;
+	}
+
+	void DeviceManager::CommitConstantBufferRanges( CommandBuffer* const* commandBuffers, uint32_t commandBufferCount, SubmitHandle submission )
+	{
+		assert( commandBuffers != nullptr );
+		assert( commandBufferCount > 0 && commandBufferCount <= ourMaxCommandBufferBatch );
+		assert( !submission.Empty() );
+
+		bool hasRanges = false;
+
+		for( uint32_t commandIndex = 0; commandIndex < commandBufferCount; ++commandIndex )
+		{
+			const CommandBuffer* commandBuffer = commandBuffers[ commandIndex ];
+
+			assert( commandBuffer != nullptr );
+			assert( commandBuffer->manager_ == this && commandBuffer->active_ );
+
+			for( const std::deque<ConstantBufferInternalRange>& ranges : commandBuffer->constantBufferRanges_ )
+			{
+				hasRanges = hasRanges || !ranges.empty();
+			}
+		}
+
+		if( !hasRanges )
+		{
+			return;
+		}
+
+		ConstantBufferBatchRanges submittedRanges;
+
+		// Transfer the lists; each command receives empty lists for its next recording.
+		for( uint32_t commandIndex = 0; commandIndex < commandBufferCount; ++commandIndex )
+		{
+			ConstantBufferRecordingRanges& deferredRanges = submittedRanges[ commandIndex ];
+			ConstantBufferRecordingRanges& commandRanges = commandBuffers[ commandIndex ]->constantBufferRanges_;
+
+			deferredRanges.swap( commandRanges );
+		}
+
+		// The task owns these ranges across frames until the submission completes.
+		AddDeferredRelease( submission,
+			[ this, submittedRanges = std::move( submittedRanges ), commandBufferCount ]()
+			{
+				for( uint32_t commandIndex = 0; commandIndex < commandBufferCount; ++commandIndex )
+				{
+					const ConstantBufferRecordingRanges& commandRanges = submittedRanges[ commandIndex ];
+
+					for( uint32_t ringIndex = 0; ringIndex < commandRanges.size(); ++ringIndex )
+					{
+						ReleaseConstantBufferRanges( ringIndex, commandRanges[ ringIndex ] );
+					}
+				}
+			} );
+	}
+
+	void DeviceManager::ReleaseConstantBufferRanges( uint32_t ringIndex, const std::deque<ConstantBufferInternalRange>& ranges ) noexcept
+	{
+		assert( ringIndex < constantBufferRings_.size() );
+
+		if( ranges.empty() )
+		{
+			return;
+		}
+
+		ConstantBufferRing& ring = constantBufferRings_[ ringIndex ];
+		lockGuard lock( ring.mutex_ );
+
+		for( const ConstantBufferInternalRange& completedRange : ranges )
+		{
+			ConstantBufferRing::RangeState* matchingRange = nullptr;
+
+			for( ConstantBufferRing::RangeState& ringRange : ring.ranges_ )
+			{
+				if( ringRange.range_.begin_ == completedRange.begin_ && ringRange.range_.end_ == completedRange.end_ )
+				{
+					matchingRange = &ringRange;
+					break;
+				}
+			}
+
+			assert( matchingRange != nullptr );
+
+			matchingRange->completed_ = true;
+		}
+
+		// Reuse only the completed prefix; later completed ranges still wait for their predecessors.
+		while( !ring.ranges_.empty() && ring.ranges_.front().completed_ )
+		{
+			ring.tail_ = ring.ranges_.front().range_.end_;
+			ring.ranges_.pop_front();
+		}
 	}
 
 	uint32_t DeviceManager::AllocateBindlessDescriptor()
@@ -646,12 +842,14 @@ namespace ldx12
 	{
 		if( index < LDX12_BINDLESS_FIXED_SLOT_FIRST || index > LDX12_BINDLESS_FIXED_SLOT_LAST || index >= fixedBindlessDescriptorUsed_.size() )
 		{
-			throw std::runtime_error( "Invalid fixed bindless descriptor slot." );
+			OutputDebugStringA( "Ldx12: Invalid fixed bindless descriptor slot.\n" );
+			return UINT32_MAX;
 		}
 
 		if( fixedBindlessDescriptorUsed_[ index ] != 0u )
 		{
-			throw std::runtime_error( "Fixed bindless descriptor slot is already in use." );
+			OutputDebugStringA( "Ldx12: Fixed bindless descriptor slot is already in use.\n" );
+			return UINT32_MAX;
 		}
 
 		fixedBindlessDescriptorUsed_[ index ] = 1u;
@@ -957,6 +1155,21 @@ namespace ldx12
 		stagingDevice_.reset();
 		graphicsQueue_.immediateCommands_.reset();
 		baseMips_.reset();
+
+		for( ConstantBufferRing& ring : constantBufferRings_ )
+		{
+			if( ring.resource_ != nullptr && ring.mappedPtr_ != nullptr )
+			{
+				ring.resource_->Unmap( 0, nullptr );
+			}
+
+			ring.mappedPtr_ = nullptr;
+			ring.resource_.Reset();
+			ring.descriptorIndex_ = UINT32_MAX;
+			ring.head_ = 0;
+			ring.tail_ = 0;
+			ring.ranges_.clear();
+		}
 
 		slotMapBuffers_.ForEach(
 			[]( BufferResource& buffer )

@@ -5,6 +5,9 @@
 
 #define LDX12_DESCRIPTOR_SLOT_INVALID 0u
 
+#define LDX12_CONSTANT_BUFFER_RING_SIZE_BYTES ( 64u * 1024u )
+#define LDX12_CONSTANT_BUFFER_RING_ALIGNMENT 16u
+
 #define LDX12_FREE_CBV_SLOT_FIRST 1u
 #define LDX12_FREE_CBV_SLOT_COUNT 5u
 #define LDX12_ENGINE_CBV_SLOT_FIRST 6u
@@ -51,8 +54,8 @@ namespace ldx12
 		FreeCB3,
 		FreeCB4,
 
-		EngineFrame = LDX12_ENGINE_CBV_SLOT_FIRST,
-		EngineCamera,
+		EngineRingBuffer0 = LDX12_ENGINE_CBV_SLOT_FIRST,
+		EngineRingBuffer1,
 		EngineObject,
 		EngineMaterial,
 		EngineLighting,

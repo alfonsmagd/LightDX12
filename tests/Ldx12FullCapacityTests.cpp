@@ -20,7 +20,7 @@ namespace
 	constexpr uint32_t ourExpectedActiveCommandBuffers = 64;
 	constexpr uint32_t ourExpectedCommandBufferBatch = 4;
 	constexpr uint32_t ourExpectedTrackedTextures = 256;
-	constexpr uint32_t ourExpectedPushConstantValues = 63;
+	constexpr uint32_t ourExpectedPushConstantValues = 62;
 	constexpr uint32_t ourTestWindowCount = ourExpectedLiveSwapchains + 1;
 
 	LRESULT CALLBACK TestWindowProc( HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam )
@@ -370,7 +370,7 @@ float4 PSMain() : SV_Target0
 
 	void TestPushConstantCapacity( RenderDevice& device )
 	{
-		Require( ourMaxPushConstant32BitValues == ourExpectedPushConstantValues, "The public push-constant capacity is not 63 values." );
+		Require( ourMaxPushConstant32BitValues == ourExpectedPushConstantValues, "The public push-constant capacity is not 62 values." );
 
 		std::array<uint32_t, ourExpectedPushConstantValues + 1u> values{};
 		CommandBuffer& commands = device.AcquireCommandBuffer();
@@ -385,7 +385,7 @@ float4 PSMain() : SV_Target0
 		{
 			pushConstantLimitReached = true;
 		}
-		Require( pushConstantLimitReached, "CmdPushConstants accepted more than 63 values." );
+		Require( pushConstantLimitReached, "CmdPushConstants accepted more than 62 values." );
 
 		const SubmitHandle submission = device.Submit( commands );
 		device.Wait( submission );
