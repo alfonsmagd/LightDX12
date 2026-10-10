@@ -246,7 +246,7 @@ Ldx12 is available under the [MIT License](LICENSE). Third-party attribution is 
 | **3. [CBSRVCubes](samples/CBSRVCubes)**<br>[![CBSRVCubes](examples/images/03-cbsrv-cubes-0.4.0.png)](samples/CBSRVCubes) |
 | **4. [ImGuiNodeEditor](samples/ImGuiNodeEditor)**<br>[![ImGuiNodeEditor](examples/images/04-imgui-node-editor.png)](samples/ImGuiNodeEditor) |
 | **5. [Z-buffer + MSAA x4](samples/ZFighting)**<br>[![Z-buffer and MSAA x4](examples/images/05-zbuffer-msaa4.png)](samples/ZFighting) |
-| **6. [TexturedCube](samples/TexturedCube)**<br>[![TexturedCube](examples/images/06-textured-cube-0.4.0.png)](samples/TexturedCube) |
+| **6. [TexturedCube](samples/TexturedCube)**<br>[![TexturedCube](examples/images/06-textured-cube-light-gray-0.4.0.png)](samples/TexturedCube) |
 | **7. [TextureSamplers](samples/TextureSamplers)**<br>[![TextureSamplers](examples/images/07-texture-samplers.png)](samples/TextureSamplers) |
 | **8. [Ldx12 + Dear ImGui](samples/ImGuiDemo)**<br>[![Ldx12 + Dear ImGui](examples/images/08-imgui-demo.png)](samples/ImGuiDemo) |
 | **9. [WorldGeometry](samples/WorldGeometry)**<br>[![WorldGeometry](examples/images/09-world-geometry.png)](samples/WorldGeometry) |
