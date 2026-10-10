@@ -102,10 +102,11 @@ float4 PSMain(float4 position : SV_Position, float2 uv : TEXCOORD0) : SV_Target0
 	PushConstants BuildPushConstants( RenderDevice& device, TextureHandle texture, float time, float aspectRatio )
 	{
 		const XMMATRIX model = XMMatrixRotationX( time * 0.55f ) * XMMatrixRotationY( time ) * XMMatrixTranslation( 0.0f, 0.0f, 4.0f );
+		const XMMATRIX scale = XMMatrixScaling( 0.5f, 0.5f, 0.5f );
 		const XMMATRIX projection = XMMatrixPerspectiveFovLH( XMConvertToRadians( 45.0f ), aspectRatio, 0.1f, 100.0f );
 
 		PushConstants constants{};
-		XMStoreFloat4x4( &constants.mvp, XMMatrixTranspose( model * projection ) );
+		XMStoreFloat4x4( &constants.mvp, XMMatrixTranspose( scale * model * projection ) );
 		constants.textureIndex = device.GetBindlessIndex( texture );
 		constants.samplerIndex = ToSamplerIndex( SamplerSlot::LinearWrap );
 		return constants;
