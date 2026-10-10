@@ -112,13 +112,23 @@ float4 PSMain(float2 uv : TEXCOORD0) : SV_Target0
 
 Changing either resource means changing an index, not binding another resource table. Ldx12 configures the heaps and root signature for you. The snippets assume a prepared render pass, pipeline and resource states; bindless does not remove draws or synchronization.
 
-## Bindless layout
+## Origin and license
+
+Ldx12 began inside **IFNITY** and later became a standalone project.
+
+Ldx12 is available under the [MIT License](LICENSE). Third-party attribution is documented in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+<details>
+<summary><h1>Bindless layout</h1></summary>
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="Ldx12/docs/images/bindless-layout-dark.png">
   <img alt="Ldx12 bindless layout" src="Ldx12/docs/images/bindless-layout-light.png">
 </picture>
 
-## Get started
+</details>
+
+<details>
+<summary><h1>Get started</h1></summary>
 
 Requirements: Windows 10/11, Visual Studio 2022 with Desktop development with C++, CMake 3.24+, the Windows SDK with DXC, and an x64 target.
 
@@ -173,7 +183,10 @@ When used as a subproject, Ldx12 builds only the core library by default. Instal
 
 </details>
 
-## Features
+</details>
+
+<details>
+<summary><h1>Features</h1></summary>
 
 - Win32 `HWND` swapchains with VSync and tearing configuration.
 - Color and depth rendering, viewport, scissor, vertex/index buffers, instancing and indirect indexed draws.
@@ -217,24 +230,18 @@ The predefined descriptor positions are conveniences, not resource limits. Appli
 
 </details>
 
-## Current scope
+</details>
 
-Ldx12 requires Direct3D 12 feature level 12.0, bindless resource binding tier 3 and Shader Model 6.6. It currently does not provide:
+<details>
+<summary><h1>Requirements</h1></summary>
 
-- Dedicated compute queues, command buffers or submissions.
-- Ray tracing, mesh shaders or amplification shaders.
-- Traditional per-draw descriptor tables; binding is bindless-only.
-- Native swapchains for window types other than Win32 `HWND`.
+Windows 10/11, Direct3D 12 feature level 12.0, Resource Binding Tier 3 and Shader Model 6.6.
 
-Stress and functional tests are described in the [tests documentation](tests/README.md).
+**No ray tracing or mesh shaders yet.**
 
-Build options, capacities and limitations are also collected in the [technical reference](Ldx12/docs/REFERENCE.md). See the [CMake guide](cmake/README.md) for project organization.
+See the [tests documentation](tests/README.md), [technical reference](Ldx12/docs/REFERENCE.md) and [CMake guide](cmake/README.md) for more details.
 
-## Origin and license
-
-Ldx12 began inside **IFNITY** and later became a standalone project.
-
-Ldx12 is available under the [MIT License](LICENSE). Third-party attribution is documented in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+</details>
 
 <details>
 <summary><h1>Samples</h1></summary>
