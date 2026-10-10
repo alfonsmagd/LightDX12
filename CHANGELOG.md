@@ -2,6 +2,17 @@
 
 This file lists the main user-visible changes in each Ldx12 version.
 
+## 0.4.0 - Unreleased
+
+### Added
+
+- Added ring buffers to `CommandBuffer::SetConstantBuffer` for easy, fast per-draw constant-buffer uploads, with automatic offsets, typed HLSL `CB0.Load<T>()` / `CB1.Load<T>()` access and deferred reuse after GPU completion.
+- Added `21_ConstantBufferRings`, demonstrating per-object data in CB0 and a shared point light in CB1.
+
+### Changed
+
+- Updated the shared cube-logo texture with a light-gray background and refreshed the `06_TexturedCube` README screenshot.
+
 ## 0.3.1 - 2026-09-15
 
 ### Fixed
