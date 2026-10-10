@@ -259,5 +259,6 @@ Ldx12 is available under the [MIT License](LICENSE). Third-party attribution is 
 | **19. [MultiDrawIndirect glTF](samples/DrawIndirectGltf)**<br>[![MultiDrawIndirect glTF](examples/images/19-multidraw-indirect-gltf-0.4.0.png)](samples/DrawIndirectGltf) |
 | **20. [TriplanarMapping](samples/TriplanarMapping)** — sixteen animated icosahedra textured without UV coordinates. |
 | **21. Skinning** — animated BrainStem character with GPU skinning and playback controls. |
+| **[ConstantBufferRings](samples/ConstantBufferRings)** — easy, fast per-draw constant uploads with `SetConstantBuffer`: a rotating red cube and an orbiting point-light sphere, using CB0 per object and CB1 for shared light data. |
 
 </details>
