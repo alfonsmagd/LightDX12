@@ -76,3 +76,16 @@ These targets are enabled by their corresponding build components:
 | `DesktopRetroEffectTests` | Headless retro presets, resize behavior, temporal-history reset and D3D12 debug-layer errors |
 
 The glTF tests require Utils and third-party support. `Ldx12NodeGraphTests` requires the App target. `DesktopRetroEffectTests` is enabled with the desktop retro overlay.
+
+## Constant-buffer ring regression tests
+
+- `Ldx12ConstantBufferTests` reads CB0 and CB1 through the real HLSL header, verifies per-dispatch offsets and offset preservation, checks recording reset, and gates GPU submission to test deferred retirement during command-buffer reuse.
+- `Ldx12ConstantBufferRenderTests` renders the ConstantBufferRings sample offscreen for 900 frames at 320 x 180. It wraps ring 0, verifies the red cube and constant light color by pixel readback, checks animation changes, and rejects D3D12 debug-layer errors. Requires `LDX12_BUILD_UTILS=ON` or examples enabled.
+- `Ldx12DeferredTests` exercises ring lifetime through public batch submission, including interleaved reservations and full-capacity reuse.
+
+```bat
+cmake --build build --config Debug --target Ldx12ConstantBufferTests Ldx12ConstantBufferRenderTests Ldx12DeferredTests
+ctest --test-dir build -C Debug -R "^Ldx12(ConstantBuffer|ConstantBufferRender|Deferred)Tests$" --output-on-failure
+```
+
+The compute and deferred tests run in core CI; the 900-frame rendering test runs in Utils CI. Use `Release` in both commands to check the release configuration.

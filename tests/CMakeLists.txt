@@ -26,6 +26,12 @@ ldx12_add_test(Ldx12DeferredTests
     SOURCES Ldx12DeferredTests.cpp LIBRARIES Ldx12::Ldx12 TIMEOUT 10 WARNINGS)
 target_include_directories(Ldx12DeferredTests PRIVATE "${LDX12_PROJECT_ROOT}/Ldx12/src")
 
+ldx12_add_test(Ldx12ConstantBufferTests
+    SOURCES Ldx12ConstantBufferTests.cpp LIBRARIES Ldx12::Ldx12 TIMEOUT 60 WARNINGS)
+target_include_directories(Ldx12ConstantBufferTests PRIVATE "${LDX12_PROJECT_ROOT}/Ldx12/src")
+target_compile_definitions(Ldx12ConstantBufferTests PRIVATE
+    LDX12_RING_SHADER_DIRECTORY="${LDX12_PROJECT_ROOT}/Ldx12/src/shaders")
+
 ldx12_add_test(Ldx12StressTests
     SOURCES Ldx12StressTests.cpp LIBRARIES Ldx12::Ldx12 TIMEOUT 120 WARNINGS)
 ldx12_add_test(Ldx12FrameStressTests
@@ -36,6 +42,12 @@ ldx12_add_test(Ldx12FullCapacityTests
     SOURCES Ldx12FullCapacityTests.cpp LIBRARIES Ldx12::Ldx12 TIMEOUT 600 WARNINGS)
 
 if(LDX12_UTILS_AVAILABLE)
+    ldx12_add_test(Ldx12ConstantBufferRenderTests
+        SOURCES Ldx12ConstantBufferRenderTests.cpp LIBRARIES Ldx12::Utils TIMEOUT 180 WARNINGS)
+    target_include_directories(Ldx12ConstantBufferRenderTests PRIVATE "${LDX12_PROJECT_ROOT}/Ldx12/src")
+    target_compile_definitions(Ldx12ConstantBufferRenderTests PRIVATE
+        LDX12_RING_SAMPLE_DIRECTORY="${LDX12_PROJECT_ROOT}/samples/ConstantBufferRings")
+
     ldx12_add_test(Ldx12UtilsTests
         SOURCES Ldx12UtilsTests.cpp LIBRARIES Ldx12::Utils TIMEOUT 60 WARNINGS)
     if(LDX12_BUILD_THIRD_PARTY)

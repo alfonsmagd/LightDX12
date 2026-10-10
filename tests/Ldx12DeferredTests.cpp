@@ -17,9 +17,6 @@ namespace ldx12
 			expectedSubmission.bufferIndex_ = lastBufferIndex;
 			expectedSubmission.submitId_ = manager.graphicsQueue_.immediateCommands_->GetLastSubmitHandle().submitId_ + 1;
 
-			// Exercise Commit explicitly until the public submission path integrates it.
-			manager.CommitConstantBufferRanges( commands, count, expectedSubmission );
-
 			const SubmitHandle submission = manager.GetRenderDevice()->SubmitBatch( commands, count );
 
 			tests::Require( submission.Handle() == expectedSubmission.Handle(), "Unexpected ring batch submission handle." );
