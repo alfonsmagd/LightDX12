@@ -2,16 +2,12 @@ set(ldx12_core_test_sources
     "${CMAKE_CURRENT_LIST_DIR}/../Ldx12Tests.cpp"
     TestTemplate.hpp
     SlotMapCreationTest.cpp
-    SlotMapDestroyTest.cpp
-    SlotMapStaleHandleTest.cpp
     SlotMapCapacityTest.cpp
+    SlotMapFragmentationTest.cpp
     SlotMapVirtualObjectTest.cpp
     AdapterSelectionTest.cpp
-    PublicArrayTest.cpp
     GpuResourceLifecycleTest.cpp
-    GpuSamplerDeferredDestructionTest.cpp
     GpuComputeTest.cpp
-    GpuInvalidHandleTest.cpp
     GpuSubmissionTest.cpp
     GpuDescriptorRecyclingTest.cpp
     GpuMultisampleTest.cpp

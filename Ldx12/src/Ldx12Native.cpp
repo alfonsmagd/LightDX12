@@ -61,11 +61,14 @@ namespace ldx12
 		resource.formats_.srv_ = desc.Format;
 		resource.usageFlags_ = desc.Flags;
 		auto& manager = *device_->manager_;
+
+		manager.RequireResourceSlots();
+
 		uint32_t descriptor = UINT32_MAX;
 		DeviceManager::DeferredRelease::OnFailure cleanup( [ &manager, &descriptor ]() noexcept { manager.FreeBindlessDescriptor( descriptor ); } );
 		manager.CreateTextureShaderResourceView( resource );
 		descriptor = resource.srvIndex_;
-		const TextureHandle handle = manager.slotMapTextures_.Create( std::move( resource ) );
+		const TextureHandle handle = manager.StoreTextureResource( std::move( resource ) );
 		return handle;
 	}
 }

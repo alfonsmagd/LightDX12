@@ -1,14 +1,15 @@
 #include "Ldx12/Ldx12.hpp"
 #include "Ldx12Utils/Geometry.hpp"
 #include "Ldx12Utils/Ldx12Utils.hpp"
+#include "Ldx12/TestTemplate.hpp"
 
-#include <cassert>
 #include <cstdint>
 #include <iostream>
 #include <stdexcept>
 
 using namespace ldx12;
 using namespace ldx12::utils;
+using ldx12::tests::Require;
 
 namespace
 {
@@ -41,15 +42,14 @@ int main()
 		GeometryBuffers quadGeometry = CreateQuad( device );
 		GeometryBuffers cubeGeometry = CreateCube( device );
 		GeometryBuffers sphereGeometry = CreateSphere( device );
-		assert( quadGeometry.vertexBuffer.Valid() );
-		assert( quadGeometry.indexBuffer.Valid() );
-		assert( quadGeometry.indexCount == 6 );
-		assert( cubeGeometry.vertexBuffer.Valid() );
-		assert( cubeGeometry.indexBuffer.Valid() );
-		assert( cubeGeometry.indexCount == 36 );
-		assert( sphereGeometry.vertexBuffer.Valid() );
-		assert( sphereGeometry.indexBuffer.Valid() );
-		assert( sphereGeometry.indexCount > 0 );
+
+		Require( quadGeometry.vertexBuffer.Valid() && quadGeometry.indexBuffer.Valid() && quadGeometry.indexCount == 6,
+			"CreateQuad did not produce buffers for two triangles." );
+		Require( cubeGeometry.vertexBuffer.Valid() && cubeGeometry.indexBuffer.Valid() && cubeGeometry.indexCount == 36,
+			"CreateCube did not produce buffers for twelve triangles." );
+		Require( sphereGeometry.vertexBuffer.Valid() && sphereGeometry.indexBuffer.Valid() && sphereGeometry.indexCount > 0,
+			"CreateSphere did not produce indexed geometry." );
+
 		DestroyGeometry( device, sphereGeometry );
 		DestroyGeometry( device, cubeGeometry );
 		DestroyGeometry( device, quadGeometry );
@@ -97,54 +97,62 @@ int main()
 		arrowDesc.end = { 0.0f, 2.0f, 0.0f };
 		arrowDesc.color = { 0.0f, 1.0f, 0.0f, 1.0f };
 		world.AddArrow( arrowDesc );
-		assert( world.NumObjects() == 7 );
+
+		Require( world.NumObjects() == 7, "World did not retain three cubes, two spheres and two arrows." );
 
 		DebugRendererDesc debugRendererDesc{};
 		debugRendererDesc.colorFormat = colorDesc.format;
 		debugRendererDesc.depthFormat = depthDesc.format;
 		{
 			DebugRenderer debugRenderer( device, debugRendererDesc );
-			assert( debugRenderer.GetVertexCount() == 453 && debugRenderer.GetIndexCount() == 2346 );
+
+			Require( debugRenderer.GetVertexCount() == 453 && debugRenderer.GetIndexCount() == 2346,
+				"DebugRenderer did not build its shared cube, sphere and arrow meshes." );
 
 			Camera camera{};
 			camera.aspectRatio = 1.0f;
 			RenderFrame( device, debugRenderer, world, camera, color, depth );
-			assert( debugRenderer.GetVertexCount() == 453 );
-			assert( debugRenderer.GetIndexCount() == 2346 );
-			assert( debugRenderer.GetDrawCount() == 3 );
-			assert( debugRenderer.GetInstanceCount() == 7 );
+
+			Require( debugRenderer.GetDrawCount() == 3 && debugRenderer.GetInstanceCount() == 7,
+				"Seven objects of three geometry types were not batched into three draws." );
 
 			World secondWorld;
 			secondWorld.AddSphere( SphereDesc{} );
 			secondWorld.AddSphere( SphereDesc{} );
 			RenderFrame( device, debugRenderer, secondWorld, camera, color, depth );
-			assert( debugRenderer.GetVertexCount() == 453 && debugRenderer.GetIndexCount() == 2346 );
-			assert( debugRenderer.GetDrawCount() == 1 && debugRenderer.GetInstanceCount() == 2 );
+
+			Require( debugRenderer.GetVertexCount() == 453 && debugRenderer.GetIndexCount() == 2346,
+				"Switching worlds rebuilt or duplicated the shared geometry." );
+			Require( debugRenderer.GetDrawCount() == 1 && debugRenderer.GetInstanceCount() == 2,
+				"Switching worlds retained draws or instances from the previous world." );
+
 			RenderFrame( device, debugRenderer, world, camera, color, depth );
+
+			Require( debugRenderer.GetDrawCount() == 3 && debugRenderer.GetInstanceCount() == 7,
+				"Switching back did not restore the original world's instances." );
 
 			Transform movedCube{};
 			movedCube.position = { -2.0f, 0.5f, 0.0f };
 			world.SetTransform( cube, movedCube );
 			RenderFrame( device, debugRenderer, world, camera, color, depth );
-			assert( debugRenderer.GetVertexCount() == 453 );
-			assert( debugRenderer.GetDrawCount() == 3 );
-			assert( debugRenderer.GetInstanceCount() == 7 );
+
+			Require( debugRenderer.GetDrawCount() == 3 && debugRenderer.GetInstanceCount() == 7,
+				"Changing an object's transform changed the draw or instance count." );
 
 			world.Destroy( cube );
 			RenderFrame( device, debugRenderer, world, camera, color, depth );
-			assert( debugRenderer.GetVertexCount() == 453 );
-			assert( debugRenderer.GetIndexCount() == 2346 );
-			assert( debugRenderer.GetDrawCount() == 3 );
-			assert( debugRenderer.GetInstanceCount() == 6 );
 
-			assert( world.Contains( sphere ) );
-			assert( world.Contains( arrow ) );
+			Require( debugRenderer.GetDrawCount() == 3 && debugRenderer.GetInstanceCount() == 6, "Destroying one cube did not remove exactly one instance." );
+
+			Require( world.Contains( sphere ) && world.Contains( arrow ), "Destroying a cube invalidated unrelated objects." );
+
 			world.Clear();
 			RenderFrame( device, debugRenderer, world, camera, color, depth );
-			assert( debugRenderer.GetVertexCount() == 453 );
-			assert( debugRenderer.GetIndexCount() == 2346 );
-			assert( debugRenderer.GetDrawCount() == 0 );
-			assert( debugRenderer.GetInstanceCount() == 0 );
+
+			Require( debugRenderer.GetVertexCount() == 453 && debugRenderer.GetIndexCount() == 2346,
+				"Clearing a world changed the renderer's shared geometry." );
+			Require( debugRenderer.GetDrawCount() == 0 && debugRenderer.GetInstanceCount() == 0,
+				"Rendering a cleared world retained stale draws or instances." );
 		}
 
 		device.WaitIdle();

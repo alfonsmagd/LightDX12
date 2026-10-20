@@ -463,6 +463,7 @@ namespace ldx12
 
 		freeBindlessRangeCount_ = 0;
 		const uint32_t dynamicDescriptorCount = desc_.bindlessCapacity - LDX12_BINDLESS_DYNAMIC_SLOT_FIRST;
+
 		if( dynamicDescriptorCount > 0 )
 		{
 			freeBindlessRanges_[ freeBindlessRangeCount_++ ] = DescriptorRange{ .start_ = LDX12_BINDLESS_DYNAMIC_SLOT_FIRST, .count_ = dynamicDescriptorCount };
@@ -924,9 +925,79 @@ namespace ldx12
 		}
 	}
 
+	void DeviceManager::RequireResourceSlots( uint32_t count ) const
+	{
+		if( count > ourMaxResources - slotMapResources_.Size() )
+		{
+			throw std::length_error( "The shared buffer/texture pool has no room for the requested resources." );
+		}
+	}
+
+	BufferHandle DeviceManager::StoreBufferResource( BufferResource&& resource )
+	{
+		Resource storedResource = std::move( resource );
+		const ResourceHandle handle = slotMapResources_.Create( std::move( storedResource ) );
+
+		return BufferHandle( handle.Index(), handle.Gen() );
+	}
+
+	TextureHandle DeviceManager::StoreTextureResource( TextureResource&& resource )
+	{
+		Resource storedResource = std::move( resource );
+		const ResourceHandle handle = slotMapResources_.Create( std::move( storedResource ) );
+
+		return TextureHandle( handle.Index(), handle.Gen() );
+	}
+
+	BufferResource* DeviceManager::FindBufferResource( BufferHandle handle ) noexcept
+	{
+		const ResourceHandle resourceHandle( handle.Index(), handle.Gen() );
+		Resource* resource = slotMapResources_.Get( resourceHandle );
+
+		return resource != nullptr ? std::get_if<BufferResource>( resource ) : nullptr;
+	}
+
+	const BufferResource* DeviceManager::FindBufferResource( BufferHandle handle ) const noexcept
+	{
+		const ResourceHandle resourceHandle( handle.Index(), handle.Gen() );
+		const Resource* resource = slotMapResources_.Get( resourceHandle );
+
+		return resource != nullptr ? std::get_if<BufferResource>( resource ) : nullptr;
+	}
+
+	TextureResource* DeviceManager::FindTextureResource( TextureHandle handle ) noexcept
+	{
+		const ResourceHandle resourceHandle( handle.Index(), handle.Gen() );
+		Resource* resource = slotMapResources_.Get( resourceHandle );
+
+		return resource != nullptr ? std::get_if<TextureResource>( resource ) : nullptr;
+	}
+
+	const TextureResource* DeviceManager::FindTextureResource( TextureHandle handle ) const noexcept
+	{
+		const ResourceHandle resourceHandle( handle.Index(), handle.Gen() );
+		const Resource* resource = slotMapResources_.Get( resourceHandle );
+
+		return resource != nullptr ? std::get_if<TextureResource>( resource ) : nullptr;
+	}
+
+	void DeviceManager::DestroyResourceSlot( BufferHandle handle )
+	{
+		const ResourceHandle resourceHandle( handle.Index(), handle.Gen() );
+
+		slotMapResources_.Destroy( resourceHandle );
+	}
+
+	void DeviceManager::DestroyResourceSlot( TextureHandle handle )
+	{
+		const ResourceHandle resourceHandle( handle.Index(), handle.Gen() );
+
+		slotMapResources_.Destroy( resourceHandle );
+	}
+
 	BufferResource& DeviceManager::GetBufferResource( BufferHandle handle )
 	{
-		BufferResource* resource = slotMapBuffers_.Get( handle );
+		BufferResource* resource = FindBufferResource( handle );
 		if( resource == nullptr )
 		{
 			throw std::runtime_error( "Invalid buffer handle." );
@@ -936,7 +1007,7 @@ namespace ldx12
 
 	const BufferResource& DeviceManager::GetBufferResource( BufferHandle handle ) const
 	{
-		const BufferResource* resource = slotMapBuffers_.Get( handle );
+		const BufferResource* resource = FindBufferResource( handle );
 		if( resource == nullptr )
 		{
 			throw std::runtime_error( "Invalid buffer handle." );
@@ -946,7 +1017,7 @@ namespace ldx12
 
 	TextureResource& DeviceManager::GetTextureResource( TextureHandle handle )
 	{
-		TextureResource* resource = slotMapTextures_.Get( handle );
+		TextureResource* resource = FindTextureResource( handle );
 		if( resource == nullptr )
 		{
 			throw std::runtime_error( "Invalid texture handle." );
@@ -956,7 +1027,7 @@ namespace ldx12
 
 	const TextureResource& DeviceManager::GetTextureResource( TextureHandle handle ) const
 	{
-		const TextureResource* resource = slotMapTextures_.Get( handle );
+		const TextureResource* resource = FindTextureResource( handle );
 		if( resource == nullptr )
 		{
 			throw std::runtime_error( "Invalid texture handle." );
@@ -1086,13 +1157,15 @@ namespace ldx12
 			ring.ranges_.clear();
 		}
 
-		slotMapBuffers_.ForEach(
-			[]( BufferResource& buffer )
+		slotMapResources_.ForEach(
+			[]( Resource& resource )
 			{
-				if( buffer.mappedPtr_ != nullptr && buffer.resource_ != nullptr )
+				BufferResource* buffer = std::get_if<BufferResource>( &resource );
+
+				if( buffer != nullptr && buffer->mappedPtr_ != nullptr && buffer->resource_ != nullptr )
 				{
-					buffer.resource_->Unmap( 0, nullptr );
-					buffer.mappedPtr_ = nullptr;
+					buffer->resource_->Unmap( 0, nullptr );
+					buffer->mappedPtr_ = nullptr;
 				}
 			} );
 
@@ -1122,8 +1195,7 @@ namespace ldx12
 			} );
 		slotMapSwapchains_.Clear();
 
-		slotMapTextures_.Clear();
-		slotMapBuffers_.Clear();
+		slotMapResources_.Clear();
 		slotMapSamplers_.Clear();
 		graphicsQueue_.deferredReleases_.clear();
 
@@ -1225,7 +1297,7 @@ namespace ldx12
 
 	Swapchain* DeviceManager::GetOwningSwapchain( TextureHandle texture ) noexcept
 	{
-		const TextureResource* resource = slotMapTextures_.Get( texture );
+		const TextureResource* resource = FindTextureResource( texture );
 		if( resource == nullptr || !resource->swapchain_.Valid() )
 		{
 			return nullptr;

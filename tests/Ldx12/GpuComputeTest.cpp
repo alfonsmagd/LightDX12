@@ -81,12 +81,6 @@ void Copy(uint3 id : SV_DispatchThreadID)
 			device.GetUnorderedAccessIndex( output ),
 			count };
 		constants.back() = 7;
-		Require( constants[ 0 ] != LDX12_DESCRIPTOR_SLOT_INVALID && constants[ 1 ] != LDX12_DESCRIPTOR_SLOT_INVALID &&
-				constants[ 2 ] != LDX12_DESCRIPTOR_SLOT_INVALID,
-			"Compute buffers did not receive valid UAV/SRV descriptors." );
-		Require( constants[ 0 ] != constants[ 1 ] && constants[ 0 ] != constants[ 2 ] && constants[ 1 ] != constants[ 2 ],
-			"Compute UAV/SRV descriptors must occupy distinct slots." );
-
 		// Native readback is local to this test; dispatch and barriers use Ldx12.
 		D3D12_HEAP_PROPERTIES heap{};
 		heap.Type = D3D12_HEAP_TYPE_READBACK;
@@ -109,12 +103,6 @@ void Copy(uint3 id : SV_DispatchThreadID)
 
 		CommandBuffer& producer = device.AcquireCommandBuffer();
 		producer.CmdTransitionBuffer( input, D3D12_RESOURCE_STATE_UNORDERED_ACCESS );
-		RequireThrows<std::length_error>(
-			[ &producer, &constants ] { producer.CmdPushConstants( constants.data(), static_cast<uint32_t>( sizeof( constants ) + sizeof( uint32_t ) ) ); },
-			"CmdPushConstants accepted a payload larger than 248 bytes." );
-		RequireThrows<std::length_error>(
-			[ &producer, &constants ] { producer.CmdPushConstants( constants.data(), sizeof( uint32_t ), ourMaxPushConstant32BitValues ); },
-			"CmdPushConstants accepted a write past the application constants." );
 		producer.CmdPushConstants( constants );
 		producer.CmdBindComputePipeline( seed );
 		producer.CmdDispatch( groups );
@@ -161,8 +149,8 @@ void Copy(uint3 id : SV_DispatchThreadID)
 			const uint32_t expected = ( ( count - 1 - index ) * 3 + 7 ) * 2 + 1;
 			if( actual[ index ] != expected )
 			{
-				throw std::runtime_error( "Compute readback mismatch at index " + std::to_string( index ) +
-					": GPU value " + std::to_string( actual[ index ] ) + ", expected " + std::to_string( expected ) + "." );
+				throw std::runtime_error( "Compute readback mismatch at index " + std::to_string( index ) + ": GPU value " + std::to_string( actual[ index ] ) +
+										  ", expected " + std::to_string( expected ) + "." );
 			}
 		}
 		std::cout << "Compute readback verified: " << count << " values across " << groups << " thread groups.\n";

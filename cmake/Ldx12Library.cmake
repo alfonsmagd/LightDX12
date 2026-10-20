@@ -71,6 +71,7 @@ set_target_properties(Ldx12 PROPERTIES DEBUG_POSTFIX "d")
 target_compile_features(Ldx12 PUBLIC cxx_std_20)
 target_compile_definitions(Ldx12
     PUBLIC
+        LDX12_${LDX12_SELECTED_RESOURCE_PROFILE}_RESOURCES
         WIN32_LEAN_AND_MEAN
         NOMINMAX
         UNICODE

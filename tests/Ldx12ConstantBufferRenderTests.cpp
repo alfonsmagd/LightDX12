@@ -16,8 +16,11 @@ int main()
 		guard.active = true;
 		RenderDevice& device = *manager.GetRenderDevice();
 		D3D12Native native = device.GetNative();
+#if defined( _DEBUG )
 		ComPtr<ID3D12InfoQueue> infoQueue;
 		C_RESULT( native.GetDevice()->QueryInterface( IID_PPV_ARGS( infoQueue.GetAddressOf() ) ), "Info queue unavailable." );
+#endif
+
 		HLSLLoader::SetRootDirectory( LDX12_RING_SAMPLE_DIRECTORY );
 		RenderPipelineState cubePipeline = CreatePipeline( device, "VSCube", "PSCube" );
 		RenderPipelineState spherePipeline = CreatePipeline( device, "VSSphere", "PSSphere" );
@@ -141,6 +144,7 @@ int main()
 			}
 		}
 
+#if defined( _DEBUG )
 		for( UINT64 index = 0; index < infoQueue->GetNumStoredMessagesAllowedByRetrievalFilter(); ++index )
 		{
 			SIZE_T size = 0;
@@ -153,12 +157,14 @@ int main()
 				throw std::runtime_error( message->pDescription );
 			}
 		}
+#endif
+
 		depthTarget.Reset();
 		utils::DestroyGeometry( device, sphereGeometry );
 		utils::DestroyGeometry( device, cubeGeometry );
 		device.Destroy( target );
 		device.WaitIdle();
-		std::cout << "[PASS] 900 frames rendered, two different structs per frame through CB0, ring 0 wrapped, no D3D12 errors.\n";
+		std::cout << "[PASS] 900 frames rendered, two different structs per frame through CB0, ring 0 wrapped.\n";
 		return 0;
 	}
 	catch( const std::exception& error )

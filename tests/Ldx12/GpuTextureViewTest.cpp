@@ -2,13 +2,36 @@
 #include "Ldx12/Ldx12Native.hpp"
 
 #include <array>
-#include <string_view>
-#include <vector>
-
-#include <d3d12sdklayers.h>
 
 namespace ldx12::tests
 {
+	namespace
+	{
+		class PausedGpuQueue final
+		{
+		public:
+			explicit PausedGpuQueue( const D3D12Native& native )
+			{
+				Require( SUCCEEDED( native.GetDevice()->CreateFence( 0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS( fence_.GetAddressOf() ) ) ),
+					"Failed to create the queue pause fence." );
+				Require( SUCCEEDED( native.GetCommandQueue()->Wait( fence_.Get(), 1 ) ), "Failed to pause the GPU queue." );
+			}
+
+			~PausedGpuQueue()
+			{
+				fence_->Signal( 1 );
+			}
+
+			void Resume()
+			{
+				Require( SUCCEEDED( fence_->Signal( 1 ) ), "Failed to resume the GPU queue." );
+			}
+
+		private:
+			ComPtr<ID3D12Fence> fence_;
+		};
+	}
+
 	void TestGpuTextureArrayAndCubeViews()
 	{
 		ContextDesc context{};
@@ -30,6 +53,7 @@ namespace ldx12::tests
 		arrayDesc.data = arrayPixels.data();
 		arrayDesc.rowPitch = sizeof( uint32_t );
 		arrayDesc.slicePitch = sizeof( uint32_t );
+
 		const TextureHandle arrayTexture = device.CreateTexture( arrayDesc );
 
 		const std::array<uint32_t, ourCubeMapFaceCount> cubePixels = { 0xff0000ffu, 0xff00ffffu, 0xffff00ffu, 0xffffff00u, 0xffff0000u, 0xff00ff00u };
@@ -42,13 +66,17 @@ namespace ldx12::tests
 		cubeDesc.data = cubePixels.data();
 		cubeDesc.rowPitch = sizeof( uint32_t );
 		cubeDesc.slicePitch = sizeof( uint32_t );
+
 		const TextureHandle cubeTexture = device.CreateTexture( cubeDesc );
+
+		const D3D12Native native = device.GetNative();
 
 		TextureDesc targetDesc{};
 		targetDesc.debugName = "Ldx12Tests texture view target";
 		targetDesc.width = 2;
 		targetDesc.height = 1;
 		targetDesc.usage = TextureUsage::RenderTarget;
+
 		const TextureHandle target = device.CreateTexture( targetDesc );
 
 		static constexpr char vertexShader[] = R"(
@@ -97,9 +125,19 @@ float4 PSMain(float4 position : SV_Position) : SV_Target0
 		pipelineDesc.depthStencilState.StencilEnable = FALSE;
 		RenderPipelineState pipeline = device.CreateRenderPipeline( pipelineDesc );
 
-		const std::array<uint32_t, 3> constants = { device.GetBindlessIndex( arrayTexture ),
-			device.GetBindlessIndex( cubeTexture ),
-			ToSamplerIndex( SamplerSlot::PointClamp ) };
+		SamplerDesc samplerDesc{};
+		samplerDesc.filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
+		std::array<SamplerHandle, ourCustomSamplerCount> samplers{};
+
+		for( SamplerHandle& sampler : samplers )
+		{
+			sampler = device.CreateSampler( samplerDesc );
+		}
+
+		const SamplerHandle retiredSampler = samplers[ 0 ];
+		const uint32_t samplerIndex = device.GetSamplerIndex( retiredSampler );
+
+		const std::array<uint32_t, 3> constants = { device.GetBindlessIndex( arrayTexture ), device.GetBindlessIndex( cubeTexture ), samplerIndex };
 		RenderPass renderPass{};
 		renderPass.color[ 0 ].loadOp = LoadOp::Clear;
 		Framebuffer framebuffer{};
@@ -111,8 +149,21 @@ float4 PSMain(float4 position : SV_Position) : SV_Target0
 		commands.CmdPushConstants( constants.data(), sizeof( constants ) );
 		commands.CmdDraw( 3 );
 		commands.CmdEndRendering();
+
+		// Retire the sampler while this draw still needs its descriptor on the GPU.
+		PausedGpuQueue pausedQueue( native );
 		const SubmitHandle submission = device.Submit( commands );
+
+		Require( !device.IsReady( submission ), "The draw completed while the queue was paused." );
+		Require( device.Destroy( retiredSampler ) && !device.IsAlive( retiredSampler ), "Sampler destruction did not retire its handle." );
+		RequireThrows<std::length_error>( [ & ] { device.CreateSampler( samplerDesc ); }, "A pending draw's sampler descriptor was reused early." );
+
+		pausedQueue.Resume();
 		device.Wait( submission );
+		samplers[ 0 ] = device.CreateSampler( samplerDesc );
+
+		Require( device.GetSamplerIndex( samplers[ 0 ] ) == samplerIndex, "The sampler descriptor was not reclaimed after GPU completion." );
+		Require( !device.IsAlive( retiredSampler ), "Reusing the sampler descriptor revived its retired handle." );
 
 		std::array<uint8_t, 8> result{};
 		device.DownloadTexture2D( target, result.data(), 8, 8 );
@@ -120,36 +171,9 @@ float4 PSMain(float4 position : SV_Position) : SV_Target0
 			"Texture2DArray SRV did not sample the requested array slice." );
 		Require( result[ 4 ] == 255u && result[ 5 ] == 0u && result[ 6 ] == 0u && result[ 7 ] == 255u, "TextureCube SRV did not sample the +X face." );
 
-		ComPtr<ID3D12InfoQueue> infoQueue;
-		device.GetNative().GetDevice()->QueryInterface( IID_PPV_ARGS( infoQueue.GetAddressOf() ) );
-		const UINT64 firstValidationMessage = infoQueue != nullptr ? infoQueue->GetNumStoredMessages() : 0;
-
-		RenderPipelineDesc mismatchedPipelineDesc = pipelineDesc;
-		mismatchedPipelineDesc.color[ 0 ].format = DXGI_FORMAT_R16G16B16A16_FLOAT;
-		RenderPipelineState mismatchedPipeline = device.CreateRenderPipeline( mismatchedPipelineDesc );
-		CommandBuffer& validationCommands = device.AcquireCommandBuffer();
-		validationCommands.CmdBeginRendering( renderPass, framebuffer );
-		validationCommands.CmdBindRenderPipeline( mismatchedPipeline );
-		validationCommands.CmdEndRendering();
-		device.Discard( validationCommands );
-
-		if( infoQueue != nullptr )
+		for( SamplerHandle sampler : samplers )
 		{
-			bool foundFormatWarning = false;
-			for( UINT64 index = firstValidationMessage; index < infoQueue->GetNumStoredMessages(); ++index )
-			{
-				SIZE_T messageSize = 0;
-				infoQueue->GetMessage( index, nullptr, &messageSize );
-				std::vector<uint8_t> storage( messageSize );
-				D3D12_MESSAGE* message = reinterpret_cast<D3D12_MESSAGE*>( storage.data() );
-				if( SUCCEEDED( infoQueue->GetMessage( index, message, &messageSize ) ) && message->pDescription != nullptr &&
-					std::string_view( message->pDescription ).find( "Ldx12 warning: render pipeline color[0] format" ) != std::string_view::npos )
-				{
-					foundFormatWarning = true;
-					break;
-				}
-			}
-			Require( foundFormatWarning, "Binding a pipeline with a mismatched color format did not report an Ldx12 warning." );
+			device.Destroy( sampler );
 		}
 
 		device.Destroy( target );

@@ -9,7 +9,7 @@
 
 namespace
 {
-	constexpr uint32_t ourResourceCount = 128;
+	constexpr uint32_t ourResourceCount = ldx12::ourMaxTrackedTexturesPerCommandBuffer < 128u ? ldx12::ourMaxTrackedTexturesPerCommandBuffer : 128u;
 	constexpr uint32_t ourRoundCount = 32;
 	constexpr uint32_t ourBatchSize = 4;
 

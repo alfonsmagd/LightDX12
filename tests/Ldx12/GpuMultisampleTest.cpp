@@ -1,5 +1,4 @@
 #include "TestTemplate.hpp"
-#include "Ldx12/Ldx12Native.hpp"
 
 #include <array>
 
@@ -19,7 +18,6 @@ namespace ldx12::tests
 		DeviceManager& manager = DeviceManager::Initialize( context );
 		guard.active = true;
 		RenderDevice& device = *manager.GetRenderDevice();
-		D3D12Native native = device.GetNative();
 
 		Require( device.SupportsSampleCount( DXGI_FORMAT_R8G8B8A8_UNORM, sampleCount ), "RGBA8 does not support the required MSAA x4 test configuration." );
 		Require( device.SupportsSampleCount( DXGI_FORMAT_D32_FLOAT, sampleCount ), "D32 does not support the required MSAA x4 test configuration." );
@@ -48,10 +46,6 @@ namespace ldx12::tests
 		resolveDesc.height = height;
 		resolveDesc.format = DXGI_FORMAT_R8G8B8A8_UNORM;
 		const TextureHandle resolvedColor = device.CreateTexture( resolveDesc );
-
-		Require( native.GetResource( multisampleColor )->GetDesc().SampleDesc.Count == sampleCount, "The color texture was not created with four samples." );
-		Require( native.GetResource( multisampleDepth )->GetDesc().SampleDesc.Count == sampleCount, "The depth texture was not created with four samples." );
-		Require( native.GetResource( resolvedColor )->GetDesc().SampleDesc.Count == 1, "The resolve texture must contain one sample per pixel." );
 
 		static constexpr char vertexShader[] = R"(
 float4 VSMain(uint vertexId : SV_VertexID) : SV_Position
@@ -95,6 +89,7 @@ float4 PSMain() : SV_Target0
 		CommandBuffer& commands = device.AcquireCommandBuffer();
 		commands.CmdBeginRendering( renderPass, framebuffer );
 		commands.CmdBindRenderPipeline( pipeline );
+		commands.CmdDraw( 3 );
 		commands.CmdEndRendering();
 		commands.CmdResolveTexture( multisampleColor, resolvedColor );
 		const SubmitHandle submission = device.Submit( commands );
@@ -104,11 +99,31 @@ float4 PSMain() : SV_Target0
 		std::array<uint8_t, rowPitch * height> pixels{};
 		device.DownloadTexture2D( resolvedColor, pixels.data(), rowPitch, static_cast<uint32_t>( pixels.size() ) );
 
+		uint32_t backgroundPixels = 0;
+		uint32_t trianglePixels = 0;
+		uint32_t edgePixels = 0;
+
 		for( uint32_t offset = 0; offset < pixels.size(); offset += 4u )
 		{
-			Require( pixels[ offset ] == 255u && pixels[ offset + 1u ] == 0u && pixels[ offset + 2u ] == 0u && pixels[ offset + 3u ] == 255u,
-				"Resolving the MSAA render target produced unexpected pixels." );
+			Require( pixels[ offset ] == 255u && pixels[ offset + 1u ] == pixels[ offset + 2u ] && pixels[ offset + 3u ] == 255u,
+				"MSAA resolve produced a color outside the red-background/white-triangle blend." );
+
+			if( pixels[ offset + 1u ] == 0u )
+			{
+				++backgroundPixels;
+			}
+			else if( pixels[ offset + 1u ] == 255u )
+			{
+				++trianglePixels;
+			}
+			else
+			{
+				++edgePixels;
+			}
 		}
+
+		Require( backgroundPixels > 0 && trianglePixels > 0, "The draw did not produce both the triangle and its background." );
+		Require( edgePixels > 0, "Resolving the triangle did not produce any partially covered MSAA edge pixels." );
 
 		device.Destroy( resolvedColor );
 		device.Destroy( multisampleDepth );

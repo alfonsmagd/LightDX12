@@ -17,6 +17,29 @@
 	#define LDX12_PREFERRED_GPU_INDEX UINT32_MAX
 #endif
 
+// Select exactly one resource profile for the library and every consumer.
+#if ( defined( LDX12_SMALL_RESOURCES ) + defined( LDX12_MEDIUM_RESOURCES ) + defined( LDX12_HIGH_RESOURCES ) ) > 1
+	#error Select only one Ldx12 resource profile.
+#endif
+
+#if !defined( LDX12_SMALL_RESOURCES ) && !defined( LDX12_MEDIUM_RESOURCES ) && !defined( LDX12_HIGH_RESOURCES )
+	#define LDX12_HIGH_RESOURCES
+#endif
+
+#if defined( LDX12_SMALL_RESOURCES )
+	#define LDX12_MAX_RESOURCES 256u
+	#define LDX12_MAX_RTV_DESCRIPTORS 16u
+	#define LDX12_MAX_DSV_DESCRIPTORS 4u
+#elif defined( LDX12_MEDIUM_RESOURCES )
+	#define LDX12_MAX_RESOURCES 1024u
+	#define LDX12_MAX_RTV_DESCRIPTORS 32u
+	#define LDX12_MAX_DSV_DESCRIPTORS 8u
+#else
+	#define LDX12_MAX_RESOURCES 4096u
+	#define LDX12_MAX_RTV_DESCRIPTORS 64u
+	#define LDX12_MAX_DSV_DESCRIPTORS 12u
+#endif
+
 #define LDX12_DESCRIPTOR_SLOT_INVALID 0u
 
 #define LDX12_CONSTANT_BUFFER_RING_SIZE_BYTES ( 64u * 1024u )
@@ -116,7 +139,8 @@ namespace ldx12
 	concept BindingSlot =
 		std::is_same_v<SlotType, ConstantBufferSlot> || std::is_same_v<SlotType, ShaderResourceSlot> || std::is_same_v<SlotType, ReadWriteResourceSlot>;
 
-	template <BindingSlot SlotType> [[nodiscard]] constexpr uint32_t ToSlotIndex( SlotType slot ) noexcept
+	template <BindingSlot SlotType>
+	[[nodiscard]] constexpr uint32_t ToSlotIndex( SlotType slot ) noexcept
 	{
 		return static_cast<uint32_t>( slot );
 	}

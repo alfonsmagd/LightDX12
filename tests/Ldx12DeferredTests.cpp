@@ -135,10 +135,14 @@ namespace ldx12
 				Deferred::OnFailure cleanup( [ &cleanupCount ]() noexcept { ++cleanupCount; } );
 			}
 			if( cleanupCount != 0 )
+			{
 				throw std::runtime_error( "Normal exit ran cleanup." );
+			}
 			std::cout << "[PASS] Normal exit retains the resource\n";
 
-			struct ExpectedFailure{};
+			struct ExpectedFailure
+			{
+			};
 			bool propagated = false;
 			try
 			{
@@ -149,10 +153,14 @@ namespace ldx12
 			{
 				propagated = true;
 				if( cleanupCount != 1 )
+				{
 					throw std::runtime_error( "Cleanup did not run exactly once before the handler." );
+				}
 			}
 			if( !propagated )
+			{
 				throw std::runtime_error( "The original exception was swallowed." );
+			}
 			std::cout << "[PASS] Exception runs cleanup once and continues to the caller\n";
 
 			{
@@ -163,11 +171,13 @@ namespace ldx12
 				}
 				catch( const ExpectedFailure& )
 				{
-					std::cout << "[PASS] incremented ++ cleanupcountg \n";
+					// Handle the exception before the cleanup guard leaves its scope.
 				}
 			}
 			if( cleanupCount != 1 )
+			{
 				throw std::runtime_error( "A locally handled exception ran cleanup." );
+			}
 			std::cout << "[PASS] Locally handled exception retains the resource\n";
 		}
 	};

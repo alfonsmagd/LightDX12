@@ -352,7 +352,7 @@ namespace ldx12
 		trackedBuffer.currentState_ = resource.currentState_;
 		if( trackedBufferCount_ == trackedBuffers_.size() )
 		{
-			throw std::length_error( "A command buffer cannot track more than 256 buffers." );
+			throw std::length_error( "The command buffer buffer-tracking limit for the selected resource profile is exhausted." );
 		}
 
 		trackedBuffers_[ trackedBufferCount_ ] = trackedBuffer;
@@ -377,7 +377,7 @@ namespace ldx12
 		trackedTexture.currentState_ = resource.currentState_;
 		if( trackedTextureCount_ == trackedTextures_.size() )
 		{
-			throw std::length_error( "A command buffer cannot track more than 256 textures." );
+			throw std::length_error( "The command buffer texture-tracking limit for the selected resource profile is exhausted." );
 		}
 
 		trackedTextures_[ trackedTextureCount_ ] = trackedTexture;

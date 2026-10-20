@@ -10,16 +10,15 @@ namespace
 	using namespace ldx12;
 	using namespace ldx12::tests;
 
-	constexpr uint32_t ourExpectedLiveBuffers = 4'096;
-	constexpr uint32_t ourExpectedLiveTextures = 4'096;
-	constexpr uint32_t ourExpectedLiveSwapchains = 16;
+	constexpr uint32_t ourExpectedLiveResources = LDX12_MAX_RESOURCES;
+	constexpr uint32_t ourExpectedLiveSwapchains = ourMaxRtvDescriptors / 2u < 16u ? ourMaxRtvDescriptors / 2u : 16u;
 	constexpr uint32_t ourExpectedMinimumBackbuffers = 2;
 	constexpr uint32_t ourExpectedMaximumBackbuffers = 3;
 	constexpr uint32_t ourExpectedColorAttachments = 8;
 	constexpr uint32_t ourExpectedVertexInputElements = 16;
 	constexpr uint32_t ourExpectedActiveCommandBuffers = 64;
 	constexpr uint32_t ourExpectedCommandBufferBatch = 4;
-	constexpr uint32_t ourExpectedTrackedTextures = 256;
+	constexpr uint32_t ourExpectedTrackedTextures = LDX12_MAX_RESOURCES / 16u;
 	constexpr uint32_t ourExpectedPushConstantValues = 62;
 	constexpr uint32_t ourTestWindowCount = ourExpectedLiveSwapchains + 1;
 
@@ -101,6 +100,27 @@ namespace
 		return context;
 	}
 
+	void TestResourceProfileLimits()
+	{
+		ContextDesc context = CreateSmallContext();
+		context.bindlessCapacity = ourMaxBindlessDescriptors + 1u;
+
+		RequireThrows<std::length_error>( [ & ] { DeviceManager::Initialize( context ); },
+			"A context accepted a bindless heap larger than the compiled profile." );
+
+		context = CreateSmallContext();
+		context.rtvCapacity = ourMaxRtvDescriptors + 1u;
+
+		RequireThrows<std::length_error>( [ & ] { DeviceManager::Initialize( context ); },
+			"A context accepted an RTV heap larger than the compiled profile." );
+
+		context = CreateSmallContext();
+		context.dsvCapacity = ourMaxDsvDescriptors + 1u;
+
+		RequireThrows<std::length_error>( [ & ] { DeviceManager::Initialize( context ); },
+			"A context accepted a DSV heap larger than the compiled profile." );
+	}
+
 	void TestLiveBufferAndTextureCapacities()
 	{
 		ContextDesc context = CreateSmallContext();
@@ -113,7 +133,7 @@ namespace
 		bufferDesc.debugName = "Full-capacity buffer";
 		bufferDesc.size = sizeof( uint32_t );
 
-		std::array<BufferHandle, ourExpectedLiveBuffers> buffers{};
+		std::array<BufferHandle, ourExpectedLiveResources> buffers{};
 		for( BufferHandle& buffer : buffers )
 		{
 			buffer = device.CreateBuffer( bufferDesc );
@@ -130,7 +150,7 @@ namespace
 		{
 			bufferLimitReached = true;
 		}
-		Require( bufferLimitReached, "Ldx12 accepted more than 4,096 live buffers." );
+		Require( bufferLimitReached, "Ldx12 accepted buffers beyond the selected resource profile." );
 
 		for( BufferHandle buffer : buffers )
 		{
@@ -144,7 +164,7 @@ namespace
 		textureDesc.format = DXGI_FORMAT_R8_UNORM;
 		textureDesc.usage = TextureUsage::None;
 
-		std::array<TextureHandle, ourExpectedLiveTextures> textures{};
+		std::array<TextureHandle, ourExpectedLiveResources> textures{};
 		for( TextureHandle& texture : textures )
 		{
 			texture = device.CreateTexture( textureDesc );
@@ -161,11 +181,105 @@ namespace
 		{
 			textureLimitReached = true;
 		}
-		Require( textureLimitReached, "Ldx12 accepted more than 4,096 live textures." );
+		Require( textureLimitReached, "Ldx12 accepted textures beyond the selected resource profile." );
 
 		for( TextureHandle texture : textures )
 		{
 			Require( device.Destroy( texture ), "Full-capacity texture cleanup failed." );
+		}
+		device.WaitIdle();
+	}
+
+	void TestSharedResourceCapacity()
+	{
+		ContextDesc context = CreateSmallContext();
+		DeviceManagerGuard guard;
+		DeviceManager& manager = DeviceManager::Initialize( context );
+		guard.active = true;
+		RenderDevice& device = *manager.GetRenderDevice();
+
+		BufferDesc bufferDesc{};
+		bufferDesc.size = sizeof( uint32_t );
+
+		TextureDesc textureDesc{};
+		textureDesc.width = 1;
+		textureDesc.height = 1;
+		textureDesc.format = DXGI_FORMAT_R8_UNORM;
+		textureDesc.usage = TextureUsage::None;
+
+		std::array<BufferHandle, ourExpectedLiveResources / 2> buffers{};
+		std::array<TextureHandle, ourExpectedLiveResources / 2> textures{};
+
+		for( uint32_t index = 0; index < buffers.size(); ++index )
+		{
+			buffers[ index ] = device.CreateBuffer( bufferDesc );
+			textures[ index ] = device.CreateTexture( textureDesc );
+		}
+
+		RequireThrows<std::length_error>( [ & ] { device.CreateBuffer( bufferDesc ); }, "The shared pool accepted a buffer beyond the combined resource profile limit." );
+		RequireThrows<std::length_error>( [ & ] { device.CreateTexture( textureDesc ); },
+			"The shared pool accepted a texture beyond the combined resource profile limit." );
+
+		TextureDesc sampledTextureDesc = textureDesc;
+		sampledTextureDesc.usage = TextureUsage::Sampled;
+
+		RequireThrows<std::length_error>( [ & ] { device.CreateTexture( sampledTextureDesc ); }, "A sampled texture bypassed the shared resource limit." );
+
+		// Reuse an early slot across types while the rest of the static array remains full.
+		const BufferHandle staleBuffer = buffers.front();
+
+		Require( device.Destroy( staleBuffer ), "Could not free a buffer slot from the full pool." );
+		buffers.front() = {};
+
+		const TextureHandle replacementTexture = device.CreateTexture( textureDesc );
+
+		Require( replacementTexture.Index() == staleBuffer.Index() && replacementTexture.Gen() != staleBuffer.Gen(),
+			"A texture did not reuse the freed buffer slot with a new generation." );
+		Require( !device.IsAlive( staleBuffer ) && !device.Destroy( staleBuffer ), "A stale buffer handle affected a texture in its former slot." );
+		Require( device.IsAlive( replacementTexture ), "The replacement texture was invalidated." );
+
+		const TextureHandle staleTexture = textures.front();
+
+		Require( device.Destroy( staleTexture ), "Could not free a texture slot from the full pool." );
+		textures.front() = {};
+
+		const BufferHandle replacementBuffer = device.CreateBuffer( bufferDesc );
+
+		Require( replacementBuffer.Index() == staleTexture.Index() && replacementBuffer.Gen() != staleTexture.Gen(),
+			"A buffer did not reuse the freed texture slot with a new generation." );
+		Require( !device.IsAlive( staleTexture ) && !device.Destroy( staleTexture ), "A stale texture handle affected a buffer in its former slot." );
+		Require( device.IsAlive( replacementBuffer ), "The replacement buffer was invalidated." );
+
+		for( BufferHandle buffer : buffers )
+		{
+			if( buffer.Valid() )
+			{
+				Require( device.Destroy( buffer ), "Mixed resource buffer cleanup failed." );
+			}
+		}
+
+		for( TextureHandle texture : textures )
+		{
+			if( texture.Valid() )
+			{
+				Require( device.Destroy( texture ), "Mixed resource texture cleanup failed." );
+			}
+		}
+
+		Require( device.Destroy( replacementTexture ), "Replacement texture cleanup failed." );
+		Require( device.Destroy( replacementBuffer ), "Replacement buffer cleanup failed." );
+
+		// A rejected creation must leave the entire dynamic descriptor budget available.
+		std::array<TextureHandle, 8> sampledTextures{};
+
+		for( TextureHandle& texture : sampledTextures )
+		{
+			texture = device.CreateTexture( sampledTextureDesc );
+		}
+
+		for( TextureHandle texture : sampledTextures )
+		{
+			Require( device.Destroy( texture ), "Descriptor budget cleanup failed." );
 		}
 		device.WaitIdle();
 	}
@@ -328,7 +442,7 @@ float4 PSMain() : SV_Target0
 
 	void TestTextureTrackingCapacity( RenderDevice& device )
 	{
-		Require( ourMaxTrackedTexturesPerCommandBuffer == ourExpectedTrackedTextures, "The public tracked-texture capacity is not 256." );
+		Require( ourMaxTrackedTexturesPerCommandBuffer == ourExpectedTrackedTextures, "The tracked-texture capacity differs from the selected profile." );
 
 		TextureDesc textureDesc{};
 		textureDesc.debugName = "Full-capacity tracked texture";
@@ -358,7 +472,7 @@ float4 PSMain() : SV_Target0
 		{
 			trackingLimitReached = true;
 		}
-		Require( trackingLimitReached, "A command buffer tracked more than 256 textures." );
+		Require( trackingLimitReached, "A command buffer exceeded its texture-tracking limit." );
 
 		const SubmitHandle submission = device.Submit( commands );
 		device.Wait( submission );
@@ -511,7 +625,17 @@ float4 PSMain() : SV_Target0
 		{
 			swapchainLimitReached = true;
 		}
-		Require( swapchainLimitReached, "Ldx12 accepted more than 16 live swapchains." );
+		catch( const std::runtime_error& )
+		{
+			if constexpr( ourExpectedLiveSwapchains == 16 )
+			{
+				throw;
+			}
+
+			// SMALL reaches the RTV budget before the 16 swapchain slots.
+			swapchainLimitReached = true;
+		}
+		Require( swapchainLimitReached, "Ldx12 exceeded the available swapchain slots or RTV descriptors." );
 	}
 }
 
@@ -520,8 +644,14 @@ int main()
 	try
 	{
 		const auto startTime = std::chrono::steady_clock::now();
+		TestResourceProfileLimits();
+		std::cout << "[PASS] compiled resource profile heap limits\n";
+
 		TestLiveBufferAndTextureCapacities();
-		std::cout << "[PASS] 4,096 live buffers and textures\n";
+		std::cout << "[PASS] " << ourExpectedLiveResources << " buffers or textures\n";
+
+		TestSharedResourceCapacity();
+		std::cout << "[PASS] " << ourExpectedLiveResources << " combined resources and cross-type slot reuse\n";
 
 		TestRecordedCapacities();
 		std::cout << "[PASS] render, pipeline and command-buffer capacities\n";
@@ -531,7 +661,7 @@ int main()
 		std::cout << "[PASS] 2-3 backbuffers per swapchain\n";
 
 		TestLiveSwapchainCapacity( windows );
-		std::cout << "[PASS] 16 live swapchains\n";
+		std::cout << "[PASS] " << ourExpectedLiveSwapchains << " live swapchains within slot and RTV limits\n";
 
 		const double elapsedSeconds = std::chrono::duration<double>( std::chrono::steady_clock::now() - startTime ).count();
 		std::cout << "Ldx12 full-capacity tests passed in " << elapsedSeconds << " seconds.\n";

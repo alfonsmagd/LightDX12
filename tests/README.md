@@ -17,8 +17,8 @@ Use `Release` in both commands to test the release configuration.
 
 `Ldx12Tests` contains the main CPU and GPU contract checks:
 
-- Generational `SlotMap` creation, destruction, reuse, stale handles, fixed capacity and virtual objects.
-- Public fixed-array properties and documented capacities.
+- Generational `SlotMap` creation, destruction, reuse, stale handles, stable storage, fragmented-slot reuse, fixed capacity and virtual objects.
+- Adapter selection through the public initialization API, selected device properties and fallback after a nonexistent index.
 - Buffer, texture and sampler lifetime, including invalid-handle behavior.
 - Deferred sampler destruction and descriptor reuse after GPU completion.
 - Bindless SRV/UAV descriptor allocation, fragmentation, coalescing and recycling.
@@ -26,7 +26,6 @@ Use `Release` in both commands to test the release configuration.
 - Command-buffer batches, synchronization, recycling and `Discard()` recovery.
 - Multisample rendering and resolve.
 - Shader access to `Texture2DArray` and `TextureCube` views.
-- Texture-format queries and framebuffer/pipeline color-format warnings through the D3D12 info queue.
 
 The compute test also exercises the typed `CmdPushConstants(constants)` overload. Build and run this target with:
 
@@ -35,15 +34,46 @@ cmake --build build --config Debug --target Ldx12Tests --parallel
 ctest --test-dir build -C Debug -R "^Ldx12Tests$" --output-on-failure
 ```
 
+For a shorter feedback loop, list or select cases directly. `CPU` and `GPU` select their group; other filters match a case-sensitive substring of the displayed name. An unmatched filter fails instead of silently passing:
+
+```bat
+build\tests\Ldx12\Debug\Ldx12Tests.exe --list
+build\tests\Ldx12\Debug\Ldx12Tests.exe CPU
+build\tests\Ldx12\Debug\Ldx12Tests.exe "SlotMap capacity"
+build\tests\Ldx12\Debug\Ldx12Tests.exe "GPU descriptor"
+```
+
+`CPU` runs without initializing a graphics device. With no argument, the executable runs all cases and reports every failure. CTest keeps the existing `Ldx12Tests` entry and runs the complete suite once.
+
+### Core scenarios
+
+The core executable has eleven cases: four CPU cases, adapter selection and six GPU resource-use scenarios. Capacity and sustained pressure have their own executables.
+
+| Source | Scenario |
+| --- | --- |
+| `Ldx12/SlotMapCreationTest.cpp` | Create, retrieve and iterate objects; destroy/reuse a slot; reject stale handles; clear and refill |
+| `Ldx12/SlotMapCapacityTest.cpp` | Fill a four-slot map, reject overflow, copy and move fragmented storage |
+| `Ldx12/SlotMapFragmentationTest.cpp` | Preserve the 32/53-hole regression across three 64-slot regions |
+| `Ldx12/SlotMapVirtualObjectTest.cpp` | Release owned polymorphic objects on destruction and clear |
+| `Ldx12/AdapterSelectionTest.cpp` | Initialize the default GPU, inspect its properties and verify fallback from a nonexistent index |
+| `Ldx12/GpuResourceLifecycleTest.cpp` | Upload/update a buffer, upload/read back texture pixels, destroy/recreate resources and reject retired handles |
+| `Ldx12/GpuComputeTest.cpp` | Write a structured UAV, consume it as an SRV, write a raw UAV and verify CPU readback |
+| `Ldx12/GpuSubmissionTest.cpp` | Discard a resource transition, record two render passes before submission and verify the final texture pixels |
+| `Ldx12/GpuDescriptorRecyclingTest.cpp` | Reuse descriptor holes and ranges across textures/buffers, and reclaim RTV/DSV/fixed slots |
+| `Ldx12/GpuMultisampleTest.cpp` | Draw a white triangle over red, resolve MSAA and verify the interior, background and partially covered edges |
+| `Ldx12/GpuTextureViewTest.cpp` | Sample an array slice and cube face, retire the sampler during the pending draw and reuse its descriptor after completion |
+
+GPU checks prefer observable results over inspecting native resource descriptions. Test expectations use exceptions so they remain active in Release. Constant-buffer usage is covered by the dedicated compute and rendering regressions below.
+
 ## Focused infrastructure tests
 
 | Target | Coverage |
 | --- | --- |
 | `Ldx12NativeImportTests` | Native texture import, COM ownership, pixels, invalid inputs and descriptor reuse |
-| `Ldx12DeferredTests` | `DeferredRelease::OnFailure` on normal exit, exception unwinding and locally handled exceptions; no GPU required |
+| `Ldx12DeferredTests` | CPU cleanup-guard semantics plus GPU ring retirement, interleaved reservations and full-capacity reuse |
 | `Ldx12FullCapacityTests` | Live-resource, swapchain, attachment, vertex-input, command-buffer, state-tracking and push-constant limits |
 
-The capacity test reaches 64 acquired command buffers, batches of four, 256 tracked textures and 63 push-constant values:
+The capacity test uses the compiled resource profile, checks oversized heap rejection, and reaches 64 acquired command buffers, batches of four, the profile tracking limit and 62 push-constant values. Configure `LDX12_RESOURCE_PROFILE=SMALL`, `MEDIUM` or `HIGH` to exercise each profile:
 
 ```bat
 cmake --build build --config Debug --target Ldx12FullCapacityTests --parallel

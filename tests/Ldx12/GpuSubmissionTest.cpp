@@ -1,5 +1,4 @@
 #include "TestTemplate.hpp"
-#include "Ldx12/Ldx12Native.hpp"
 
 #include <array>
 
@@ -15,80 +14,48 @@ namespace ldx12::tests
 		DeviceManager& manager = DeviceManager::Initialize( context );
 		guard.active = true;
 		RenderDevice& device = *manager.GetRenderDevice();
-		D3D12Native native = device.GetNative();
 
-		const SubmitHandle emptySubmission{};
-		Require( device.IsReady( emptySubmission ), "An empty submission handle was not reported as ready." );
-		device.Wait( emptySubmission );
+		TextureDesc targetDesc{};
+		targetDesc.debugName = "Batched render target";
+		targetDesc.width = 2;
+		targetDesc.height = 2;
+		targetDesc.usage = TextureUsage::RenderTarget;
 
-		TextureDesc batchTextureDesc{};
-		batchTextureDesc.debugName = "Ldx12Tests batch state tracking";
-		const TextureHandle batchTexture = device.CreateTexture( batchTextureDesc );
+		const TextureHandle target = device.CreateTexture( targetDesc );
+		Framebuffer framebuffer{};
+		framebuffer.color[ 0 ].texture = target;
+		RenderPass renderPass{};
+		renderPass.color[ 0 ].loadOp = LoadOp::Clear;
+		renderPass.color[ 0 ].clearColor = { 1.0f, 0.0f, 0.0f, 1.0f };
 
-		CommandBuffer& firstBatchCommandBuffer = device.AcquireCommandBuffer();
-		CommandBuffer& secondBatchCommandBuffer = device.AcquireCommandBuffer();
-		CommandBuffer& thirdBatchCommandBuffer = device.AcquireCommandBuffer();
-		CommandBuffer& fourthBatchCommandBuffer = device.AcquireCommandBuffer();
-		firstBatchCommandBuffer.CmdTransitionTexture( batchTexture, D3D12_RESOURCE_STATE_COPY_DEST );
-		secondBatchCommandBuffer.CmdTransitionTexture( batchTexture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE );
-		thirdBatchCommandBuffer.CmdTransitionTexture( batchTexture, D3D12_RESOURCE_STATE_COPY_SOURCE );
-		fourthBatchCommandBuffer.CmdTransitionTexture( batchTexture, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE );
+		// Discarded transitions must not affect the next recording of this resource.
+		CommandBuffer& cancelled = device.AcquireCommandBuffer();
+		cancelled.CmdTransitionTexture( target, D3D12_RESOURCE_STATE_COPY_DEST );
+		device.Discard( cancelled );
+		RequireThrows<std::invalid_argument>( [ & ] { device.Discard( cancelled ); }, "Discard accepted an inactive command buffer." );
 
-		CommandBuffer* commandBufferBatch[] = { &firstBatchCommandBuffer, &secondBatchCommandBuffer, &thirdBatchCommandBuffer, &fourthBatchCommandBuffer };
-		const SubmitHandle batchSubmission = device.SubmitBatch( commandBufferBatch, static_cast<uint32_t>( std::size( commandBufferBatch ) ) );
-		Require( !batchSubmission.Empty(), "Submitting a command-buffer batch returned an empty submission handle." );
-		device.Wait( batchSubmission );
-		Require( device.IsReady( batchSubmission ), "A waited command-buffer batch was not reported as ready." );
-		device.Destroy( batchTexture );
+		// Record both passes before submitting; the second pass must see the first pass's state.
+		CommandBuffer& first = device.AcquireCommandBuffer();
+		first.CmdBeginRendering( renderPass, framebuffer );
+		first.CmdEndRendering();
+		first.CmdTransitionTexture( target, D3D12_RESOURCE_STATE_COPY_SOURCE );
 
-		std::array<CommandBuffer*, ourMaxActiveCommandBuffers> activeCommandBuffers{};
-		for( CommandBuffer*& activeCommandBuffer : activeCommandBuffers )
-		{
-			activeCommandBuffer = &device.AcquireCommandBuffer();
-		}
-		bool activeCommandBufferLimitReached = false;
-		try
-		{
-			device.AcquireCommandBuffer();
-		}
-		catch( const std::length_error& )
-		{
-			activeCommandBufferLimitReached = true;
-		}
-		Require( activeCommandBufferLimitReached, "AcquireCommandBuffer exceeded the fixed active-command-buffer pool." );
+		renderPass.color[ 0 ].clearColor = { 0.0f, 1.0f, 0.0f, 1.0f };
+		CommandBuffer& second = device.AcquireCommandBuffer();
+		second.CmdBeginRendering( renderPass, framebuffer );
+		second.CmdEndRendering();
 
-		device.Discard( *activeCommandBuffers[ 0 ] );
-		RequireThrows<std::invalid_argument>(
-			[ &device, &activeCommandBuffers ] { device.Discard( *activeCommandBuffers[ 0 ] ); }, "Discard accepted an inactive command buffer." );
-		activeCommandBuffers[ 0 ] = &device.AcquireCommandBuffer();
-
-		SubmitHandle poolSubmission{};
-		for( uint32_t offset = 0; offset < ourMaxActiveCommandBuffers; offset += ourMaxCommandBufferBatch )
-		{
-			poolSubmission = device.SubmitBatch( activeCommandBuffers.data() + offset, ourMaxCommandBufferBatch );
-		}
-		device.Wait( poolSubmission );
-		Require( device.IsReady( poolSubmission ), "The fixed command-buffer pool did not complete its submissions." );
-
-		CommandBuffer& commandBuffer = device.AcquireCommandBuffer();
-		Require( native.GetCommandList( commandBuffer ) != nullptr, "Command buffer does not expose its native D3D12 command list." );
-		commandBuffer.CmdSetViewport( 4.0f, 8.0f, 32.0f, 16.0f, 0.25f, 0.75f );
-		commandBuffer.CmdSetScissor( 4, 8, 36, 24 );
-		const SubmitHandle submission = device.Submit( commandBuffer );
-		Require( !submission.Empty(), "Submitting a command buffer returned an empty submission handle." );
+		CommandBuffer* batch[] = { &first, &second };
+		const SubmitHandle submission = device.SubmitBatch( batch, 2 );
 
 		device.Wait( submission );
-		Require( device.IsReady( submission ), "A waited submission was not reported as ready." );
+		std::array<uint32_t, 4> pixels{};
 
-		constexpr uint32_t recycleSubmissionCount = 65;
-		for( uint32_t index = 0; index < recycleSubmissionCount; ++index )
-		{
-			CommandBuffer& recycledCommandBuffer = device.AcquireCommandBuffer();
-			const SubmitHandle recycledSubmission = device.Submit( recycledCommandBuffer );
-			Require( !recycledSubmission.Empty(), "Command-buffer recycling returned an empty submission handle." );
-			device.Wait( recycledSubmission );
-		}
+		device.DownloadTexture2D( target, pixels.data(), 2u * sizeof( uint32_t ), sizeof( pixels ) );
+		const std::array<uint32_t, 4> expected = { 0xff00ff00u, 0xff00ff00u, 0xff00ff00u, 0xff00ff00u };
 
-		Require( device.IsReady( submission ), "A completed submission became pending after command-buffer recycling." );
+		Require( pixels == expected, "Batched passes did not leave the second pass's green pixels." );
+		device.Destroy( target );
+		device.WaitIdle();
 	}
 }

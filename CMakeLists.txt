@@ -15,6 +15,13 @@ option(LDX12_BUILD_THIRD_PARTY "Build bundled third-party integrations and sampl
 option(LDX12_INSTALL "Generate installation rules for Ldx12" ${PROJECT_IS_TOP_LEVEL})
 option(LDX12_BUILD_DESKTOP_RETRO_OVERLAY "Build the Windows capture/D3D11 desktop overlay example" ${LDX12_BUILD_EXAMPLES})
 
+set(LDX12_RESOURCE_PROFILE "HIGH" CACHE STRING "Static resource capacity: SMALL (256), MEDIUM (1024), HIGH (4096)")
+set_property(CACHE LDX12_RESOURCE_PROFILE PROPERTY STRINGS SMALL MEDIUM HIGH)
+string(TOUPPER "${LDX12_RESOURCE_PROFILE}" LDX12_SELECTED_RESOURCE_PROFILE)
+if(NOT LDX12_SELECTED_RESOURCE_PROFILE MATCHES "^(SMALL|MEDIUM|HIGH)$")
+    message(FATAL_ERROR "LDX12_RESOURCE_PROFILE must be SMALL, MEDIUM or HIGH.")
+endif()
+
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 include(GNUInstallDirs)
 include(cmake/Ldx12BuildHelpers.cmake)

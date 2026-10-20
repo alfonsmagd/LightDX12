@@ -6,12 +6,14 @@ This file lists the main user-visible changes in each Ldx12 version.
 
 ### Added
 
+- Added SMALL/MEDIUM/HIGH resource profiles and regression coverage for fixed capacities, fragmented slot reuse and shared buffer/texture storage.
 - Added support for selecting different GPU adapters by DXGI index or NVIDIA/AMD preference, with configurable defaults, fallback to a compatible adapter and Shader Model 6.6 validation.
 - Added ring buffers to `CommandBuffer::SetConstantBuffer` for easy, fast per-draw constant-buffer uploads, with automatic offsets, typed HLSL `CB0.Load<T>()` / `CB1.Load<T>()` access and deferred reuse after GPU completion.
 - Added `21_ConstantBufferRings`, demonstrating per-object data in CB0 and a shared point light in CB1.
 
 ### Changed
 
+- Consolidated the core CPU/GPU tests, added case filters, and kept test checks active in Release builds.
 - Simplified GPU capability checks to Shader Model 6.6; adapter names now use fixed buffers and expose a LUID. Software adapters, including WARP, are no longer selected.
 - Updated the shared cube-logo texture with a light-gray background and refreshed the `06_TexturedCube` README screenshot.
 

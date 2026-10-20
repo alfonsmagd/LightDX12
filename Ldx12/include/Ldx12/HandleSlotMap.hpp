@@ -6,7 +6,10 @@
 #include <cstdint>
 #include <limits>
 #include <stdexcept>
+#include <type_traits>
 #include <utility>
+
+#include "Ldx12/Ldx12_Defines.hpp"
 
 namespace ldx12
 {
@@ -63,6 +66,7 @@ namespace ldx12
 		}
 
 		template <typename T, std::size_t Capacity> friend class SlotMap;
+		friend class DeviceManager;
 
 		uint32_t index_ = 0;
 		uint32_t gen_ = 0;
@@ -72,57 +76,60 @@ namespace ldx12
 	{
 		static_assert( Capacity > 0 );
 		static_assert( Capacity <= std::numeric_limits<uint32_t>::max() );
+		static_assert( Capacity <= LDX12_MAX_RESOURCES, "Slot capacity exceeds the selected resource profile." );
 
 		struct Slot
 		{
-			ObjectType obj = {};
-			uint32_t gen = 1;
+			ObjectType object = {};
+			uint32_t generation = 1;
 			bool occupied = false;
 		};
 
 	public:
-		Handle<ObjectType> Create( ObjectType&& obj )
+		SlotMap() = default;
+
+		Handle<ObjectType> Create( ObjectType&& object )
 		{
-			uint32_t index = 0;
-			if( freeCount_ > 0 )
+			const bool reuseFreeSlot = freeSlotCount_ > 0;
+			uint32_t slotIndex = slotCount_;
+
+			if( reuseFreeSlot )
 			{
-				index = freeList_[ freeCount_ - 1 ];
-				slots_[ index ].obj = std::move( obj );
-				--freeCount_;
-				slots_[ index ].occupied = true;
+				slotIndex = freeSlotIndices_[ freeSlotCount_ - 1 ];
+			}
+			else if( slotCount_ == Capacity )
+			{
+				throw std::length_error( "Ldx12 SlotMap capacity exhausted." );
+			}
+
+			Slot& slot = slots_[ slotIndex ];
+
+			slot.object = std::move( object );
+			slot.occupied = true;
+
+			if( reuseFreeSlot )
+			{
+				--freeSlotCount_;
 			}
 			else
 			{
-				if( slotCount_ == Capacity )
-				{
-					throw std::length_error( "Ldx12 SlotMap capacity exhausted." );
-				}
-
-				index = slotCount_;
-				slots_[ index ].obj = std::move( obj );
-				slots_[ index ].occupied = true;
 				++slotCount_;
 			}
 
 			++objectCount_;
-			return Handle<ObjectType>( index, slots_[ index ].gen );
+			return Handle<ObjectType>( slotIndex, slot.generation );
 		}
 
 		bool Contains( Handle<ObjectType> handle ) const noexcept
 		{
-			if( !handle.Valid() )
+			if( !handle.Valid() || handle.Index() >= slotCount_ )
 			{
 				return false;
 			}
 
-			const uint32_t index = handle.Index();
-			if( index >= slotCount_ )
-			{
-				return false;
-			}
+			const Slot& slot = slots_[ handle.Index() ];
 
-			const Slot& slot = slots_[ index ];
-			return slot.occupied && handle.Gen() == slot.gen;
+			return slot.occupied && handle.Gen() == slot.generation;
 		}
 
 		bool Destroy( Handle<ObjectType> handle )
@@ -132,70 +139,67 @@ namespace ldx12
 				return false;
 			}
 
-			const uint32_t index = handle.Index();
-			Slot& slot = slots_[ index ];
-			slot.obj = {};
+			const uint32_t slotIndex = handle.Index();
+			Slot& slot = slots_[ slotIndex ];
+
+			slot.object = {};
 			IncrementGeneration( slot );
 			slot.occupied = false;
-			freeList_[ freeCount_++ ] = index;
+
+			freeSlotIndices_[ freeSlotCount_ ] = slotIndex;
+			++freeSlotCount_;
 			--objectCount_;
 			return true;
 		}
 
 		ObjectType* Get( Handle<ObjectType> handle )
 		{
-			return Contains( handle ) ? &slots_[ handle.Index() ].obj : nullptr;
+			return Contains( handle ) ? &slots_[ handle.Index() ].object : nullptr;
 		}
 
 		const ObjectType* Get( Handle<ObjectType> handle ) const
 		{
-			return Contains( handle ) ? &slots_[ handle.Index() ].obj : nullptr;
+			return Contains( handle ) ? &slots_[ handle.Index() ].object : nullptr;
 		}
 
-		ObjectType* GetByIndex( uint32_t index )
+		ObjectType* GetByIndex( uint32_t slotIndex )
 		{
-			if( index >= slotCount_ )
+			if( slotIndex >= slotCount_ )
 			{
 				return nullptr;
 			}
 
-			Slot& slot = slots_[ index ];
-			if( !slot.occupied )
-			{
-				return nullptr;
-			}
+			Slot& slot = slots_[ slotIndex ];
 
-			return &slot.obj;
+			return slot.occupied ? &slot.object : nullptr;
 		}
 
-		const ObjectType* GetByIndex( uint32_t index ) const
+		const ObjectType* GetByIndex( uint32_t slotIndex ) const
 		{
-			if( index >= slotCount_ )
+			if( slotIndex >= slotCount_ )
 			{
 				return nullptr;
 			}
 
-			const Slot& slot = slots_[ index ];
-			if( !slot.occupied )
-			{
-				return nullptr;
-			}
+			const Slot& slot = slots_[ slotIndex ];
 
-			return &slot.obj;
+			return slot.occupied ? &slot.object : nullptr;
 		}
 
-		Handle<ObjectType> Find( const ObjectType* obj ) const
+		Handle<ObjectType> Find( const ObjectType* object ) const
 		{
-			if( obj == nullptr )
+			if( object == nullptr )
 			{
 				return {};
 			}
 
-			for( uint32_t i = 0; i < slotCount_; ++i )
+			for( uint32_t slotIndex = 0; slotIndex < slotCount_; ++slotIndex )
 			{
-				if( slots_[ i ].occupied && &slots_[ i ].obj == obj )
+				const Slot& slot = slots_[ slotIndex ];
+
+				if( slot.occupied && &slot.object == object )
 				{
-					return Handle<ObjectType>( i, slots_[ i ].gen );
+					return Handle<ObjectType>( slotIndex, slot.generation );
 				}
 			}
 
@@ -209,42 +213,46 @@ namespace ldx12
 
 		void Clear()
 		{
-			for( uint32_t i = 0; i < slotCount_; ++i )
+			// Preserve slot generations so handles from before Clear() stay invalid.
+			for( uint32_t slotIndex = 0; slotIndex < slotCount_; ++slotIndex )
 			{
-				Slot& slot = slots_[ i ];
+				Slot& slot = slots_[ slotIndex ];
+
 				if( slot.occupied )
 				{
-					slot.obj = {};
+					slot.object = {};
 					IncrementGeneration( slot );
 					slot.occupied = false;
 				}
 			}
 
 			slotCount_ = 0;
-			freeCount_ = 0;
+			freeSlotCount_ = 0;
 			objectCount_ = 0;
 		}
 
 		template <typename Function> void ForEach( Function&& function )
 		{
-			for( uint32_t i = 0; i < slotCount_; ++i )
+			for( uint32_t slotIndex = 0; slotIndex < slotCount_; ++slotIndex )
 			{
-				Slot& slot = slots_[ i ];
+				Slot& slot = slots_[ slotIndex ];
+
 				if( slot.occupied )
 				{
-					std::forward<Function>( function )( slot.obj );
+					std::forward<Function>( function )( slot.object );
 				}
 			}
 		}
 
 		template <typename Function> void ForEach( Function&& function ) const
 		{
-			for( uint32_t i = 0; i < slotCount_; ++i )
+			for( uint32_t slotIndex = 0; slotIndex < slotCount_; ++slotIndex )
 			{
-				const Slot& slot = slots_[ i ];
+				const Slot& slot = slots_[ slotIndex ];
+
 				if( slot.occupied )
 				{
-					std::forward<Function>( function )( slot.obj );
+					std::forward<Function>( function )( slot.object );
 				}
 			}
 		}
@@ -264,20 +272,50 @@ namespace ldx12
 			return Capacity;
 		}
 
+		SlotMap( const SlotMap& other )
+			requires std::is_copy_constructible_v<ObjectType>
+		= default;
+
+		SlotMap& operator=( const SlotMap& other )
+			requires std::is_copy_constructible_v<ObjectType>
+		= default;
+
+		SlotMap( SlotMap&& other ) noexcept( std::is_nothrow_move_assignable_v<ObjectType> )
+		{
+			*this = std::move( other );
+		}
+
+		SlotMap& operator=( SlotMap&& other ) noexcept( std::is_nothrow_move_assignable_v<ObjectType> )
+		{
+			if( this != &other )
+			{
+				slots_ = std::move( other.slots_ );
+				freeSlotIndices_ = std::move( other.freeSlotIndices_ );
+				slotCount_ = other.slotCount_;
+				freeSlotCount_ = other.freeSlotCount_;
+				objectCount_ = other.objectCount_;
+
+				other.Clear();
+			}
+
+			return *this;
+		}
+
 	private:
 		static void IncrementGeneration( Slot& slot ) noexcept
 		{
-			++slot.gen;
-			if( slot.gen == 0 )
+			++slot.generation;
+			if( slot.generation == 0 )
 			{
-				slot.gen = 1;
+				slot.generation = 1;
 			}
 		}
 
 		std::array<Slot, Capacity> slots_ = {};
-		std::array<uint32_t, Capacity> freeList_ = {};
+		std::array<uint32_t, Capacity> freeSlotIndices_ = {};
+		// Slots reached so far, including released slots.
 		uint32_t slotCount_ = 0;
-		uint32_t freeCount_ = 0;
+		uint32_t freeSlotCount_ = 0;
 		uint32_t objectCount_ = 0;
 	};
 

@@ -989,6 +989,8 @@ namespace ldx12
 		DeviceManager::DeferredRelease::OnFailure cleanup(
 			[ this, fixedDescriptorIndex ]() noexcept { manager_->FreeBindlessDescriptor( fixedDescriptorIndex ); } );
 
+		manager_->RequireResourceSlots();
+
 		BufferResource resource = CreateBufferResource( desc );
 		CreateBufferDescriptors( resource, desc, constantBufferSlot, shaderResourceSlot );
 
@@ -997,7 +999,7 @@ namespace ldx12
 			manager_->stagingDevice_->BufferSubData( resource, 0, static_cast<size_t>( desc.size ), desc.initialData );
 		}
 
-		return manager_->slotMapBuffers_.Create( std::move( resource ) );
+		return manager_->StoreBufferResource( std::move( resource ) );
 	}
 
 	void RenderDevice::WriteBuffer( BufferHandle buffer, uint64_t offset, const void* data, uint64_t size )
@@ -1027,6 +1029,8 @@ namespace ldx12
 		{
 			throw std::runtime_error( "The selected texture format does not support the requested sample count." );
 		}
+		manager_->RequireResourceSlots();
+
 		const TextureCreationPlan creationPlan = BuildTextureCreationPlan( desc );
 		TextureResource resource = PrepareTextureResource( desc, creationPlan );
 		manager_->CreateCommittedTextureResource( desc, resource );
@@ -1056,7 +1060,7 @@ namespace ldx12
 			manager_->CreateTextureDepthStencilView( resource );
 		}
 
-		const TextureHandle handle = manager_->slotMapTextures_.Create( std::move( resource ) );
+		const TextureHandle handle = manager_->StoreTextureResource( std::move( resource ) );
 		if( desc.data != nullptr && desc.rowPitch > 0 && desc.slicePitch > 0 )
 		{
 			TextureResource& textureResource = manager_->GetTextureResource( handle );
@@ -1174,12 +1178,12 @@ namespace ldx12
 
 	bool RenderDevice::IsAlive( BufferHandle buffer ) const noexcept
 	{
-		return manager_ != nullptr && manager_->slotMapBuffers_.Contains( buffer );
+		return manager_ != nullptr && manager_->FindBufferResource( buffer ) != nullptr;
 	}
 
 	bool RenderDevice::IsAlive( TextureHandle texture ) const noexcept
 	{
-		return manager_ != nullptr && manager_->slotMapTextures_.Contains( texture );
+		return manager_ != nullptr && manager_->FindTextureResource( texture ) != nullptr;
 	}
 
 	bool RenderDevice::IsAlive( SamplerHandle sampler ) const noexcept
@@ -1195,7 +1199,7 @@ namespace ldx12
 	bool RenderDevice::Destroy( BufferHandle buffer )
 	{
 		DeviceManager& manager = *manager_;
-		BufferResource* resource = manager.slotMapBuffers_.Get( buffer );
+		BufferResource* resource = manager.FindBufferResource( buffer );
 		if( resource == nullptr )
 		{
 			ReportInvalidDestroy( "BufferHandle", buffer.Index(), buffer.Gen() );
@@ -1215,7 +1219,7 @@ namespace ldx12
 		resource->srvIndex_ = UINT32_MAX;
 		resource->uavIndex_ = UINT32_MAX;
 		resource->cbvIndex_ = UINT32_MAX;
-		manager.slotMapBuffers_.Destroy( buffer );
+		manager.DestroyResourceSlot( buffer );
 
 		std::function<void()> release = [ &manager, nativeResource = std::move( nativeResource ), wasMapped, srvIndex, uavIndex, cbvIndex ]() mutable
 		{
@@ -1245,7 +1249,7 @@ namespace ldx12
 	bool RenderDevice::Destroy( TextureHandle texture )
 	{
 		DeviceManager& manager = *manager_;
-		TextureResource* resource = manager.slotMapTextures_.Get( texture );
+		TextureResource* resource = manager.FindTextureResource( texture );
 		if( resource == nullptr )
 		{
 			ReportInvalidDestroy( "TextureHandle", texture.Index(), texture.Gen() );
@@ -1267,7 +1271,7 @@ namespace ldx12
 		const uint32_t baseMipsUavBaseIndex = resource->baseMipsUavBaseIndex_;
 		const uint32_t baseMipsUavCount = resource->baseMipsUavCount_;
 
-		manager.slotMapTextures_.Destroy( texture );
+		manager.DestroyResourceSlot( texture );
 
 		std::function<void()> release =
 			[ &manager, nativeResource = std::move( nativeResource ), srvIndex, uavIndex, rtvIndex, dsvIndex, baseMipsUavBaseIndex, baseMipsUavCount ]() mutable

@@ -118,12 +118,12 @@ namespace ldx12
 		for( uint32_t index = 0; index < properties_.numSwapchainImages_; ++index )
 		{
 			const TextureHandle handle = backBufferHandles_[ index ];
-			TextureResource* texture = ctx_.slotMapTextures_.Get( handle );
+			TextureResource* texture = ctx_.FindTextureResource( handle );
 			if( texture != nullptr )
 			{
 				ctx_.FreeRtvDescriptor( texture->rtvIndex_ );
 				texture->resource_.Reset();
-				ctx_.slotMapTextures_.Destroy( handle );
+				ctx_.DestroyResourceSlot( handle );
 			}
 
 			backBufferHandles_[ index ] = {};
@@ -140,6 +140,12 @@ namespace ldx12
 		if( properties_.numSwapchainImages_ > backBuffers_.size() )
 		{
 			throw std::runtime_error( "Swapchain image count exceeds fixed back buffer storage." );
+		}
+
+		ctx_.RequireResourceSlots( properties_.numSwapchainImages_ );
+		if( properties_.numSwapchainImages_ > ctx_.freeRtvDescriptorCount_ )
+		{
+			throw std::runtime_error( "The RTV descriptor heap has no room for the swapchain backbuffers." );
 		}
 
 		for( uint32_t index = 0; index < properties_.numSwapchainImages_; ++index )
@@ -175,7 +181,7 @@ namespace ldx12
 			ctx_.device_->CreateRenderTargetView( buffer.Get(), &rtvDesc, texture.rtvHandle_ );
 
 			rtvHandles_[ index ] = texture.rtvHandle_;
-			backBufferHandles_[ index ] = ctx_.slotMapTextures_.Create( std::move( texture ) );
+			backBufferHandles_[ index ] = ctx_.StoreTextureResource( std::move( texture ) );
 		}
 	}
 

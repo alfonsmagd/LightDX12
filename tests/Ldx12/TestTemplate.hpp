@@ -92,17 +92,13 @@ namespace ldx12::tests
 		void ( *function )() = nullptr;
 	};
 
-	void TestSlotMapCreationAndProperties();
-	void TestSlotMapDestroyAndReuse();
-	void TestSlotMapStaleHandleSafety();
-	void TestSlotMapCapacity();
+	void TestSlotMapLifecycle();
+	void TestSlotMapStorage();
+	void TestSlotMapFragmentation();
 	void TestSlotMapVirtualObjects();
-	void TestPublicArrayProperties();
 	void TestGpuAdapterSelection();
-	void TestGpuResourceLifecycleAndProperties();
-	void TestGpuSamplerDeferredDestruction();
+	void TestGpuResourceLifecycle();
 	void TestGpuComputeUav();
-	void TestGpuInvalidHandleSafety();
 	void TestGpuSubmissionSynchronization();
 	void TestGpuDescriptorRecycling();
 	void TestGpuMultisampleRendering();

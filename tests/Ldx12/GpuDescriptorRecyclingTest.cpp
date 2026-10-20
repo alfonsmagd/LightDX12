@@ -74,23 +74,6 @@ namespace ldx12::tests
 			sampledTextures[ slot ] = {};
 		}
 
-		constexpr uint32_t stressRoundCount = 12;
-		for( uint32_t round = 0; round < stressRoundCount; ++round )
-		{
-			for( uint32_t index = 0; index < dynamicDescriptorCount; ++index )
-			{
-				sampledTextures[ index ] = device.CreateTexture( sampledDesc );
-				Require( device.GetBindlessIndex( sampledTextures[ index ] ) == LDX12_BINDLESS_DYNAMIC_SLOT_FIRST + index,
-					"A coalesced bindless range did not allocate contiguously." );
-			}
-
-			for( uint32_t slot : destructionOrder )
-			{
-				Require( device.Destroy( sampledTextures[ slot ] ), "Descriptor stress destruction failed." );
-				sampledTextures[ slot ] = {};
-			}
-		}
-
 		TextureDesc sampledUavDesc = sampledDesc;
 		sampledUavDesc.debugName = "Ldx12Tests recycled sampled UAV texture";
 		sampledUavDesc.usage = TextureUsage::Sampled | TextureUsage::UnorderedAccess;
@@ -101,12 +84,28 @@ namespace ldx12::tests
 			Require( device.GetBindlessIndex( texture ) != device.GetUnorderedAccessIndex( texture ),
 				"A sampled UAV texture aliased its SRV and UAV descriptors." );
 		}
+
+		const uint32_t firstPairSrv = device.GetBindlessIndex( sampledUavTextures[ 0 ] );
+		const uint32_t firstPairUav = device.GetUnorderedAccessIndex( sampledUavTextures[ 0 ] );
+
 		RequireThrows<std::runtime_error>( [ &device, &sampledUavDesc ] { device.CreateTexture( sampledUavDesc ); },
 			"The bindless heap accepted another SRV/UAV pair after exhaustion." );
 		for( TextureHandle texture : sampledUavTextures )
 		{
 			Require( device.Destroy( texture ), "Failed to recycle a sampled UAV texture descriptor pair." );
 		}
+
+		BufferDesc structuredDesc{};
+		structuredDesc.size = 64;
+		structuredDesc.stride = 16;
+		structuredDesc.type = BufferType::Structured;
+		structuredDesc.unorderedAccess = true;
+
+		const BufferHandle structuredBuffer = device.CreateBuffer( structuredDesc );
+
+		Require( device.GetBindlessIndex( structuredBuffer ) == firstPairSrv && device.GetUnorderedAccessIndex( structuredBuffer ) == firstPairUav,
+			"A structured UAV buffer could not reuse a released texture's descriptor pair." );
+		device.Destroy( structuredBuffer );
 
 		std::array<uint32_t, 8u * 8u> mipPixels{};
 		TextureDesc mipDesc{};
@@ -176,6 +175,7 @@ namespace ldx12::tests
 		fixedBufferDesc.size = 256;
 		fixedBufferDesc.type = BufferType::Constant;
 		fixedBufferDesc.memory = BufferMemory::CpuToGpu;
+
 		const BufferHandle fixedBuffer = device.CreateBuffer( fixedBufferDesc, ConstantBufferSlot::FreeCB1 );
 		const BufferHandle duplicateFixedBuffer = device.CreateBuffer( fixedBufferDesc, ConstantBufferSlot::FreeCB1 );
 

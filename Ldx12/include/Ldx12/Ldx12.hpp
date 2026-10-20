@@ -10,6 +10,7 @@
 #include <string>
 #include <string_view>
 #include <type_traits>
+#include <variant>
 
 #ifndef WIN32_LEAN_AND_MEAN
 	#define WIN32_LEAN_AND_MEAN
@@ -35,14 +36,15 @@ namespace ldx12
 	static constexpr uint32_t ourMaxColorAttachments = D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT;
 	static constexpr uint32_t ourMaxShaderIncludeDirectories = 8;
 	static constexpr uint32_t ourMaxVertexInputElements = 16;
-	static constexpr uint32_t ourMaxBindlessDescriptors = 4096;
-	static constexpr uint32_t ourMaxRtvDescriptors = 256;
-	static constexpr uint32_t ourMaxDsvDescriptors = 64;
+	static constexpr uint32_t ourMaxResources = LDX12_MAX_RESOURCES;
+	static constexpr uint32_t ourMaxBindlessDescriptors = ourMaxResources;
+	static constexpr uint32_t ourMaxRtvDescriptors = LDX12_MAX_RTV_DESCRIPTORS;
+	static constexpr uint32_t ourMaxDsvDescriptors = LDX12_MAX_DSV_DESCRIPTORS;
 	static constexpr uint32_t ourMaxActiveCommandBuffers = 64;
 	static constexpr uint32_t ourMaxCommandBufferBatch = 4;
 	static constexpr uint32_t ourMaxImmediateCommandBuffers = ourMaxActiveCommandBuffers + ourMaxCommandBufferBatch;
-	static constexpr uint32_t ourMaxTrackedBuffersPerCommandBuffer = 256;
-	static constexpr uint32_t ourMaxTrackedTexturesPerCommandBuffer = 256;
+	static constexpr uint32_t ourMaxTrackedBuffersPerCommandBuffer = ourMaxResources / 16;
+	static constexpr uint32_t ourMaxTrackedTexturesPerCommandBuffer = ourMaxResources / 16;
 	static constexpr uint32_t ourMaxPushConstant32BitValues = 62;
 	static constexpr uint32_t ourCubeMapFaceCount = 6;
 	static constexpr uint32_t ourBuiltInSamplerCount = LDX12_BUILT_IN_SAMPLER_COUNT;
@@ -811,8 +813,10 @@ namespace ldx12
 
 	private:
 		static constexpr std::size_t ourMaxSwapchains = 16;
-		static constexpr std::size_t ourMaxBuffers = 4096;
-		static constexpr std::size_t ourMaxTextures = 4096;
+
+		// Each slot stores either a buffer or a texture, sharing the same free indices.
+		using Resource = std::variant<std::monostate, BufferResource, TextureResource>;
+		using ResourceHandle = Handle<Resource>;
 
 		struct DeferredRelease final
 		{
@@ -914,6 +918,16 @@ namespace ldx12
 		void FreeSamplerDescriptor( uint32_t index ) noexcept;
 		void FreeRtvDescriptor( uint32_t index );
 		void FreeDsvDescriptor( uint32_t index );
+		void RequireResourceSlots( uint32_t count = 1 ) const;
+		BufferHandle StoreBufferResource( BufferResource&& resource );
+		TextureHandle StoreTextureResource( TextureResource&& resource );
+		BufferResource* FindBufferResource( BufferHandle handle ) noexcept;
+		const BufferResource* FindBufferResource( BufferHandle handle ) const noexcept;
+		TextureResource* FindTextureResource( TextureHandle handle ) noexcept;
+		const TextureResource* FindTextureResource( TextureHandle handle ) const noexcept;
+		void DestroyResourceSlot( BufferHandle handle );
+		void DestroyResourceSlot( TextureHandle handle );
+
 		BufferResource& GetBufferResource( BufferHandle handle );
 		const BufferResource& GetBufferResource( BufferHandle handle ) const;
 		TextureResource& GetTextureResource( TextureHandle handle );
@@ -971,8 +985,7 @@ namespace ldx12
 		ComPtr<ID3D12RootSignature> rootSignature_;
 		ComPtr<ID3D12CommandSignature> commandSignature_;
 		SlotMap<SwapchainResource, ourMaxSwapchains> slotMapSwapchains_;
-		SlotMap<BufferResource, ourMaxBuffers> slotMapBuffers_;
-		SlotMap<TextureResource, ourMaxTextures> slotMapTextures_;
+		SlotMap<Resource, ourMaxResources> slotMapResources_;
 		SlotMap<SamplerResource, ourCustomSamplerCount> slotMapSamplers_;
 		std::unique_ptr<StagingDevice> stagingDevice_;
 		std::unique_ptr<BaseMips> baseMips_;
