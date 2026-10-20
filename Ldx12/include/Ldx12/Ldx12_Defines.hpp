@@ -3,6 +3,20 @@
 #include <cstdint>
 #include <type_traits>
 
+#define LDX12_GPU_VENDOR_DEFAULT 0u
+#define LDX12_GPU_VENDOR_NVIDIA 0x10DEu
+#define LDX12_GPU_VENDOR_AMD 0x1002u
+
+// Override these defaults for the library and every consumer, or edit them here.
+#ifndef LDX12_PREFERRED_GPU_VENDOR
+	#define LDX12_PREFERRED_GPU_VENDOR LDX12_GPU_VENDOR_NVIDIA
+#endif
+
+// UINT32_MAX selects the first compatible adapter according to the vendor preference.
+#ifndef LDX12_PREFERRED_GPU_INDEX
+	#define LDX12_PREFERRED_GPU_INDEX UINT32_MAX
+#endif
+
 #define LDX12_DESCRIPTOR_SLOT_INVALID 0u
 
 #define LDX12_CONSTANT_BUFFER_RING_SIZE_BYTES ( 64u * 1024u )

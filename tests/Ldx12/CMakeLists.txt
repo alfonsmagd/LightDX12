@@ -6,6 +6,7 @@ set(ldx12_core_test_sources
     SlotMapStaleHandleTest.cpp
     SlotMapCapacityTest.cpp
     SlotMapVirtualObjectTest.cpp
+    AdapterSelectionTest.cpp
     PublicArrayTest.cpp
     GpuResourceLifecycleTest.cpp
     GpuSamplerDeferredDestructionTest.cpp

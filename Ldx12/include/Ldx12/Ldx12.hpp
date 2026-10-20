@@ -346,13 +346,12 @@ namespace ldx12
 
 	struct DeviceProperties
 	{
-		std::string adapterName;
+		char adapterName[ 512 ] = {};
+		LUID adapterLuid = {};
 		uint64_t dedicatedVideoMemoryBytes = 0;
 		uint64_t dedicatedSystemMemoryBytes = 0;
 		uint64_t sharedSystemMemoryBytes = 0;
-		D3D_FEATURE_LEVEL featureLevel = D3D_FEATURE_LEVEL_11_0;
 		D3D_SHADER_MODEL shaderModel = D3D_SHADER_MODEL_5_1;
-		D3D12_RESOURCE_BINDING_TIER resourceBindingTier = D3D12_RESOURCE_BINDING_TIER_1;
 	};
 
 	struct SamplerDesc
@@ -381,6 +380,9 @@ namespace ldx12
 		uint32_t swapchainBufferCount = 3;
 		DXGI_FORMAT swapchainFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
 		D3D_FEATURE_LEVEL minimumFeatureLevel = D3D_FEATURE_LEVEL_12_0;
+		uint32_t preferredAdapterVendor = LDX12_PREFERRED_GPU_VENDOR;
+		// Other indices use EnumAdapters1; an unavailable or incompatible choice falls back.
+		uint32_t adapterIndex = LDX12_PREFERRED_GPU_INDEX;
 	};
 
 	struct SwapchainDesc
@@ -877,7 +879,6 @@ namespace ldx12
 		void Initialize();
 		void InitializeFactory();
 		void InitializeDevice();
-		bool CheckCapabilities( std::string& failureReason );
 		void InitializeCommandQueues();
 		void InitializeQueueContext( QueueContext& context, D3D12_COMMAND_LIST_TYPE type );
 		void InitializeDescriptorHeaps();

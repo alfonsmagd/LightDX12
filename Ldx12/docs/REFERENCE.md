@@ -86,7 +86,42 @@ The predefined descriptor positions are conveniences, not resource limits. Appli
 
 ## Platform and scope
 
-The current core requires Windows, Direct3D feature level 12.0, Shader Model 6.6 and Resource Binding Tier 3.
+Initialization requires a D3D12 device supporting Shader Model 6.6. `ContextDesc::minimumFeatureLevel` is passed directly to device creation and defaults to 12.0. No additional feature-level or resource-binding-tier queries are performed during adapter selection.
+
+### GPU selection and capability checks
+
+Use `DeviceManager::Initialize(contextDesc)` to select and create a compatible device, then `GetDeviceProperties()` to inspect its name, LUID, memory and Shader Model. There is no separate public adapter-probing API.
+
+```cpp
+ContextDesc contextDesc{};
+contextDesc.adapterIndex = 1;
+
+DeviceManager& manager = DeviceManager::Initialize( contextDesc );
+const DeviceProperties& properties = manager.GetDeviceProperties();
+
+std::cout << properties.adapterName << '\n';
+```
+
+The selection defaults can be changed in `Ldx12_Defines.hpp`, or overridden with compiler defines shared by the library and every consumer:
+
+```cpp
+#define LDX12_PREFERRED_GPU_VENDOR LDX12_GPU_VENDOR_NVIDIA
+#define LDX12_PREFERRED_GPU_INDEX UINT32_MAX
+```
+
+Use `LDX12_GPU_VENDOR_DEFAULT`, `LDX12_GPU_VENDOR_NVIDIA` or `LDX12_GPU_VENDOR_AMD`. With `UINT32_MAX` as the index, a vendor preference selects the first compatible GPU from that vendor. If none is available, selection falls back to the first compatible hardware adapter in DXGI's `EnumAdapters1` order.
+
+To choose a specific GPU when several are installed, set `LDX12_PREFERRED_GPU_INDEX` to its `EnumAdapters1` index (for example `1u`). The index takes priority over the vendor flag. If that adapter is unavailable or incompatible, selection falls back to the first compatible hardware adapter in DXGI's default order. The index is global, not relative to a vendor's filtered list.
+
+`ContextDesc::preferredAdapterVendor` and `ContextDesc::adapterIndex` use these defines as defaults and can also be assigned at runtime. With no vendor or index preference, the existing `preferHighPerformanceAdapter` setting controls whether automatic selection follows DXGI's high-performance order (default) or `EnumAdapters1` order.
+
+Every candidate must support SM 6.6 before engine resources are created. If none passes, initialization throws `std::runtime_error` with the last rejection reason, or a generic SM 6.6 requirement message when no candidate was found. Indices may change after hardware changes, so enumerate again instead of persisting them across runs. `GetDeviceProperties().adapterLuid` identifies the selected adapter in the current Windows session.
+
+Software adapters are always excluded, including when explicitly selected by index. WARP is not supported. If no compatible hardware adapter is available, initialization throws.
+
+`InitializeDevice()` explicitly creates the candidate device and retains it when SM 6.6 is supported. `ProbeAdapter(ID3D12Device*)` only queries support on an existing device. `GetAdapterProperties()` copies adapter metadata from the descriptor already read by the caller.
+
+The probe makes one [Shader Model capability query](https://learn.microsoft.com/en-us/windows/win32/api/d3d12/ns-d3d12-d3d12_feature_data_shader_model) for 6.6. A failed query or a returned version below 6.6 rejects the candidate. `RenderDevice::BindlessSupported()` queries resource binding support only when explicitly called.
 
 - Swapchains use Win32 `HWND`.
 - Compute and graphics use the graphics queue; there is no dedicated compute queue.

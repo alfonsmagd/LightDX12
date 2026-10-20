@@ -1166,7 +1166,10 @@ namespace ldx12
 
 	bool RenderDevice::BindlessSupported() const noexcept
 	{
-		return manager_->deviceProperties_.resourceBindingTier >= D3D12_RESOURCE_BINDING_TIER_3;
+		D3D12_FEATURE_DATA_D3D12_OPTIONS options{};
+		const HRESULT result = manager_->device_->CheckFeatureSupport( D3D12_FEATURE_D3D12_OPTIONS, &options, sizeof( options ) );
+
+		return SUCCEEDED( result ) && options.ResourceBindingTier >= D3D12_RESOURCE_BINDING_TIER_3;
 	}
 
 	bool RenderDevice::IsAlive( BufferHandle buffer ) const noexcept

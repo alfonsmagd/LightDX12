@@ -8,8 +8,8 @@
 
 #include <algorithm>
 #include <cassert>
-#include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <cwchar>
 #include <filesystem>
 #include <mutex>
@@ -22,58 +22,48 @@ namespace ldx12
 		std::unique_ptr<DeviceManager> gDeviceManagerSingleton;
 		uint32_t gDeviceManagerSingletonReferenceCount = 0;
 		constexpr D3D_SHADER_MODEL ourRequiredShaderModel = D3D_SHADER_MODEL_6_6;
-		constexpr D3D12_RESOURCE_BINDING_TIER ourRequiredResourceBindingTier = D3D12_RESOURCE_BINDING_TIER_3;
 
-		std::string ToUtf8( const wchar_t* text )
+		DeviceProperties GetAdapterProperties( const DXGI_ADAPTER_DESC1& adapterDesc )
 		{
-			const int wideLength = static_cast<int>( std::wcslen( text ) );
-			const int utf8Length = WideCharToMultiByte( CP_UTF8, 0, text, wideLength, nullptr, 0, nullptr, nullptr );
-			if( utf8Length <= 0 )
+			DeviceProperties properties;
+
+			const int nameLength = WideCharToMultiByte( CP_UTF8,
+				0,
+				adapterDesc.Description,
+				-1,
+				properties.adapterName,
+				static_cast<int>( sizeof( properties.adapterName ) ),
+				nullptr,
+				nullptr );
+
+			if( nameLength == 0 )
 			{
-				return "Unknown adapter";
+				strcpy_s( properties.adapterName, "Unknown adapter" );
 			}
 
-			std::string utf8Text( static_cast<size_t>( utf8Length ), '\0' );
-			WideCharToMultiByte( CP_UTF8, 0, text, wideLength, utf8Text.data(), utf8Length, nullptr, nullptr );
-			return utf8Text;
+			properties.adapterLuid = adapterDesc.AdapterLuid;
+			properties.dedicatedVideoMemoryBytes = static_cast<uint64_t>( adapterDesc.DedicatedVideoMemory );
+			properties.dedicatedSystemMemoryBytes = static_cast<uint64_t>( adapterDesc.DedicatedSystemMemory );
+			properties.sharedSystemMemoryBytes = static_cast<uint64_t>( adapterDesc.SharedSystemMemory );
+
+			return properties;
 		}
 
-		std::string HResultText( HRESULT result )
+		bool ProbeAdapter( ID3D12Device* device )
 		{
-			char text[ 11 ] = {};
-			std::snprintf( text, sizeof( text ), "0x%08lX", static_cast<unsigned long>( result ) );
-			return text;
-		}
+			D3D12_FEATURE_DATA_SHADER_MODEL shaderModel{};
+			shaderModel.HighestShaderModel = ourRequiredShaderModel;
 
-		std::string FeatureLevelText( D3D_FEATURE_LEVEL featureLevel )
-		{
-			switch( featureLevel )
-			{
-			case D3D_FEATURE_LEVEL_12_2:
-				return "12.2";
-			case D3D_FEATURE_LEVEL_12_1:
-				return "12.1";
-			case D3D_FEATURE_LEVEL_12_0:
-				return "12.0";
-			case D3D_FEATURE_LEVEL_11_1:
-				return "11.1";
-			case D3D_FEATURE_LEVEL_11_0:
-				return "11.0";
-			default:
-				return "unknown";
-			}
-		}
+			const HRESULT result = device->CheckFeatureSupport( D3D12_FEATURE_SHADER_MODEL, &shaderModel, sizeof( shaderModel ) );
 
-		std::string ShaderModelText( D3D_SHADER_MODEL shaderModel )
-		{
-			const uint32_t value = static_cast<uint32_t>( shaderModel );
-			return std::to_string( value >> 4u ) + "." + std::to_string( value & 0x0fu );
+			return SUCCEEDED( result ) && shaderModel.HighestShaderModel >= ourRequiredShaderModel;
 		}
 
 		bool ContextDescsAreCompatible( const ContextDesc& existingDesc, const ContextDesc& requestedDesc ) noexcept
 		{
 			return existingDesc.enableDebugLayer == requestedDesc.enableDebugLayer &&
 				   existingDesc.preferHighPerformanceAdapter == requestedDesc.preferHighPerformanceAdapter &&
+				   existingDesc.preferredAdapterVendor == requestedDesc.preferredAdapterVendor && existingDesc.adapterIndex == requestedDesc.adapterIndex &&
 				   existingDesc.allowTearing == requestedDesc.allowTearing &&
 				   existingDesc.pixSettings.enableGpuCapture == requestedDesc.pixSettings.enableGpuCapture &&
 				   existingDesc.pixSettings.showGpuCaptureHud == requestedDesc.pixSettings.showGpuCaptureHud &&
@@ -261,11 +251,7 @@ namespace ldx12
 
 		InitializeFactory();
 		InitializeDevice();
-		std::string capabilityFailure;
-		if( !CheckCapabilities( capabilityFailure ) )
-		{
-			throw std::runtime_error( capabilityFailure );
-		}
+
 		InitializeCommandQueues();
 		InitializeDescriptorHeaps();
 		InitializeRootSignature();
@@ -295,161 +281,90 @@ namespace ldx12
 
 	void DeviceManager::InitializeDevice()
 	{
-		auto tryAdapter = [ this ]( IDXGIAdapter1* candidate ) -> bool
-		{ return SUCCEEDED( D3D12CreateDevice( candidate, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS( device_.GetAddressOf() ) ) ); };
+		const char* failureReason = "Ldx12 found no compatible adapter. Shader Model 6.6 is required.";
 
-		if( desc_.preferHighPerformanceAdapter )
+		auto tryCreateDevice = [ this, &failureReason ]( IDXGIAdapter1* candidate, const DXGI_ADAPTER_DESC1& adapterDesc ) -> bool
 		{
-			for( UINT adapterIndex = 0;; ++adapterIndex )
+			ComPtr<ID3D12Device> candidateDevice;
+			const HRESULT result = D3D12CreateDevice( candidate, desc_.minimumFeatureLevel, IID_PPV_ARGS( candidateDevice.GetAddressOf() ) );
+
+			if( FAILED( result ) )
 			{
-				ComPtr<IDXGIAdapter1> candidate;
-				if( factory_->EnumAdapterByGpuPreference( adapterIndex, DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE, IID_PPV_ARGS( candidate.GetAddressOf() ) ) ==
-					DXGI_ERROR_NOT_FOUND )
-				{
-					break;
-				}
-
-				DXGI_ADAPTER_DESC1 adapterDesc{};
-				candidate->GetDesc1( &adapterDesc );
-				if( ( adapterDesc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE ) != 0 )
-				{
-					continue;
-				}
-
-				if( tryAdapter( candidate.Get() ) )
-				{
-					adapter_ = candidate;
-					break;
-				}
+				failureReason = "Failed to create a D3D12 device on the adapter.";
+				return false;
 			}
-		}
 
-		if( device_ == nullptr )
-		{
-			for( UINT adapterIndex = 0;; ++adapterIndex )
+			if( !ProbeAdapter( candidateDevice.Get() ) )
 			{
-				ComPtr<IDXGIAdapter1> candidate;
-				if( factory_->EnumAdapters1( adapterIndex, candidate.GetAddressOf() ) == DXGI_ERROR_NOT_FOUND )
-				{
-					break;
-				}
-
-				DXGI_ADAPTER_DESC1 adapterDesc{};
-				candidate->GetDesc1( &adapterDesc );
-				if( ( adapterDesc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE ) != 0 )
-				{
-					continue;
-				}
-
-				if( tryAdapter( candidate.Get() ) )
-				{
-					adapter_ = candidate;
-					break;
-				}
+				failureReason = "The adapter does not provide Shader Model 6.6 support.";
+				return false;
 			}
-		}
 
-		if( device_ == nullptr )
+			adapter_ = candidate;
+			device_ = std::move( candidateDevice );
+			deviceProperties_ = GetAdapterProperties( adapterDesc );
+			deviceProperties_.shaderModel = ourRequiredShaderModel;
+			return true;
+		};
+
+		struct AdapterCandidate
 		{
-			ComPtr<IDXGIAdapter1> warpAdapter;
-			C_RESULT( factory_->EnumWarpAdapter( IID_PPV_ARGS( warpAdapter.GetAddressOf() ) ), "Failed to enumerate WARP adapter." );
-			C_RESULT( D3D12CreateDevice( warpAdapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS( device_.GetAddressOf() ) ),
-				"Failed to create D3D12 device." );
-			adapter_ = warpAdapter;
-		}
-	}
+			ComPtr<IDXGIAdapter1> adapter;
+			DXGI_ADAPTER_DESC1 desc = {};
+			bool preferred = false;
+		};
 
-	bool DeviceManager::CheckCapabilities( std::string& failureReason )
-	{
-		DXGI_ADAPTER_DESC1 adapterDesc{};
-		const HRESULT adapterResult = adapter_->GetDesc1( &adapterDesc );
-		if( FAILED( adapterResult ) )
+		const bool hasPreferredIndex = desc_.adapterIndex != UINT32_MAX;
+		const bool hasPreferredVendor = desc_.preferredAdapterVendor != LDX12_GPU_VENDOR_DEFAULT;
+		const bool useHighPerformanceOrder = desc_.preferHighPerformanceAdapter && !hasPreferredIndex && !hasPreferredVendor;
+		const DXGI_GPU_PREFERENCE gpuPreference = useHighPerformanceOrder ? DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE : DXGI_GPU_PREFERENCE_UNSPECIFIED;
+
+		std::deque<AdapterCandidate> candidates;
+
+		for( UINT adapterIndex = 0;; ++adapterIndex )
 		{
-			failureReason = "Ldx12 failed to read the selected adapter properties (HRESULT " + HResultText( adapterResult ) + ").";
-			return false;
-		}
+			AdapterCandidate candidate;
+			const HRESULT result = factory_->EnumAdapterByGpuPreference( adapterIndex, gpuPreference, IID_PPV_ARGS( candidate.adapter.GetAddressOf() ) );
 
-		deviceProperties_.adapterName = ToUtf8( adapterDesc.Description );
-		deviceProperties_.dedicatedVideoMemoryBytes = static_cast<uint64_t>( adapterDesc.DedicatedVideoMemory );
-		deviceProperties_.dedicatedSystemMemoryBytes = static_cast<uint64_t>( adapterDesc.DedicatedSystemMemory );
-		deviceProperties_.sharedSystemMemoryBytes = static_cast<uint64_t>( adapterDesc.SharedSystemMemory );
-		const std::string adapterPrefix = "Ldx12 cannot initialize adapter \"" + deviceProperties_.adapterName + "\": ";
-
-		const D3D_FEATURE_LEVEL featureLevels[] = { D3D_FEATURE_LEVEL_12_2,
-			D3D_FEATURE_LEVEL_12_1,
-			D3D_FEATURE_LEVEL_12_0,
-			D3D_FEATURE_LEVEL_11_1,
-			D3D_FEATURE_LEVEL_11_0 };
-		D3D12_FEATURE_DATA_FEATURE_LEVELS featureLevelData{};
-		featureLevelData.NumFeatureLevels = static_cast<UINT>( std::size( featureLevels ) );
-		featureLevelData.pFeatureLevelsRequested = featureLevels;
-		const HRESULT featureLevelResult = device_->CheckFeatureSupport( D3D12_FEATURE_FEATURE_LEVELS, &featureLevelData, sizeof( featureLevelData ) );
-		if( FAILED( featureLevelResult ) )
-		{
-			failureReason = adapterPrefix + "the feature-level query failed (HRESULT " + HResultText( featureLevelResult ) + ").";
-			return false;
-		}
-
-		deviceProperties_.featureLevel = featureLevelData.MaxSupportedFeatureLevel;
-		if( deviceProperties_.featureLevel < desc_.minimumFeatureLevel )
-		{
-			failureReason = adapterPrefix + "feature level " + FeatureLevelText( desc_.minimumFeatureLevel ) + " is required, but the adapter supports " +
-							FeatureLevelText( deviceProperties_.featureLevel ) + ".";
-			return false;
-		}
-
-		const D3D_SHADER_MODEL shaderModels[] = { D3D_SHADER_MODEL_6_6,
-			D3D_SHADER_MODEL_6_5,
-			D3D_SHADER_MODEL_6_4,
-			D3D_SHADER_MODEL_6_3,
-			D3D_SHADER_MODEL_6_2,
-			D3D_SHADER_MODEL_6_1,
-			D3D_SHADER_MODEL_6_0,
-			D3D_SHADER_MODEL_5_1 };
-		HRESULT shaderModelResult = E_INVALIDARG;
-		for( D3D_SHADER_MODEL shaderModel : shaderModels )
-		{
-			D3D12_FEATURE_DATA_SHADER_MODEL shaderModelData{};
-			shaderModelData.HighestShaderModel = shaderModel;
-			shaderModelResult = device_->CheckFeatureSupport( D3D12_FEATURE_SHADER_MODEL, &shaderModelData, sizeof( shaderModelData ) );
-			if( SUCCEEDED( shaderModelResult ) )
+			if( result == DXGI_ERROR_NOT_FOUND )
 			{
-				deviceProperties_.shaderModel = shaderModelData.HighestShaderModel;
 				break;
 			}
+
+			C_RESULT( result, "Failed to enumerate DXGI adapters." );
+			C_RESULT( candidate.adapter->GetDesc1( &candidate.desc ), "Failed to read DXGI adapter properties." );
+
+			const bool isHardwareAdapter = ( candidate.desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE ) == 0;
+
+			if( isHardwareAdapter )
+			{
+				const bool matchesIndex = adapterIndex == desc_.adapterIndex;
+				const bool matchesVendor = hasPreferredVendor && candidate.desc.VendorId == desc_.preferredAdapterVendor;
+
+				candidate.preferred = hasPreferredIndex ? matchesIndex : matchesVendor;
+				candidates.push_back( std::move( candidate ) );
+			}
 		}
 
-		if( FAILED( shaderModelResult ) )
+		// Try the requested index or vendor in DXGI order.
+		for( const AdapterCandidate& candidate : candidates )
 		{
-			failureReason = adapterPrefix + "the Shader Model query failed (HRESULT " + HResultText( shaderModelResult ) + ").";
-			return false;
-		}
-		if( deviceProperties_.shaderModel < ourRequiredShaderModel )
-		{
-			failureReason = adapterPrefix + "Shader Model " + ShaderModelText( ourRequiredShaderModel ) + " is required, but the adapter supports " +
-							ShaderModelText( deviceProperties_.shaderModel ) + ".";
-			return false;
+			if( candidate.preferred && tryCreateDevice( candidate.adapter.Get(), candidate.desc ) )
+			{
+				return;
+			}
 		}
 
-		D3D12_FEATURE_DATA_D3D12_OPTIONS options{};
-		const HRESULT optionsResult = device_->CheckFeatureSupport( D3D12_FEATURE_D3D12_OPTIONS, &options, sizeof( options ) );
-		if( FAILED( optionsResult ) )
+		// Fall back to the remaining adapters in the same order.
+		for( const AdapterCandidate& candidate : candidates )
 		{
-			failureReason = adapterPrefix + "the Resource Binding Tier query failed (HRESULT " + HResultText( optionsResult ) + ").";
-			return false;
+			if( !candidate.preferred && tryCreateDevice( candidate.adapter.Get(), candidate.desc ) )
+			{
+				return;
+			}
 		}
 
-		deviceProperties_.resourceBindingTier = options.ResourceBindingTier;
-		if( deviceProperties_.resourceBindingTier < ourRequiredResourceBindingTier )
-		{
-			failureReason = adapterPrefix + "Resource Binding Tier " + std::to_string( static_cast<uint32_t>( ourRequiredResourceBindingTier ) ) +
-							" is required, but the adapter supports Tier " + std::to_string( static_cast<uint32_t>( deviceProperties_.resourceBindingTier ) ) +
-							".";
-			return false;
-		}
-
-		failureReason.clear();
-		return true;
+		throw std::runtime_error( failureReason );
 	}
 
 	void DeviceManager::InitializeCommandQueues()

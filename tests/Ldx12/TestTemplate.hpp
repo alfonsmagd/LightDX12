@@ -98,6 +98,7 @@ namespace ldx12::tests
 	void TestSlotMapCapacity();
 	void TestSlotMapVirtualObjects();
 	void TestPublicArrayProperties();
+	void TestGpuAdapterSelection();
 	void TestGpuResourceLifecycleAndProperties();
 	void TestGpuSamplerDeferredDestruction();
 	void TestGpuComputeUav();
