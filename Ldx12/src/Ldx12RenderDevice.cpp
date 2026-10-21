@@ -325,12 +325,6 @@ namespace ldx12
 				throw std::runtime_error( "This lightweight API currently supports Texture3D only for SRV/UAV "
 										  "usage." );
 			}
-
-			if( desc.data != nullptr )
-			{
-				throw std::runtime_error( "Texture3D CPU uploads are not implemented yet. Populate them with "
-										  "compute or add a staging path." );
-			}
 		}
 
 		[[nodiscard]] D3D12_RESOURCE_DESC BuildTextureResourceDesc( const TextureDesc& desc, const TextureResource& resource ) noexcept

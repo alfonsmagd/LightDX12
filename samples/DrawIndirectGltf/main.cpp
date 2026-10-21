@@ -2,6 +2,7 @@
 #include "Ldx12Utils/AppLdx.hpp"
 #include "Ldx12Utils/DepthTarget.hpp"
 #include "Ldx12Utils/OrbitCamera.hpp"
+#include "Ldx12Utils/TextureLoader.hpp"
 #include "SceneEnvironment.hpp"
 #include "SceneTargets.hpp"
 #include "DrawIndirectModel.hpp"
@@ -55,6 +56,16 @@ namespace
 
 	static_assert( sizeof( RootConstants ) == 176 );
 
+	struct SkyboxConstants
+	{
+		XMFLOAT4X4 viewProjection = {};
+		uint32_t cubeMapIndex = 0;
+		uint32_t samplerIndex = 0;
+		std::array<uint32_t, 2> padding = {};
+	};
+
+	static_assert( sizeof( SkyboxConstants ) == 80 );
+
 	bool HandleImGuiMessage( HWND window, UINT message, WPARAM wParam, LPARAM lParam, void* )
 	{
 		return ImGui::GetCurrentContext() != nullptr && ImGui_ImplWin32_WndProcHandler( window, message, wParam, lParam ) != 0;
@@ -101,6 +112,23 @@ namespace
 		desc.depthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
 		desc.depthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
 		desc.depthStencilState.StencilEnable = FALSE;
+		return device.CreateRenderPipeline( desc );
+	}
+
+	RenderPipelineState CreateSkyboxPipeline( RenderDevice& device, DXGI_FORMAT format, uint32_t sampleCount )
+	{
+		RenderPipelineDesc desc{};
+		desc.vertexShader = HLSLLoader::LoadStage( "shaders/DrawIndirectSkybox.hlsl", "vs_6_6", "VSMain" );
+		desc.fragmentShader = HLSLLoader::LoadStage( "shaders/DrawIndirectSkybox.hlsl", "ps_6_6", "PSMain" );
+		desc.color[ 0 ].format = format;
+		desc.depthFormat = DXGI_FORMAT_D32_FLOAT;
+		desc.sampleCount = sampleCount;
+		desc.rasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+		desc.depthStencilState.DepthEnable = TRUE;
+		desc.depthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+		desc.depthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+		desc.depthStencilState.StencilEnable = FALSE;
+
 		return device.CreateRenderPipeline( desc );
 	}
 }
@@ -155,6 +183,12 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 			HLSLLoader::SetRootDirectory( std::filesystem::path( __FILE__ ).parent_path() );
 			RenderPipelineState pipeline = CreatePipeline( device, context.swapchainFormat, 1 );
 			RenderPipelineState msaaPipeline = CreatePipeline( device, context.swapchainFormat, 4 );
+			RenderPipelineState skyboxPipeline = CreateSkyboxPipeline( device, context.swapchainFormat, 1 );
+			RenderPipelineState msaaSkyboxPipeline = CreateSkyboxPipeline( device, context.swapchainFormat, 4 );
+
+			const std::filesystem::path cubeMapDirectory = std::filesystem::path( LDX12_MEDIA_DIRECTORY ) / "sky_129_cubemap_2k";
+			const TextureHandle skyboxTexture = utils::LoadCubeMap( device, cubeMapDirectory );
+
 			draw_indirect_gltf_sample::DrawIndirectModel model = draw_indirect_gltf_sample::LoadModel( device,
 				std::filesystem::path( LDX12_MEDIA_DIRECTORY ) / "Sponza/glTF/Sponza.gltf" );
 			const gltf_sample::SceneEnvironment environment = gltf_sample::LoadEnvironment( device,
@@ -280,6 +314,11 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 				constants.drawDataBuffer = device.GetBindlessIndex( model.drawDataBuffer );
 				constants.materialBuffer = device.GetBindlessIndex( model.materialBuffer );
 
+				SkyboxConstants skyboxConstants{};
+				XMStoreFloat4x4( &skyboxConstants.viewProjection, XMMatrixTranspose( camera.GetSkyViewMatrix() * projection ) );
+				skyboxConstants.cubeMapIndex = device.GetBindlessIndex( skyboxTexture );
+				skyboxConstants.samplerIndex = ToSamplerIndex( SamplerSlot::LinearClamp );
+
 				const TextureHandle backbuffer = device.GetCurrentSwapchainTexture();
 				RenderPass pass{};
 				pass.color[ 0 ].loadOp = LoadOp::Clear;
@@ -298,6 +337,10 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 				commands.CmdBindIndexBuffer( model.indexBuffer );
 				commands.CmdPushConstants( &constants, sizeof( constants ) );
 				commands.CmdDrawIndexedIndirect( model.indirectBuffer, model.drawCount );
+
+				commands.CmdBindRenderPipeline( useMsaa ? msaaSkyboxPipeline : skyboxPipeline );
+				commands.CmdPushConstants( &skyboxConstants, sizeof( skyboxConstants ) );
+				commands.CmdDraw( 36 );
 				commands.CmdEndRendering();
 
 				if( useMsaa ) commands.CmdResolveTexture( msaaTargets.color, backbuffer );
@@ -318,6 +361,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 			draw_indirect_gltf_sample::DestroyModel( device, model );
 			gltf_sample::DestroyTargets( device, msaaTargets );
 			gltf_sample::DestroyEnvironment( device, environment );
+			device.Destroy( skyboxTexture );
 		}
 
 		ImGui_ImplLdx12_Shutdown();

@@ -11,11 +11,22 @@ This file lists the main user-visible changes in each Ldx12 version.
 - Added ring buffers to `CommandBuffer::SetConstantBuffer` for easy, fast per-draw constant-buffer uploads, with automatic offsets, typed HLSL `CB0.Load<T>()` / `CB1.Load<T>()` access and deferred reuse after GPU completion.
 - Added `21_ConstantBufferRings`, demonstrating per-object data in CB0 and a shared point light in CB1.
 
+- Added CPU initial-data uploads for sampled `Texture3D` resources, including row and depth-slice pitches.
+- Added a cubemap skybox to `19_DrawIndirectGltf`, with single-sample and MSAA x4 pipelines.
+- `20_TriplanarMapping` ports the LightweightVK triplanar-mapping demo to conventional D3D12 vertex and 16-bit index buffers. It renders 16 animated icosahedra, combines three projections from two textures without UV coordinates, and uses bindless texture and per-object matrix resources.
+
 ### Changed
 
 - Consolidated the core CPU/GPU tests, added case filters, and kept test checks active in Release builds.
 - Simplified GPU capability checks to Shader Model 6.6; adapter names now use fixed buffers and expose a LUID. Software adapters, including WARP, are no longer selected.
 - Updated the shared cube-logo texture with a light-gray background and refreshed the `06_TexturedCube` README screenshot.
+
+### Fixed
+
+- Moving a `SlotMap` now leaves its source empty and reusable without reviving old handles.
+- Corrected directional lighting in `19_DrawIndirectGltf` to use a fixed world-space direction.
+- Core test checks and their required operations now remain active in Release builds.
+- `20_TriplanarMapping` uses separate model-matrix buffers for three frames in flight and waits for each slot's submission before overwriting it.
 
 ## 0.3.1 - 2026-09-15
 

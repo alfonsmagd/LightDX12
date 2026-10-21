@@ -81,9 +81,9 @@ namespace ldx12
 		{
 			subresourceCount = texture.depthOrArraySize_;
 		}
-		else if( texture.dimension_ != TextureDimension::Texture2D || texture.depthOrArraySize_ != 1 )
+		else if( texture.dimension_ != TextureDimension::Texture3D && ( texture.dimension_ != TextureDimension::Texture2D || texture.depthOrArraySize_ != 1 ) )
 		{
-			throw std::runtime_error( "TextureSubData supports only Texture2D, Texture2DArray and TextureCube uploads." );
+			throw std::runtime_error( "TextureSubData supports Texture2D, Texture2DArray, TextureCube and Texture3D uploads." );
 		}
 
 		UINT64 uploadBufferSize = 0;
@@ -131,11 +131,14 @@ namespace ldx12
 		{
 			const uint8_t* sourceSlice = srcBytes + static_cast<size_t>( subresource ) * slicePitch;
 			const D3D12_PLACED_SUBRESOURCE_FOOTPRINT& layout = layouts[ subresource ];
-			for( UINT row = 0; row < rowCounts[ subresource ]; ++row )
+			for( UINT depth = 0; depth < layout.Footprint.Depth; ++depth )
 			{
-				std::memcpy( dstBytes + layout.Offset + static_cast<size_t>( row ) * layout.Footprint.RowPitch,
-					sourceSlice + static_cast<size_t>( row ) * rowPitch,
-					static_cast<size_t>( rowSizes[ subresource ] ) );
+				for( UINT row = 0; row < rowCounts[ subresource ]; ++row )
+				{
+					std::memcpy( dstBytes + layout.Offset + ( static_cast<size_t>( depth ) * rowCounts[ subresource ] + row ) * layout.Footprint.RowPitch,
+						sourceSlice + static_cast<size_t>( depth ) * slicePitch + static_cast<size_t>( row ) * rowPitch,
+						static_cast<size_t>( rowSizes[ subresource ] ) );
+				}
 			}
 		}
 

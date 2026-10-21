@@ -332,7 +332,8 @@ namespace ldx12
 		D3D12_RESOURCE_STATES initialState = D3D12_RESOURCE_STATE_COMMON;
 		// Texture2DArray data contains tightly packed base-mip slices and
 		// slicePitch advances one slice. TextureCube uses six slices in D3D12
-		// order: +X, -X, +Y, -Y, +Z, -Z.
+		// order: +X, -X, +Y, -Y, +Z, -Z. Texture3D data contains tightly
+		// packed depth slices, and slicePitch advances one depth slice.
 		const void* data = nullptr;
 		uint32_t rowPitch = 0;
 		uint32_t slicePitch = 0;

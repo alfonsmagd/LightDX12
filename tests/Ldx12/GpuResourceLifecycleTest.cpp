@@ -81,6 +81,99 @@ namespace ldx12::tests
 
 		device.Destroy( replacementTexture );
 		device.Destroy( replacementBuffer );
+
+		// Upload padded rows and slices, then sample every voxel into a 2D target.
+		constexpr uint32_t volumeWidth = 3;
+		constexpr uint32_t volumeHeight = 2;
+		constexpr uint32_t volumeDepth = 3;
+		constexpr uint32_t sourceRowElements = 5;
+		constexpr uint32_t sourceSliceElements = 12;
+		std::array<uint32_t, sourceSliceElements * volumeDepth> voxels{};
+		std::array<uint32_t, volumeWidth * volumeHeight * volumeDepth> expectedVoxels{};
+
+		voxels.fill( 0xffff00ffu );
+
+		for( uint32_t z = 0; z < volumeDepth; ++z )
+		{
+			for( uint32_t y = 0; y < volumeHeight; ++y )
+			{
+				for( uint32_t x = 0; x < volumeWidth; ++x )
+				{
+					const uint32_t red = ( x + 1u ) * 60u;
+					const uint32_t green = ( y + 1u ) * 70u;
+					const uint32_t blue = ( z + 1u ) * 50u;
+					const uint32_t color = 0xff000000u | ( blue << 16u ) | ( green << 8u ) | red;
+
+					voxels[ z * sourceSliceElements + y * sourceRowElements + x ] = color;
+					expectedVoxels[ ( z * volumeHeight + y ) * volumeWidth + x ] = color;
+				}
+			}
+		}
+
+		TextureDesc volumeDesc{};
+		volumeDesc.dimension = TextureDimension::Texture3D;
+		volumeDesc.width = volumeWidth;
+		volumeDesc.height = volumeHeight;
+		volumeDesc.depthOrArraySize = volumeDepth;
+		volumeDesc.data = voxels.data();
+		volumeDesc.rowPitch = sourceRowElements * sizeof( uint32_t );
+		volumeDesc.slicePitch = sourceSliceElements * sizeof( uint32_t );
+
+		const TextureHandle volume = device.CreateTexture( volumeDesc );
+
+		TextureDesc targetDesc{};
+		targetDesc.width = volumeWidth;
+		targetDesc.height = volumeHeight * volumeDepth;
+		targetDesc.usage = TextureUsage::RenderTarget;
+
+		const TextureHandle target = device.CreateTexture( targetDesc );
+
+		static constexpr char volumeShader[] = R"(
+cbuffer Bindings : register(b0) { uint volumeIndex; };
+
+float4 VSMain(uint vertexId : SV_VertexID) : SV_Position
+{
+    const float2 positions[3] = { float2(-1.0, -1.0), float2(-1.0, 3.0), float2(3.0, -1.0) };
+    return float4(positions[vertexId], 0.0, 1.0);
+}
+
+float4 PSMain(float4 position : SV_Position) : SV_Target0
+{
+    Texture3D<float4> volume = ResourceDescriptorHeap[volumeIndex];
+    const uint2 pixel = uint2(position.xy);
+    return volume.Load(int4(pixel.x, pixel.y % 2, pixel.y / 2, 0));
+}
+)";
+
+		RenderPipelineDesc pipelineDesc{};
+		pipelineDesc.vertexShader = { .source = volumeShader, .entryPoint = "VSMain" };
+		pipelineDesc.fragmentShader = { .source = volumeShader, .entryPoint = "PSMain" };
+		pipelineDesc.rasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+
+		RenderPipelineState pipeline = device.CreateRenderPipeline( pipelineDesc );
+		const uint32_t volumeIndex = device.GetBindlessIndex( volume );
+
+		RenderPass pass{};
+		pass.color[ 0 ].loadOp = LoadOp::Clear;
+
+		Framebuffer framebuffer{};
+		framebuffer.color[ 0 ].texture = target;
+
+		CommandBuffer& commands = device.AcquireCommandBuffer();
+		commands.CmdBeginRendering( pass, framebuffer );
+		commands.CmdBindRenderPipeline( pipeline );
+		commands.CmdPushConstants( volumeIndex );
+		commands.CmdDraw( 3 );
+		commands.CmdEndRendering();
+		device.Wait( device.Submit( commands ) );
+
+		std::array<uint32_t, expectedVoxels.size()> actualVoxels{};
+
+		device.DownloadTexture2D( target, actualVoxels.data(), volumeWidth * sizeof( uint32_t ), sizeof( actualVoxels ) );
+		Require( actualVoxels == expectedVoxels, "Texture3D initial upload changed voxel data or ignored source row/slice padding." );
+
+		device.Destroy( target );
+		device.Destroy( volume );
 		device.WaitIdle();
 	}
 }
