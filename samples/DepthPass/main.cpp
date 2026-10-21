@@ -209,6 +209,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 
 		std::array<SubmitHandle, ourFramesInFlight> frameSubmissions{};
 		uint32_t frameIndex = 0;
+		bool depthEnabled = true;
 		const std::chrono::steady_clock::time_point animationStart = std::chrono::steady_clock::now();
 
 		while( app.PumpMessages() )
@@ -262,7 +263,11 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 			colorPass.depthStencil.depthLoadOp = LoadOp::Load;
 			Framebuffer colorFramebuffer{};
 			colorFramebuffer.color[ 0 ].texture = backbuffer;
-			colorFramebuffer.depthStencil.texture = depthTarget;
+
+			if( depthEnabled )
+			{
+				colorFramebuffer.depthStencil.texture = depthTarget;
+			}
 
 			{ //Color pass
 				commands.CmdBeginRendering( colorPass, colorFramebuffer );
@@ -281,8 +286,9 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 				commands.CmdBeginRendering( uiPass, uiFramebuffer );
 				ImGui::NewFrame();
 				ImGui::SetNextWindowPos( ImVec2( 8.0f, 8.0f ), ImGuiCond_Always );
-				ImGui::SetNextWindowSize( ImVec2( 460.0f, 300.0f ), ImGuiCond_Always );
+				ImGui::SetNextWindowSize( ImVec2( 460.0f, 320.0f ), ImGuiCond_Always );
 				ImGui::Begin( "Depth buffer", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse );
+				ImGui::Checkbox( "Depth enable", &depthEnabled );
 				ImGui::TextUnformatted( "Near is darker, far is lighter" );
 				ImGui::Image( depthTarget, ImVec2( 420.0f, 420.0f * static_cast<float>( height ) / static_cast<float>( width ) ) );
 				ImGui::End();
