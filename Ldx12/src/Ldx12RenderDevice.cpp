@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cassert>
 #include <cstdio>
 
 #include "Ldx12BaseMips.hpp"
@@ -809,61 +810,41 @@ namespace ldx12
 
 	void RenderDevice::ValidateBufferDesc( const BufferDesc& desc ) const
 	{
-		constexpr uint64_t maximumConstantBufferSize = 64ull * 1024ull;
-		if( desc.size == 0 )
+		[[maybe_unused]] constexpr uint64_t maximumConstantBufferSize = 64ull * 1024ull;
+
+		assert( desc.size > 0 && "BufferDesc.size must be greater than zero." );
+
+		if( desc.type == BufferType::Constant )
 		{
-			throw std::invalid_argument( "BufferDesc.size must be greater than zero." );
+			assert( desc.size <= maximumConstantBufferSize && "Constant buffer views are limited to 64 KiB. Use an SRV/StructuredBuffer for larger data." );
 		}
 
-		if( desc.type == BufferType::Constant && desc.size > maximumConstantBufferSize )
+		if( desc.type == BufferType::Vertex || desc.type == BufferType::Index )
 		{
-			throw std::length_error( "Constant buffer views are limited to 64 KiB. Use an SRV/StructuredBuffer for larger data." );
+			assert( desc.size <= std::numeric_limits<uint32_t>::max() && "Vertex and index buffers are limited to 4 GiB by their D3D12 views." );
 		}
-		if( ( desc.type == BufferType::Vertex || desc.type == BufferType::Index ) && desc.size > std::numeric_limits<uint32_t>::max() )
-		{
-			throw std::length_error( "Vertex and index buffers are limited to 4 GiB by their D3D12 views." );
-		}
+
 		if( desc.type == BufferType::Structured )
 		{
-			if( desc.stride == 0 )
-			{
-				throw std::invalid_argument( "Structured buffers require a non-zero stride." );
-			}
-			if( desc.stride % sizeof( uint32_t ) != 0 || desc.stride > D3D12_REQ_MULTI_ELEMENT_STRUCTURE_SIZE_IN_BYTES )
-			{
-				throw std::invalid_argument( "Structured buffer stride must be a multiple of 4 bytes and no greater than 2,048 bytes." );
-			}
-			if( desc.size % desc.stride != 0 )
-			{
-				throw std::invalid_argument( "Structured buffer size must be a multiple of its stride." );
-			}
-			if( desc.size / desc.stride > std::numeric_limits<uint32_t>::max() )
-			{
-				throw std::length_error( "Structured buffer element count exceeds the D3D12 SRV limit." );
-			}
+			assert( desc.stride > 0 && "Structured buffers require a non-zero stride." );
+			assert( desc.stride % sizeof( uint32_t ) == 0 && desc.stride <= D3D12_REQ_MULTI_ELEMENT_STRUCTURE_SIZE_IN_BYTES &&
+					"Structured buffer stride must be a multiple of 4 bytes and no greater than 2,048 bytes." );
+			assert( desc.size % desc.stride == 0 && "Structured buffer size must be a multiple of its stride." );
+			assert( desc.size / desc.stride <= std::numeric_limits<uint32_t>::max() && "Structured buffer element count exceeds the D3D12 SRV limit." );
 		}
+
 		if( desc.type == BufferType::Raw )
 		{
-			if( desc.stride != 0 )
-			{
-				throw std::invalid_argument( "Raw buffers do not use a structured stride." );
-			}
-			if( desc.size % sizeof( uint32_t ) != 0 )
-			{
-				throw std::invalid_argument( "Raw buffer size must be aligned to 32-bit values." );
-			}
-			if( desc.size / sizeof( uint32_t ) > std::numeric_limits<uint32_t>::max() )
-			{
-				throw std::length_error( "Raw buffer element count exceeds the D3D12 SRV limit." );
-			}
+			assert( desc.stride == 0 && "Raw buffers do not use a structured stride." );
+			assert( desc.size % sizeof( uint32_t ) == 0 && "Raw buffer size must be aligned to 32-bit values." );
+			assert( desc.size / sizeof( uint32_t ) <= std::numeric_limits<uint32_t>::max() && "Raw buffer element count exceeds the D3D12 SRV limit." );
 		}
-		if( desc.unorderedAccess && desc.type != BufferType::Structured && desc.type != BufferType::Raw )
+
+		if( desc.unorderedAccess )
 		{
-			throw std::invalid_argument( "BufferDesc.unorderedAccess requires a Structured or Raw buffer." );
-		}
-		if( desc.unorderedAccess && desc.memory != BufferMemory::GpuLocal )
-		{
-			throw std::invalid_argument( "Unordered-access buffers must use GpuLocal memory." );
+			assert(
+				( desc.type == BufferType::Structured || desc.type == BufferType::Raw ) && "BufferDesc.unorderedAccess requires a Structured or Raw buffer." );
+			assert( desc.memory == BufferMemory::GpuLocal && "Unordered-access buffers must use GpuLocal memory." );
 		}
 	}
 

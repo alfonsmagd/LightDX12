@@ -23,6 +23,7 @@ This file lists the main user-visible changes in each Ldx12 version.
 
 ### Fixed
 
+- Buffer descriptor preconditions now use assertions instead of exceptions, removing descriptor checks from `NDEBUG` builds while preserving runtime resource-creation and capacity errors.
 - `15_DepthPass` now provides a `Depth enable` checkbox to omit the depth attachment from the color pass when disabled.
 - Moving a `SlotMap` now leaves its source empty and reusable without reviving old handles.
 - Corrected directional lighting in `19_DrawIndirectGltf` to use a fixed world-space direction.
