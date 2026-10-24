@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
   <metadata>
     <id>Ldx12</id>
-    <version>0.3.1</version>
+    <version>0.4.0</version>
     <title>Ldx12</title>
     <authors>alfonsmagd</authors>
     <description>Lightweight and fully bindless C++20 Direct3D 12 rendering library. Includes Ldx12Utils with Win32 helpers, geometry, texture loading and cgltf-based static glTF/GLB scene loading.</description>
@@ -12,7 +12,7 @@
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <icon>Ldx12.png</icon>
     <readme>README.md</readme>
-    <releaseNotes>Ldx12 0.3.1 restores compatibility with the MSVC 14.38 toolset and embeds Debug information in the static libraries so consumers do not require package PDB files.</releaseNotes>
+    <releaseNotes>Ldx12 0.4.0 adds GPU adapter selection, fixed resource profiles, GPU-safe constant-buffer rings and CPU uploads for Texture3D. Includes HLSL ring-buffer headers and refreshed samples. Application push constants now support 62 DWORDs (248 bytes); b2 is reserved for ring offsets. Rebuild consumers and shaders against this version.</releaseNotes>
     <tags>native nativepackage c++ cpp directx12 d3d12 bindless graphics rendering gltf glb cgltf pbr</tags>
     <dependencies>
       <group targetFramework="native" />

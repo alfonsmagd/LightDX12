@@ -24,14 +24,6 @@ Instanced cubes using fixed bindless CBV/SRV positions, push constants and depth
 
 [View source](../samples/CBSRVCubes)
 
-## 4. ImGuiNodeEditor
-
-Interactive ImGui node graph with typed links, texture processing and live texture previews.
-
-![4. ImGuiNodeEditor](images/04-imgui-node-editor.png)
-
-[View source](../samples/ImGuiNodeEditor)
-
 ## 5. Z-buffer and MSAA x4
 
 ![5. Z-buffer and MSAA x4](images/05-zbuffer-msaa4.png)

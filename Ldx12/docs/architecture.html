@@ -825,10 +825,11 @@
 
 				<section class="bindless-block" aria-labelledby="root-heading">
 					<div class="bindless-heading"><span class="bindless-number">01</span><h3 id="root-heading">Root signature</h3></div>
-					<p>Two root parameters. No descriptor tables.</p>
+					<p>Three root parameters. No descriptor tables.</p>
 					<dl class="bindless-rows">
-						<div><dt>Application constants <code>b0</code></dt><dd>63 × 32-bit values · 252 bytes<br><code>CmdPushConstants()</code></dd></div>
+						<div><dt>Application constants <code>b0</code></dt><dd>62 × 32-bit values · 248 bytes<br><code>CmdPushConstants()</code></dd></div>
 						<div><dt>Engine-reserved constant <code>b1</code></dt><dd>Indirect draw index · written by CommandSignature</dd></div>
+						<div><dt>Engine-reserved constant <code>b2</code></dt><dd>Two ring-buffer byte offsets · 16 bits each<br>Initialized to zero for graphics and compute</dd></div>
 					</dl>
 					<p class="bindless-footnote">Direct heap indexing is enabled for resources and samplers.</p>
 					<details class="bindless-details">

@@ -408,14 +408,6 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 		device.Destroy( woodTexture );
 		device.Destroy( xorTexture );
 
-		[[maybe_unused]] D3D12_RENDER_TARGET_VIEW_DESC rtvDesc{};
-		rtvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-		rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2DARRAY;
-		rtvDesc.Texture2DArray.MipSlice = 0;
-		rtvDesc.Texture2DArray.FirstArraySlice = 0;
-		rtvDesc.Texture2DArray.ArraySize = 1;
-		rtvDesc.Texture2DArray.PlaneSlice = 0;
-
 		for( BufferHandle modelBuffer : modelBuffers )
 		{
 			device.Destroy( modelBuffer );

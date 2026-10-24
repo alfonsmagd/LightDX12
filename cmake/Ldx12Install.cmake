@@ -33,6 +33,12 @@ endif()
 install(DIRECTORY "${LDX12_ROOT}/include/" DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
 install(
     FILES
+        "${LDX12_ROOT}/src/shaders/Ldx12_ConstantBuffers.hlsli"
+        "${LDX12_ROOT}/src/shaders/Ldx12_Defines.hlsli"
+    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/Ldx12/shaders"
+)
+install(
+    FILES
         "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE"
         "${CMAKE_CURRENT_SOURCE_DIR}/THIRD_PARTY_NOTICES.md"
     DESTINATION "${CMAKE_INSTALL_DATADIR}/Ldx12"

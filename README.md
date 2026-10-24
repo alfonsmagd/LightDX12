@@ -134,10 +134,10 @@ Requirements: Windows 10/11, Visual Studio 2022 with Desktop development with C+
 
 ### NuGet
 
-Ldx12 0.3.0 is available on [NuGet.org](https://www.nuget.org/packages/Ldx12/0.3.0):
+Ldx12 0.4.0 is available on [NuGet.org](https://www.nuget.org/packages/Ldx12/0.4.0):
 
 ```powershell
-Install-Package Ldx12 -Version 0.3.0
+Install-Package Ldx12 -Version 0.4.0
 ```
 
 The package includes the public Ldx12 and Ldx12Utils headers and automatically selects their Debug or Release static libraries.
@@ -159,14 +159,14 @@ include(FetchContent)
 FetchContent_Declare(
     Ldx12
     GIT_REPOSITORY https://github.com/alfonsmagd/LightDX12.git
-    GIT_TAG version-0.3.0
+    GIT_TAG v0.4.0
 )
 FetchContent_MakeAvailable(Ldx12)
 
 target_link_libraries(MyApplication PRIVATE Ldx12::Ldx12)
 ```
 
-The snippet targets the `version-0.3.0` branch. Pin a commit for reproducible builds; the NuGet command above installs the matching 0.3.0 release.
+The snippet targets the `v0.4.0` release tag. The NuGet command above installs the matching 0.4.0 package.
 
 When used as a subproject, Ldx12 builds only the core library by default. Installation with `find_package` is demonstrated in [`examples/InstalledLdx12`](examples/InstalledLdx12/README.md).
 
@@ -204,19 +204,25 @@ Normal rendering only requires `Ldx12.hpp`. Advanced integrations can include `L
 
 These are Ldx12 software capacities, not resources allocated immediately by the GPU.
 
-| Descriptor heap | Default | Maximum |
-| --- | ---: | ---: |
-| Shared CBV/SRV/UAV | 4,096 descriptors | 4,096 descriptors |
-| Dynamic CBV/SRV/UAV portion | 4,070 descriptors | 4,070 descriptors |
-| RTV | 256 descriptors | 256 descriptors |
-| DSV | 64 descriptors | 64 descriptors |
+Resource storage is a fixed contiguous array sized at compile time. Select one profile for both the library and its consumers:
 
-CBV, SRV and UAV descriptors share one heap. Index 0 is invalid, indices 1-25 are predefined and indices 26-4095 are dynamic. `ContextDesc` can reduce these capacities.
+| Profile define | Buffers + textures | Shared CBV/SRV/UAV | RTV | DSV | Tracked buffers/textures per command buffer |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `LDX12_SMALL_RESOURCES` | 256 | 256 | 16 | 4 | 16 per type |
+| `LDX12_MEDIUM_RESOURCES` | 1,024 | 1,024 | 32 | 8 | 64 per type |
+| `LDX12_HIGH_RESOURCES` (default) | 4,096 | 4,096 | 64 | 12 | 256 per type |
+
+With CMake, configure `-DLDX12_RESOURCE_PROFILE=SMALL`, `MEDIUM` or `HIGH`. The `Ldx12::Ldx12` target propagates the selected define, including installed packages. For manual builds, use the same profile define in every library and application translation unit. Selecting more than one profile is a compilation error.
+
+CBV, SRV and UAV descriptors share one heap. Index 0 is invalid, indices 1-25 are predefined and the dynamic portion starts at index 26: 230 slots for SMALL, 998 for MEDIUM and 4,070 for HIGH. `ContextDesc` can reduce heap capacities, but cannot exceed the compiled profile.
+
+Buffers and textures share the resource limit. Imported textures and swapchain backbuffers also count. A sampled render target uses one resource slot, one SRV and one RTV; descriptor limits count all allocated views, including views retained for deferred GPU cleanup. All CPU resource and descriptor bookkeeping arrays have static storage; there are no resource pages.
+
+The following maxima describe the default HIGH profile:
 
 | API capacity | Maximum |
 | --- | ---: |
-| Live buffers | 4,096 buffers |
-| Live textures | 4,096 textures |
+| Live buffers and textures | 4,096 resources combined |
 | Live swapchains | 16 swapchains |
 | Backbuffers per swapchain | 2-3 backbuffers |
 | Color attachments per render pass | 8 attachments |
@@ -224,7 +230,7 @@ CBV, SRV and UAV descriptors share one heap. Index 0 is invalid, indices 1-25 ar
 | Acquired command buffers awaiting submission | 64 command buffers |
 | Command buffers per submission batch | 4 command buffers |
 | Texture states tracked per command buffer | 256 textures |
-| Push constants | 63 × 32-bit values (252 bytes) |
+| Push constants | 62 × 32-bit values (248 bytes) |
 
 The predefined descriptor positions are conveniences, not resource limits. Applications can use five CBV, five SRV and three UAV predefined positions; other resources receive dynamic descriptor indices.
 
@@ -251,7 +257,6 @@ See the [tests documentation](tests/README.md), [technical reference](Ldx12/docs
 | **1. [Triangle](samples/Triangle)**<br>[![Triangle](examples/images/01-triangle.png)](samples/Triangle) |
 | **2. [ViewportScissor](samples/ViewportScissor)**<br>[![ViewportScissor](examples/images/02-viewport-scissor.png)](samples/ViewportScissor) |
 | **3. [CBSRVCubes](samples/CBSRVCubes)**<br>[![CBSRVCubes](examples/images/03-cbsrv-cubes-0.4.0.png)](samples/CBSRVCubes) |
-| **4. [ImGuiNodeEditor](samples/ImGuiNodeEditor)**<br>[![ImGuiNodeEditor](examples/images/04-imgui-node-editor.png)](samples/ImGuiNodeEditor) |
 | **5. [Z-buffer + MSAA x4](samples/ZFighting)**<br>[![Z-buffer and MSAA x4](examples/images/05-zbuffer-msaa4.png)](samples/ZFighting) |
 | **6. [TexturedCube](samples/TexturedCube)**<br>[![TexturedCube](examples/images/06-textured-cube-light-gray-0.4.0.png)](samples/TexturedCube) |
 | **7. [TextureSamplers](samples/TextureSamplers)**<br>[![TextureSamplers](examples/images/07-texture-samplers.png)](samples/TextureSamplers) |
@@ -265,7 +270,6 @@ See the [tests documentation](tests/README.md), [technical reference](Ldx12/docs
 | **15. [DepthPass (depth buffer)](samples/DepthPass)**<br>[![Depth buffer visualization](examples/images/15-depth-prepass-0.4.0.png)](samples/DepthPass) |
 | **19. [MultiDrawIndirect glTF](samples/DrawIndirectGltf)**<br>[![MultiDrawIndirect glTF](examples/images/19-multidraw-indirect-gltf-0.4.0.png)](samples/DrawIndirectGltf) |
 | **20. [TriplanarMapping](samples/TriplanarMapping)** — sixteen animated icosahedra textured without UV coordinates. |
-| **21. Skinning** — animated BrainStem character with GPU skinning and playback controls. |
 | **[ConstantBufferRings](samples/ConstantBufferRings)** — easy, fast per-draw constant uploads with `SetConstantBuffer`: a rotating red cube and an orbiting point-light sphere, using CB0 per object and CB1 for shared light data. |
 
 </details>

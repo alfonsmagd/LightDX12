@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [ValidatePattern( '^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$' )]
-    [string] $Version = '0.3.1-local',
+    [string] $Version = '0.4.0-local',
     [ValidatePattern( '^\d+\.\d+\.\d+(?:\.\d+)?$' )]
     [string] $MsvcToolsetVersion = '14.38.33130',
     [string] $NuGetExe = ''
@@ -86,6 +86,15 @@ $extractedPackage = Join-Path $packageInstallDirectory "Ldx12.$Version"
 if( -not ( Test-Path -LiteralPath $extractedPackage -PathType Container ) )
 {
     throw "The extracted package was not found at '$extractedPackage'."
+}
+
+foreach( $shaderHeader in @( 'Ldx12_ConstantBuffers.hlsli', 'Ldx12_Defines.hlsli' ) )
+{
+    $shaderHeaderPath = Join-Path $extractedPackage "build\native\include\Ldx12\shaders\$shaderHeader"
+    if( -not ( Test-Path -LiteralPath $shaderHeaderPath -PathType Leaf ) )
+    {
+        throw "The package is missing the public shader header '$shaderHeader'."
+    }
 }
 
 foreach( $configuration in @( 'Debug', 'Release' ) )

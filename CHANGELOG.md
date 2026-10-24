@@ -2,7 +2,7 @@
 
 This file lists the main user-visible changes in each Ldx12 version.
 
-## 0.4.0 - Unreleased
+## 0.4.0 - 2026-10-24
 
 ### Added
 
@@ -10,6 +10,7 @@ This file lists the main user-visible changes in each Ldx12 version.
 - Added support for selecting different GPU adapters by DXGI index or NVIDIA/AMD preference, with configurable defaults, fallback to a compatible adapter and Shader Model 6.6 validation.
 - Added ring buffers to `CommandBuffer::SetConstantBuffer` for easy, fast per-draw constant-buffer uploads, with automatic offsets, typed HLSL `CB0.Load<T>()` / `CB1.Load<T>()` access and deferred reuse after GPU completion.
 - Added `21_ConstantBufferRings`, demonstrating per-object data in CB0 and a shared point light in CB1.
+- Added the `ByteAddressBuffer` rotating-cube sample.
 
 - Added CPU initial-data uploads for sampled `Texture3D` resources, including row and depth-slice pitches.
 - Added a cubemap skybox to `19_DrawIndirectGltf`, with single-sample and MSAA x4 pipelines.
@@ -20,6 +21,9 @@ This file lists the main user-visible changes in each Ldx12 version.
 - Consolidated the core CPU/GPU tests, added case filters, and kept test checks active in Release builds.
 - Simplified GPU capability checks to Shader Model 6.6; adapter names now use fixed buffers and expose a LUID. Software adapters, including WARP, are no longer selected.
 - Updated the shared cube-logo texture with a light-gray background and refreshed the `06_TexturedCube` README screenshot.
+- Reserved root constant `b2` for constant-buffer ring offsets, reducing application push constants to 62 DWORDs (248 bytes). Consumers must rebuild their shaders and keep application constants within this limit.
+- Removed ImGuiNodeEditor from the enabled sample catalogue. Skinning is not included in this release.
+- Retained the deprecated `RenderPipelineDesc::colorFormat` compatibility fallback; new code should use `color[i].format`.
 
 ### Fixed
 
@@ -29,6 +33,7 @@ This file lists the main user-visible changes in each Ldx12 version.
 - Corrected directional lighting in `19_DrawIndirectGltf` to use a fixed world-space direction.
 - Core test checks and their required operations now remain active in Release builds.
 - `20_TriplanarMapping` uses separate model-matrix buffers for three frames in flight and waits for each slot's submission before overwriting it.
+- Installed packages now include `Ldx12_ConstantBuffers.hlsli` and `Ldx12_Defines.hlsli` for consumer shaders.
 
 ## 0.3.1 - 2026-09-15
 

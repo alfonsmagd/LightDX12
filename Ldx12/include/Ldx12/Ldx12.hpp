@@ -236,7 +236,7 @@ namespace ldx12
 		D3D12_DEPTH_STENCIL_DESC depthStencilState = {};
 		D3D12_PRIMITIVE_TOPOLOGY_TYPE primitiveType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 		D3D_PRIMITIVE_TOPOLOGY topology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-		[[deprecated( "Use color[0].format. colorFormat will be removed in Ldx12 0.4.0." )]]
+		[[deprecated( "Use color[0].format." )]]
 		DXGI_FORMAT colorFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
 		DXGI_FORMAT depthFormat = DXGI_FORMAT_UNKNOWN;
 		uint32_t sampleCount = 1;

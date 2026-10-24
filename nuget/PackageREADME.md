@@ -1,6 +1,6 @@
-![Ldx12](https://raw.githubusercontent.com/alfonsmagd/LightDX12/v0.3.1/nuget/Ldx12Banner.png)
+![Ldx12](https://raw.githubusercontent.com/alfonsmagd/LightDX12/v0.4.0/nuget/Ldx12Banner.png)
 
-# Ldx12 0.3.1
+# Ldx12 0.4.0
 
 **Prototype Direct3D 12 bindless renderers quickly with a compact C++20 API.**
 
@@ -13,7 +13,7 @@ It is intended for graphics experiments, tools and renderer prototypes rather th
 From the Visual Studio Package Manager Console:
 
 ```powershell
-Install-Package Ldx12 -Version 0.3.1
+Install-Package Ldx12 -Version 0.4.0
 ```
 
 The package configures include paths automatically and selects the correct x64 static libraries for Debug or Release.
@@ -88,9 +88,9 @@ float4 PSMain(float2 uv : TEXCOORD0) : SV_Target0
 
 Changing a resource means changing an index. Ldx12 owns the heaps and bindless root signature; the application still controls pipelines, commands and synchronization points.
 
-![Ldx12 bindless layout and root signature](https://raw.githubusercontent.com/alfonsmagd/LightDX12/v0.3.1/Ldx12/docs/images/bindless-layout.png)
+![Ldx12 bindless layout and root signature](https://raw.githubusercontent.com/alfonsmagd/LightDX12/v0.4.0/Ldx12/docs/images/bindless-layout.png)
 
-## Multiple render targets in 0.3.0
+## Multiple render targets
 
 Each pipeline color attachment declares its own format. The formats can be obtained directly from the framebuffer textures:
 
@@ -110,7 +110,7 @@ When a pipeline is bound, Ldx12 reports a debugger warning if its attachment for
 
 ## Load glTF and GLB scenes with Ldx12Utils
 
-Version 0.3.0 updates the bundled `Ldx12Utils` library with a static glTF 2.0 scene loader powered by the vendored [cgltf](https://github.com/jkuhlmann/cgltf) parser. Loading is CPU-only and does not require a D3D12 device:
+The bundled `Ldx12Utils` library provides a static glTF 2.0 scene loader powered by the vendored [cgltf](https://github.com/jkuhlmann/cgltf) parser. Loading is CPU-only and does not require a D3D12 device:
 
 ```cpp
 #include <Ldx12Utils/GltfLoader.hpp>
@@ -128,28 +128,29 @@ The loader supports `.gltf` and `.glb`, scene-node transforms, indexed and non-i
 
 Complete examples are available in the repository:
 
-- [18_GltfScene](https://github.com/alfonsmagd/LightDX12/tree/v0.3.0/samples/GltfScene) uploads a complete scene and renders its material textures with GGX PBR, HDR environment lighting and optional MSAA.
-- [19_DrawIndirectGltf](https://github.com/alfonsmagd/LightDX12/tree/v0.3.0/samples/DrawIndirectGltf) loads glTF scenes and renders their primitives through bindless material buffers and indexed indirect draws.
+- [18_GltfScene](https://github.com/alfonsmagd/LightDX12/tree/v0.4.0/samples/GltfScene) uploads a complete scene and renders its material textures with GGX PBR, HDR environment lighting and optional MSAA.
+- [19_DrawIndirectGltf](https://github.com/alfonsmagd/LightDX12/tree/v0.4.0/samples/DrawIndirectGltf) loads glTF scenes and renders their primitives through bindless material buffers and indexed indirect draws.
 
-The loader intentionally targets static demo scenes in 0.3.0; animation, skinning, compression, alpha blending and glTF extensions are outside its current scope.
+The loader intentionally targets static demo scenes; animation, skinning, compression, alpha blending and glTF extensions are outside its current scope.
 
-## What is new in 0.3.0
+## What is new in 0.4.0
 
-- Updated `Ldx12Utils` with cgltf-based static glTF/GLB scene loading, including transforms, geometry, materials and metallic/roughness textures.
-- Bindless UAV access for GPU-local structured and raw buffers.
-- Explicit buffer transitions and UAV barriers for compute-to-render workflows.
-- Batched submission fixups for tracked buffer and texture states.
-- Multiple render targets with independent formats and framebuffer validation.
-- Typed `CmdPushConstants(const T&)` with a clear 252-byte compile-time limit.
-- `RenderDevice::Discard()` for abandoning an acquired command buffer safely.
-- `RenderDevice::GetTextureFormat()` for pipeline attachment configuration.
-- Improved deferred destruction and Win32/OLE application initialization.
+- GPU adapter selection by DXGI index or NVIDIA/AMD preference, with fallback to compatible hardware.
+- SMALL, MEDIUM and HIGH resource profiles with fixed capacities shared by buffers and textures.
+- GPU-safe per-draw constant-buffer rings through `SetConstantBuffer`, with typed `CB0.Load<T>()` / `CB1.Load<T>()` shader access.
+- CPU initial-data uploads for `Texture3D`, including padded rows and depth slices.
+- TriplanarMapping and ByteAddressBuffer samples, a skybox in DrawIndirectGltf and a depth toggle in DepthPass.
+- Corrected `SlotMap` move behavior and tests that remain active in Release.
+
+Application push constants now support **62 DWORDs (248 bytes)** at `b0`. Root constant `b2` is reserved for ring-buffer offsets. Rebuild applications and shaders against the same Ldx12 version and resource profile.
+
+The public shader headers are installed in `build/native/include/Ldx12/shaders`. Add that directory to `ShaderStageSource::includeDirectories`, then include `Ldx12_ConstantBuffers.hlsli` from your shader. Both headers needed by the ring-buffer interface are included in the package.
 
 ## Included in the package
 
 - `Ldx12`: device, swapchains, resources, pipelines, command buffers and submission.
 - `Ldx12Utils`: Win32 application setup, cameras, geometry, depth targets, texture loading and glTF loading.
-- Public headers and native x64 static libraries for Debug and Release.
+- Public C++ and HLSL headers and native x64 static libraries for Debug and Release.
 - MSBuild integration for Visual Studio 2022.
 - MIT license and third-party notices.
 
@@ -174,11 +175,11 @@ Advanced integrations can include `Ldx12Native.hpp` to access borrowed native D3
 - Windows SDK and DXC for runtime shader compilation.
 - Direct3D feature level 12.0 or newer.
 - Shader Model 6.6.
-- Resource Binding Tier 3.
+- A compatible hardware GPU; software adapters such as WARP are unsupported.
 
 ## Learn more
 
 - [Source and full documentation](https://github.com/alfonsmagd/LightDX12)
-- [Samples](https://github.com/alfonsmagd/LightDX12/tree/v0.3.0/samples)
-- [Changelog](https://github.com/alfonsmagd/LightDX12/blob/v0.3.1/CHANGELOG.md)
-- [Third-party notices](https://github.com/alfonsmagd/LightDX12/blob/v0.3.1/THIRD_PARTY_NOTICES.md)
+- [Samples](https://github.com/alfonsmagd/LightDX12/tree/v0.4.0/samples)
+- [Changelog](https://github.com/alfonsmagd/LightDX12/blob/v0.4.0/CHANGELOG.md)
+- [Third-party notices](https://github.com/alfonsmagd/LightDX12/blob/v0.4.0/THIRD_PARTY_NOTICES.md)

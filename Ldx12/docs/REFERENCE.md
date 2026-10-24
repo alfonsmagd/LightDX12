@@ -35,7 +35,7 @@ When the D3D12 debug layer is enabled, binding a render pipeline reports debugge
 
 `color[0].format` defaults to `DXGI_FORMAT_R8G8B8A8_UNORM`. For a depth-only pipeline, set it to `DXGI_FORMAT_UNKNOWN`.
 
-`RenderPipelineDesc::colorFormat` remains as a deprecated single-RTV compatibility fallback for `0.3.x` and will be removed in `0.4.0`. Explicit `color[i].format` configuration takes precedence.
+`RenderPipelineDesc::colorFormat` remains as a deprecated single-RTV compatibility fallback in `0.4.0`. Explicit `color[i].format` configuration takes precedence.
 
 ## Build options
 
@@ -86,7 +86,7 @@ The following maxima describe the default HIGH profile:
 | Acquired command buffers awaiting submission | 64 command buffers |
 | Command buffers per submission batch | 4 command buffers |
 | Texture states tracked per command buffer | 256 textures |
-| Push constants | 62 Ã— 32-bit values (248 bytes) |
+| Push constants | 62 × 32-bit values (248 bytes) |
 
 The predefined descriptor positions are conveniences, not resource limits. Applications can use five CBV, five SRV and three UAV predefined positions; other resources receive dynamic descriptor indices.
 
@@ -95,6 +95,15 @@ Engine slots 6 and 7 are named `EngineRingBuffer0` and `EngineRingBuffer1`. Slot
 The root signature uses all 64 DWORDs: 62 application constants at `b0`, the existing indirect draw index at `b1`, and one reserved constant at `b2`. The `b2` value packs the ring 0 byte offset in its low 16 bits and the ring 1 byte offset in its high 16 bits. Both offsets are initialized to zero for graphics and compute when a command buffer is acquired. `CmdPushConstants` only writes `b0` and cannot overwrite the reserved offsets.
 
 ## Platform and scope
+
+### Migrating to 0.4.0
+
+- Rebuild applications and shaders against the same version and resource profile. Buffers and textures now share the profile's resource capacity.
+- Application push constants at `b0` are limited to 62 DWORDs (248 bytes). `b1` is reserved for indirect drawing and `b2` for constant-buffer ring offsets.
+- `SetConstantBuffer` copies data into a GPU-safe ring allocation. Include `Ldx12_ConstantBuffers.hlsli` to read it through `CB0.Load<T>()` and `CB1.Load<T>()`.
+- CMake installations and NuGet packages place the HLSL headers in `include/Ldx12/shaders` and `build/native/include/Ldx12/shaders`, respectively. Add that directory to `ShaderStageSource::includeDirectories` when compiling consumer shaders.
+- Buffer-descriptor preconditions use assertions; callers must satisfy them in Release builds as well. Resource creation and capacity failures retain their runtime errors.
+- Software adapters, including WARP, are unsupported. Initialization requires a compatible hardware adapter.
 
 Initialization requires a D3D12 device supporting Shader Model 6.6. `ContextDesc::minimumFeatureLevel` is passed directly to device creation and defaults to 12.0. No additional feature-level or resource-binding-tier queries are performed during adapter selection.
 
