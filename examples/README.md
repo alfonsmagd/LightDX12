@@ -103,3 +103,19 @@ glTF scene rendered with indexed indirect draws in one ExecuteIndirect batch.
 ![19. MultiDrawIndirect glTF](images/19-multidraw-indirect-gltf-0.4.0.png)
 
 [View source](../samples/DrawIndirectGltf)
+
+## 20. TriplanarMapping
+
+Sixteen animated icosahedra textured without UV coordinates using object-space triplanar mapping.
+
+![20. Triplanar mapping](images/20-triplanar-mapping-0.4.0.png)
+
+[View source](../samples/TriplanarMapping)
+
+## 21. ConstantBufferRings
+
+A rotating red cube and an orbiting point-light sphere use CB0 for per-object data and CB1 for shared light data through `SetConstantBuffer`.
+
+![21. Constant buffer rings](images/21-constant-buffer-rings-0.4.0.png)
+
+[View source](../samples/ConstantBufferRings)

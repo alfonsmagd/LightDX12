@@ -134,7 +134,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 			SphereData sphereData{};
 			sphereData.position = { 3.2f * std::cos( orbitAngle ), 0.0f, 3.2f * std::sin( orbitAngle ), 0.7f };
 
-			// Position.w stores the sphere radius.
+			// Store the sphere radius in w.
 			const float radius = sphereData.position.w;
 			const XMMATRIX sphereModel =
 				XMMatrixScaling( radius, radius, radius ) * XMMatrixTranslation( sphereData.position.x, sphereData.position.y, sphereData.position.z );
@@ -159,17 +159,17 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 
 			commands.CmdBeginRendering( renderPass, framebuffer );
 
-			// Both draws share the same point light through CB1.
+			// Share CB1 between both draws.
 			commands.SetConstantBuffer( lightData, 1 );
 
-			// This draw reads CubeData from the current CB0 offset.
+			// Cube constants in CB0.
 			commands.CmdBindRenderPipeline( cubePipeline );
 			commands.SetConstantBuffer( cubeData, 0 );
 			commands.CmdBindVertexBuffer( cubeGeometry.vertexBuffer );
 			commands.CmdBindIndexBuffer( cubeGeometry.indexBuffer );
 			commands.CmdDrawIndexed( cubeGeometry.indexCount );
 
-			// A new CB0 offset selects SphereData; the previous draw keeps its own offset.
+			// Sphere constants in a new CB0 range.
 			commands.CmdBindRenderPipeline( spherePipeline );
 			commands.SetConstantBuffer( sphereData, 0 );
 			commands.CmdBindVertexBuffer( sphereGeometry.vertexBuffer );

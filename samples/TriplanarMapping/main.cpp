@@ -364,7 +364,7 @@ int WINAPI wWinMain( HINSTANCE instance, HINSTANCE, PWSTR, int showCommand )
 				continue;
 			}
 
-			// Reuse matrices only after the GPU has finished this frame slot.
+			// Wait before reusing this frame's matrices.
 			device.Wait( frameSubmissions[ frameIndex ] );
 
 			const BufferHandle modelBuffer = modelBuffers[ frameIndex ];

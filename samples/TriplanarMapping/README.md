@@ -2,6 +2,8 @@
 
 Direct3D 12 port of LightweightVK's `009_TriplanarMapping` sample. It renders 16 rotating icosahedra and applies two textures without stored UV coordinates.
 
+![Triplanar mapping with sixteen textured icosahedra](../../examples/images/20-triplanar-mapping-0.4.0.png)
+
 Unlike the source sample, this version deliberately uses the conventional input assembler:
 
 - `BufferType::Vertex` for interleaved positions and colors.

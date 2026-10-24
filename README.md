@@ -269,7 +269,7 @@ See the [tests documentation](tests/README.md), [technical reference](Ldx12/docs
 | **14. [ImGuiDemoNative](samples/ImGuiDemoNative)** |
 | **15. [DepthPass (depth buffer)](samples/DepthPass)**<br>[![Depth buffer visualization](examples/images/15-depth-prepass-0.4.0.png)](samples/DepthPass) |
 | **19. [MultiDrawIndirect glTF](samples/DrawIndirectGltf)**<br>[![MultiDrawIndirect glTF](examples/images/19-multidraw-indirect-gltf-0.4.0.png)](samples/DrawIndirectGltf) |
-| **20. [TriplanarMapping](samples/TriplanarMapping)** — sixteen animated icosahedra textured without UV coordinates. |
-| **[ConstantBufferRings](samples/ConstantBufferRings)** — easy, fast per-draw constant uploads with `SetConstantBuffer`: a rotating red cube and an orbiting point-light sphere, using CB0 per object and CB1 for shared light data. |
+| **20. [TriplanarMapping](samples/TriplanarMapping)**<br>[![Triplanar mapping](examples/images/20-triplanar-mapping-0.4.0.png)](samples/TriplanarMapping) |
+| **21. [ConstantBufferRings](samples/ConstantBufferRings)**<br>[![Constant buffer rings](examples/images/21-constant-buffer-rings-0.4.0.png)](samples/ConstantBufferRings) |
 
 </details>

@@ -5,7 +5,7 @@
     <version>0.4.0</version>
     <title>Ldx12</title>
     <authors>alfonsmagd</authors>
-    <description>Lightweight and fully bindless C++20 Direct3D 12 rendering library. Includes Ldx12Utils with Win32 helpers, geometry, texture loading and cgltf-based static glTF/GLB scene loading.</description>
+    <description>Fast, lightweight C++20 Direct3D 12 rendering library for rapid prototyping. Requires Shader Model 6.6.</description>
     <projectUrl>https://github.com/alfonsmagd/LightDX12</projectUrl>
     <repository type="git" url="https://github.com/alfonsmagd/LightDX12.git" />
     <license type="expression">MIT</license>

@@ -38,7 +38,7 @@ VertexOutput VSCube( VertexInput input )
 	VertexOutput output;
 	output.position = mul( float4( input.position, 1.0 ), cube.modelViewProjection );
 	output.worldPosition = mul( float4( input.position, 1.0 ), cube.model ).xyz;
-	// The cube uses uniform scaling, so the model matrix preserves normal directions.
+	// Uniform scale keeps normal directions.
 	output.normal = normalize( mul( input.normal, (float3x3)cube.model ) );
 	return output;
 }
