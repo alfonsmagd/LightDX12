@@ -67,19 +67,19 @@ void ReadReset()
 			CommandBuffer& commands = device.AcquireCommandBuffer();
 			commands.CmdTransitionBuffer( output, D3D12_RESOURCE_STATE_UNORDERED_ACCESS );
 			commands.CmdBindComputePipeline( bothPipeline );
-			commands.SetConstantBuffer( firstData );
-			commands.SetConstantBuffer( secondData.data(), sizeof( secondData ), 1 );
+			device.SetConstantBuffer( commands, firstData );
+			device.SetConstantBuffer( commands, secondData.data(), sizeof( secondData ), 1 );
 			commands.CmdPushConstants( outputBinding );
 			commands.CmdDispatch( 1 );
 			commands.CmdUavBarrier( output );
 
-			commands.SetConstantBuffer( updatedFirst, 0 );
+			device.SetConstantBuffer( commands, updatedFirst, 0 );
 			outputBinding[ 1 ] = 16;
 			commands.CmdPushConstants( outputBinding );
 			commands.CmdDispatch( 1 );
 			commands.CmdUavBarrier( output );
 
-			commands.SetConstantBuffer( updatedSecond, 1 );
+			device.SetConstantBuffer( commands, updatedSecond, 1 );
 			outputBinding[ 1 ] = 32;
 			commands.CmdPushConstants( outputBinding );
 			commands.CmdDispatch( 1 );
@@ -101,7 +101,7 @@ void ReadReset()
 			reused.CmdTransitionBuffer( output, D3D12_RESOURCE_STATE_UNORDERED_ACCESS );
 			reused.CmdUavBarrier( output );
 			reused.CmdBindComputePipeline( resetPipeline );
-			reused.SetConstantBuffer( firstData, 0 );
+			device.SetConstantBuffer( reused, firstData, 0 );
 			outputBinding[ 1 ] = 48;
 			reused.CmdPushConstants( outputBinding );
 			reused.CmdDispatch( 1 );

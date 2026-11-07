@@ -79,14 +79,14 @@ int main()
 			framebuffer.color[ 0 ].texture = target;
 			framebuffer.depthStencil.texture = depthTarget.GetTexture();
 			commands.CmdBeginRendering( renderPass, framebuffer );
-			commands.SetConstantBuffer( lightData, 1 );
+			device.SetConstantBuffer( commands, lightData, 1 );
 			commands.CmdBindRenderPipeline( cubePipeline );
-			commands.SetConstantBuffer( cubeData, 0 );
+			device.SetConstantBuffer( commands, cubeData, 0 );
 			commands.CmdBindVertexBuffer( cubeGeometry.vertexBuffer );
 			commands.CmdBindIndexBuffer( cubeGeometry.indexBuffer );
 			commands.CmdDrawIndexed( cubeGeometry.indexCount );
 			commands.CmdBindRenderPipeline( spherePipeline );
-			commands.SetConstantBuffer( sphereData, 0 );
+			device.SetConstantBuffer( commands, sphereData, 0 );
 			commands.CmdBindVertexBuffer( sphereGeometry.vertexBuffer );
 			commands.CmdBindIndexBuffer( sphereGeometry.indexBuffer );
 			commands.CmdDrawIndexed( sphereGeometry.indexCount );

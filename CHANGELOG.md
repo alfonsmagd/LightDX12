@@ -2,6 +2,12 @@
 
 This file lists the main user-visible changes in each Ldx12 version.
 
+## 0.5.0 - Unreleased
+
+### Fixed
+
+- Simplified resource barriers and constant-buffer handling: `SetConstantBuffer` now belongs to `RenderDevice`, batch state preparation avoids nested searches and large stack arrays, and discarded recordings reclaim their ring allocations.
+
 ## 0.4.0 - 2026-10-24
 
 ### Added

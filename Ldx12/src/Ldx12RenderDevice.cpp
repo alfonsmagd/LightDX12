@@ -997,6 +997,30 @@ namespace ldx12
 		manager_->stagingDevice_->BufferSubData( resource, static_cast<size_t>( offset ), static_cast<size_t>( size ), data );
 	}
 
+	void RenderDevice::SetConstantBuffer( CommandBuffer& commandBuffer, const void* data, uint32_t sizeBytes, uint32_t ringIndex )
+	{
+		assert( commandBuffer.manager_ == manager_ && commandBuffer.active_ );
+
+		// Reserve and copy the data; keep its range alive until discard or GPU completion.
+		const uint32_t offset = manager_->UploadConstantBuffer( commandBuffer, data, sizeBytes, ringIndex );
+
+		if( offset == UINT32_MAX )
+		{
+			return;
+		}
+
+		// Each 64 KiB ring needs 16 bits for a byte offset: b2 stores CB0 in the low half and CB1 in the high half.
+		// Replace only the selected ring's offset so the other ring remains bound.
+		const uint32_t offsetShift = ringIndex * 16u;
+		const uint32_t offsetMask = 0xffffu << offsetShift;
+
+		commandBuffer.constantBufferOffsets_ = ( commandBuffer.constantBufferOffsets_ & ~offsetMask ) | ( offset << offsetShift );
+
+		// Both pipeline types use the same packed offsets, decoded by Ldx12_ConstantBuffers.hlsli.
+		commandBuffer.wrapper_->commandList_->SetGraphicsRoot32BitConstant( 2, commandBuffer.constantBufferOffsets_, 0 );
+		commandBuffer.wrapper_->commandList_->SetComputeRoot32BitConstant( 2, commandBuffer.constantBufferOffsets_, 0 );
+	}
+
 	TextureHandle RenderDevice::CreateTexture( const TextureDesc& desc )
 	{
 		ValidateTextureDesc( desc );

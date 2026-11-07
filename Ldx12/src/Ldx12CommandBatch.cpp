@@ -1,6 +1,5 @@
 #include "Ldx12CommandBatch.hpp"
 
-#include "Ldx12CommandBuffer.hpp"
 #include "Ldx12ImmediateCommands.hpp"
 #include "Ldx12Swapchain.hpp"
 
@@ -13,23 +12,7 @@ namespace ldx12
 		uint32_t commandBufferCount,
 		TextureHandle presentTexture )
 	{
-		assert( commandBuffers != nullptr );
-		assert( commandBufferCount > 0 && commandBufferCount <= ourMaxCommandBufferBatch );
-
-		for( uint32_t index = 0; index < commandBufferCount; ++index )
-		{
-			CommandBuffer* commandBuffer = commandBuffers[ index ];
-
-			assert( commandBuffer != nullptr );
-			assert( commandBuffer->manager_ == &manager );
-			assert( commandBuffer->active_ );
-			assert( !commandBuffer->IsRendering() );
-
-			for( uint32_t previousIndex = 0; previousIndex < index; ++previousIndex )
-			{
-				assert( commandBuffers[ previousIndex ] != commandBuffer );
-			}
-		}
+		assert( commandBuffers != nullptr && commandBufferCount > 0 && commandBufferCount <= ourMaxCommandBufferBatch );
 
 		DeviceManager::QueueContext& graphicsQueue = manager.GetGraphicsQueueContext();
 		Swapchain* owningSwapchain = nullptr;
@@ -43,31 +26,10 @@ namespace ldx12
 			commandBuffers[ commandBufferCount - 1 ]->CmdTransitionTexture( presentTexture, D3D12_RESOURCE_STATE_PRESENT );
 		}
 
-		std::array<CommandListWrapper*, ourMaxCommandBufferBatch * 2> wrappers = {};
-		uint32_t wrapperCount = 0;
+		const SubmitHandle handle = graphicsQueue.immediateCommands_->SubmitCommandBuffers( commandBuffers, commandBufferCount );
 
-		for( uint32_t index = 0; index < commandBufferCount; ++index )
-		{
-			CommandBuffer* commandBuffer = commandBuffers[ index ];
-
-			if( CommandListWrapper* fixup = commandBuffer->BuildSubmitFixup( commandBuffers, index ) )
-			{
-				wrappers[ wrapperCount++ ] = fixup;
-			}
-			wrappers[ wrapperCount++ ] = &commandBuffer->Wrapper();
-		}
-
-		const SubmitHandle handle = graphicsQueue.immediateCommands_->SubmitBatch( wrappers.data(), wrapperCount );
-
-		assert( !handle.Empty() );
-
-		manager.CommitConstantBufferRanges( commandBuffers, commandBufferCount, handle );
-
-		for( uint32_t index = 0; index < commandBufferCount; ++index )
-		{
-			commandBuffers[ index ]->CommitSubmittedResourceStates();
-			graphicsQueue.immediateCommands_->ReleaseCommandBuffer( *commandBuffers[ index ] );
-		}
+		manager.DeferConstantBufferRanges( commandBuffers, commandBufferCount, handle );
+		graphicsQueue.immediateCommands_->RecycleSubmittedCommandBuffers( commandBuffers, commandBufferCount );
 
 		if( owningSwapchain != nullptr )
 		{

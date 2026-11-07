@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <deque>
 #include <functional>
+#include <list>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -425,6 +426,9 @@ namespace ldx12
 		uint32_t bufferStride_ = 0;
 		BufferType type_ = BufferType::Generic;
 		D3D12_RESOURCE_STATES currentState_ = D3D12_RESOURCE_STATE_COMMON;
+		// Batch preparation predicts states here without changing currentState_.
+		D3D12_RESOURCE_STATES preparedState_ = D3D12_RESOURCE_STATE_COMMON;
+		uint64_t preparationId_ = 0;
 		D3D12_RESOURCE_DESC desc_ = {};
 		BufferMemory memory_ = BufferMemory::GpuLocal;
 		D3D12_CPU_DESCRIPTOR_HANDLE srvHandle_{ 0 };
@@ -473,6 +477,9 @@ namespace ldx12
 		ComPtr<ID3D12Resource> resource_;
 		D3D12_RESOURCE_FLAGS usageFlags_ = D3D12_RESOURCE_FLAG_NONE;
 		D3D12_RESOURCE_STATES currentState_ = D3D12_RESOURCE_STATE_COMMON;
+		// Batch preparation predicts states here without changing currentState_.
+		D3D12_RESOURCE_STATES preparedState_ = D3D12_RESOURCE_STATE_COMMON;
+		uint64_t preparationId_ = 0;
 		DXGI_FORMAT format_ = DXGI_FORMAT_UNKNOWN;
 		ResolvedFormats formats_ = {};
 		D3D12_RESOURCE_DESC desc_ = {};
@@ -552,6 +559,13 @@ namespace ldx12
 		ComPtr<ID3D12PipelineState> pipelineState_;
 	};
 
+	struct ConstantBufferRange final
+	{
+		uint32_t ringIndex_ = 0;
+		uint64_t begin_ = 0;
+		uint64_t end_ = 0;
+	};
+
 	class CommandBuffer final
 	{
 	public:
@@ -580,16 +594,6 @@ namespace ldx12
 			CmdPushConstants( &data, static_cast<uint32_t>( sizeof( data ) ) );
 		}
 
-		void SetConstantBuffer( const void* data, uint32_t sizeBytes, uint32_t ringIndex = 0 );
-
-		template <typename T> void SetConstantBuffer( const T& data, uint32_t ringIndex = 0 )
-		{
-			static_assert( !std::is_pointer_v<T>, "Pass the object directly, not a pointer." );
-			static_assert( std::is_trivially_copyable_v<T>, "Constant data must be trivially copyable." );
-
-			SetConstantBuffer( &data, static_cast<uint32_t>( sizeof( data ) ), ringIndex );
-		}
-
 		void CmdPushDebugGroupLabel( const char* label, uint32_t color );
 		void CmdPopDebugGroupLabel();
 		void CmdDraw( uint32_t vertexCount, uint32_t instanceCount = 1, uint32_t firstVertex = 0, uint32_t firstInstance = 0 );
@@ -600,19 +604,10 @@ namespace ldx12
 	private:
 		friend class D3D12Native;
 		friend class DeviceManager;
+		friend class RenderDevice;
 		friend class ImmediateCommands;
-		friend SubmitHandle SubmitCommandBufferBatch( DeviceManager& manager,
-			CommandBuffer* const* commandBuffers,
-			uint32_t commandBufferCount,
-			TextureHandle presentTexture );
 
 		CommandBuffer() = default;
-
-		struct ConstantBufferInternalRange final
-		{
-			uint64_t begin_ = 0;
-			uint64_t end_ = 0;
-		};
 
 		struct TrackedBufferState final
 		{
@@ -642,29 +637,13 @@ namespace ldx12
 		{
 			return isRendering_;
 		}
-		const TrackedBufferState* GetTrackedBuffers() const noexcept
-		{
-			return trackedBuffers_.data();
-		}
-		uint32_t GetTrackedBufferCount() const noexcept
-		{
-			return trackedBufferCount_;
-		}
-		const TrackedTextureState* GetTrackedTextures() const noexcept
-		{
-			return trackedTextures_.data();
-		}
-		uint32_t GetTrackedTextureCount() const noexcept
-		{
-			return trackedTextureCount_;
-		}
 		ID3D12GraphicsCommandList* GetNativeGraphicsCommandList();
 		TrackedBufferState& GetTrackedBufferState( BufferHandle buffer );
 		TrackedTextureState& GetTrackedTextureState( TextureHandle texture );
 		void TransitionBuffer( BufferHandle buffer, BufferResource& resource, D3D12_RESOURCE_STATES newState );
 		void TransitionTexture( TextureHandle texture, TextureResource& resource, D3D12_RESOURCE_STATES newState );
 		void ValidateRenderPipelineFramebuffer( const RenderPipelineState& pipeline ) const noexcept;
-		CommandListWrapper* BuildSubmitFixup( CommandBuffer* const* previousCommandBuffers = nullptr, uint32_t previousCommandBufferCount = 0 );
+		CommandListWrapper* BuildSubmitFixup( uint64_t preparationId );
 		void CommitSubmittedResourceStates();
 
 		DeviceManager* manager_ = nullptr;
@@ -673,8 +652,9 @@ namespace ldx12
 		bool active_ = false;
 		uint32_t debugGroupDepth_ = 0;
 
+		// Each recording keeps its own CB0/CB1 offsets and reservations until submission or discard.
 		uint32_t constantBufferOffsets_ = 0;
-		std::array<std::deque<ConstantBufferInternalRange>, 2> constantBufferRanges_ = {};
+		std::list<ConstantBufferRange> constantBufferRanges_;
 
 		std::array<DXGI_FORMAT, ourMaxColorAttachments> framebufferColorFormats_ = {};
 		std::array<TrackedBufferState, ourMaxTrackedBuffersPerCommandBuffer> trackedBuffers_ = {};
@@ -725,6 +705,7 @@ namespace ldx12
 		void Discard( CommandBuffer& commandBuffer ) const;
 		TextureHandle GetCurrentSwapchainTexture( SwapchainHandle swapchain = {} ) const;
 		// Submits commandBuffers[0..commandBufferCount) in array order as one queue batch.
+		// Entries must be distinct active recordings from this device, with all render passes ended.
 		// If presentTexture is valid, the last command buffer transitions and presents it.
 		SubmitHandle SubmitBatch( CommandBuffer* const* commandBuffers, uint32_t commandBufferCount, TextureHandle presentTexture = {} ) const;
 		SubmitHandle Submit( CommandBuffer& buffer, TextureHandle presentTexture );
@@ -740,6 +721,18 @@ namespace ldx12
 		BufferHandle CreateBuffer( const BufferDesc& desc, ConstantBufferSlot slot );
 		BufferHandle CreateBuffer( const BufferDesc& desc, ShaderResourceSlot slot );
 		void WriteBuffer( BufferHandle buffer, uint64_t offset, const void* data, uint64_t size );
+
+		// Copies data into ring 0 (CB0) or ring 1 (CB1) and binds it for subsequent draws and dispatches in this recording.
+		void SetConstantBuffer( CommandBuffer& commandBuffer, const void* data, uint32_t sizeBytes, uint32_t ringIndex = 0 );
+
+		template <typename T> void SetConstantBuffer( CommandBuffer& commandBuffer, const T& data, uint32_t ringIndex = 0 )
+		{
+			static_assert( !std::is_pointer_v<T>, "Pass the object directly, not a pointer." );
+			static_assert( std::is_trivially_copyable_v<T>, "Constant data must be trivially copyable." );
+
+			SetConstantBuffer( commandBuffer, &data, static_cast<uint32_t>( sizeof( data ) ), ringIndex );
+		}
+
 		TextureHandle CreateTexture( const TextureDesc& desc );
 		SamplerHandle CreateSampler( const SamplerDesc& desc );
 		void DownloadTexture2D( TextureHandle texture, void* outData, uint32_t rowPitch, uint32_t slicePitch );
@@ -857,15 +850,11 @@ namespace ldx12
 			uint32_t readWriteResource_ = 0;
 		};
 
-		using ConstantBufferInternalRange = CommandBuffer::ConstantBufferInternalRange;
-		using ConstantBufferRecordingRanges = std::array<std::deque<ConstantBufferInternalRange>, 2>;
-		using ConstantBufferBatchRanges = std::array<ConstantBufferRecordingRanges, ourMaxCommandBufferBatch>;
-
 		struct ConstantBufferRing final
 		{
 			struct RangeState final
 			{
-				ConstantBufferInternalRange range_ = {};
+				ConstantBufferRange range_ = {};
 				bool completed_ = false;
 			};
 
@@ -893,10 +882,10 @@ namespace ldx12
 
 		void InitializeConstantBufferRings();
 		uint32_t UploadConstantBuffer( CommandBuffer& commandBuffer, const void* data, uint32_t sizeBytes, uint32_t ringIndex );
-		void CommitConstantBufferRanges( CommandBuffer* const* commandBuffers, uint32_t commandBufferCount, SubmitHandle submission );
+		uint32_t ReserveConstantBufferRange( CommandBuffer& commandBuffer, uint32_t sizeBytes, uint32_t ringIndex );
+		void DeferConstantBufferRanges( CommandBuffer* const* commandBuffers, uint32_t commandBufferCount, SubmitHandle submission );
 		void DiscardConstantBufferRanges( CommandBuffer& commandBuffer ) noexcept;
-		void ReleaseConstantBufferRanges( uint32_t ringIndex, const std::deque<ConstantBufferInternalRange>& ranges ) noexcept;
-		void ReclaimConstantBufferRanges();
+		void ReleaseConstantBufferRanges( const std::list<ConstantBufferRange>& ranges ) noexcept;
 
 		QueueContext& GetGraphicsQueueContext() noexcept;
 		const QueueContext& GetGraphicsQueueContext() const noexcept;

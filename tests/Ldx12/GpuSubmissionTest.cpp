@@ -55,6 +55,34 @@ namespace ldx12::tests
 		const std::array<uint32_t, 4> expected = { 0xff00ff00u, 0xff00ff00u, 0xff00ff00u, 0xff00ff00u };
 
 		Require( pixels == expected, "Batched passes did not leave the second pass's green pixels." );
+
+		// Record the final pass first, then submit it after two state changes and an unrelated recording.
+		renderPass.color[ 0 ].clearColor = { 0.0f, 0.0f, 1.0f, 1.0f };
+
+		CommandBuffer& finalPass = device.AcquireCommandBuffer();
+
+		finalPass.CmdBeginRendering( renderPass, framebuffer );
+		finalPass.CmdEndRendering();
+
+		CommandBuffer& sourceTransition = device.AcquireCommandBuffer();
+
+		sourceTransition.CmdTransitionTexture( target, D3D12_RESOURCE_STATE_COPY_SOURCE );
+
+		CommandBuffer& destinationTransition = device.AcquireCommandBuffer();
+
+		destinationTransition.CmdTransitionTexture( target, D3D12_RESOURCE_STATE_COPY_DEST );
+
+		CommandBuffer& empty = device.AcquireCommandBuffer();
+		CommandBuffer* reorderedBatch[] = { &sourceTransition, &destinationTransition, &empty, &finalPass };
+		const SubmitHandle reorderedSubmission = device.SubmitBatch( reorderedBatch, 4 );
+
+		device.Wait( reorderedSubmission );
+		device.DownloadTexture2D( target, pixels.data(), 2u * sizeof( uint32_t ), sizeof( pixels ) );
+
+		const std::array<uint32_t, 4> expectedBlue = { 0xffff0000u, 0xffff0000u, 0xffff0000u, 0xffff0000u };
+
+		Require( pixels == expectedBlue, "Reordered recordings did not use the latest resource state across the empty recording." );
+
 		device.Destroy( target );
 		device.WaitIdle();
 	}

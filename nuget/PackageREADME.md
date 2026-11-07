@@ -108,7 +108,7 @@ The buffer is ready for a subsequent GPU shader read. Keep the pipeline alive un
 ## Constant data
 
 ```cpp
-commands.SetConstantBuffer( constants );
+device.SetConstantBuffer( commands, constants );
 ```
 
 Include `Ldx12_ConstantBuffers.hlsli` and read `CB0.Load<YourType>()` in HLSL. Add `build/native/include/Ldx12/shaders` from the package to the stage's `includeDirectories`.

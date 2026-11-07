@@ -584,22 +584,41 @@ namespace ldx12
 		assert( commandBuffer.manager_ == this && commandBuffer.active_ );
 
 		ConstantBufferRing& ring = constantBufferRings_[ ringIndex ];
-		const uint64_t allocationSize =
-			( static_cast<uint64_t>( sizeBytes ) + LDX12_CONSTANT_BUFFER_RING_ALIGNMENT - 1ull ) & ~( LDX12_CONSTANT_BUFFER_RING_ALIGNMENT - 1ull );
 
+		// Keep reservation and data copy under the same lock.
 		lockGuard lock( ring.mutex_ );
 
 		assert( ring.mappedPtr_ != nullptr && ring.descriptorIndex_ != UINT32_MAX );
 
+		const uint32_t offset = ReserveConstantBufferRange( commandBuffer, sizeBytes, ringIndex );
+
+		if( offset == UINT32_MAX )
+		{
+			return UINT32_MAX;
+		}
+
+		std::memcpy( ring.mappedPtr_ + offset, data, sizeBytes );
+
+		return offset;
+	}
+
+	uint32_t DeviceManager::ReserveConstantBufferRange( CommandBuffer& commandBuffer, uint32_t sizeBytes, uint32_t ringIndex )
+	{
+		// UploadConstantBuffer holds this ring's mutex until the reserved range has been filled.
+		ConstantBufferRing& ring = constantBufferRings_[ ringIndex ];
+		const uint64_t allocationSize =
+			( static_cast<uint64_t>( sizeBytes ) + LDX12_CONSTANT_BUFFER_RING_ALIGNMENT - 1ull ) & ~( LDX12_CONSTANT_BUFFER_RING_ALIGNMENT - 1ull );
+
 		uint64_t dataBegin = ring.head_;
 		const uint64_t physicalOffset = dataBegin % LDX12_CONSTANT_BUFFER_RING_SIZE_BYTES;
 
-		// we can lose some spaces of region, this is asimple ringbuffer without a allocation strategy, the idea is keep it simple and fast.
+		// Keep each upload contiguous: skip the remaining bytes when it cannot fit before the ring wraps.
 		if( allocationSize > LDX12_CONSTANT_BUFFER_RING_SIZE_BYTES - physicalOffset )
 		{
 			dataBegin += LDX12_CONSTANT_BUFFER_RING_SIZE_BYTES - physicalOffset;
 		}
 
+		// Head and tail are monotonic positions; their distance includes pending data and wrap padding.
 		const bool ringWasEmpty = ring.ranges_.empty();
 		const uint64_t reusableTail = ringWasEmpty ? dataBegin : ring.tail_;
 		const uint64_t reservationEnd = dataBegin + allocationSize;
@@ -611,14 +630,13 @@ namespace ldx12
 		}
 
 		// Keep wrap padding reserved until the allocation that follows it completes.
-		const ConstantBufferInternalRange range{ .begin_ = ringWasEmpty ? dataBegin : ring.head_, .end_ = reservationEnd };
+		const ConstantBufferRange range{ .ringIndex_ = ringIndex, .begin_ = ringWasEmpty ? dataBegin : ring.head_, .end_ = reservationEnd };
 		const uint32_t offset = static_cast<uint32_t>( dataBegin % LDX12_CONSTANT_BUFFER_RING_SIZE_BYTES );
 
 		ring.ranges_.push_back( { .range_ = range, .completed_ = false } );
 		DeferredRelease::OnFailure cleanup( [ &ring ]() noexcept { ring.ranges_.pop_back(); } );
-		commandBuffer.constantBufferRanges_[ ringIndex ].push_back( range );
+		commandBuffer.constantBufferRanges_.push_back( range );
 
-		std::memcpy( ring.mappedPtr_ + offset, data, sizeBytes );
 		ring.head_ = reservationEnd;
 
 		if( ringWasEmpty )
@@ -629,73 +647,42 @@ namespace ldx12
 		return offset;
 	}
 
-	void DeviceManager::CommitConstantBufferRanges( CommandBuffer* const* commandBuffers, uint32_t commandBufferCount, SubmitHandle submission )
+	void DeviceManager::DeferConstantBufferRanges( CommandBuffer* const* commandBuffers, uint32_t commandBufferCount, SubmitHandle submission )
 	{
-		assert( commandBuffers != nullptr );
-		assert( commandBufferCount > 0 && commandBufferCount <= ourMaxCommandBufferBatch );
 		assert( !submission.Empty() );
 
-		bool hasRanges = false;
+		std::list<ConstantBufferRange> submittedRanges;
 
-		for( uint32_t commandIndex = 0; commandIndex < commandBufferCount; ++commandIndex )
+		// Transfer all ranges into one list without copying or allocating list nodes.
+		for( uint32_t index = 0; index < commandBufferCount; ++index )
 		{
-			const CommandBuffer* commandBuffer = commandBuffers[ commandIndex ];
+			CommandBuffer& commandBuffer = *commandBuffers[ index ];
 
-			assert( commandBuffer != nullptr );
-			assert( commandBuffer->manager_ == this && commandBuffer->active_ );
-
-			for( const std::deque<ConstantBufferInternalRange>& ranges : commandBuffer->constantBufferRanges_ )
-			{
-				hasRanges = hasRanges || !ranges.empty();
-			}
+			submittedRanges.splice( submittedRanges.end(), commandBuffer.constantBufferRanges_ );
 		}
 
-		if( !hasRanges )
+		if( submittedRanges.empty() )
 		{
 			return;
 		}
 
-		ConstantBufferBatchRanges submittedRanges;
-
-		// Transfer the lists; each command receives empty lists for its next recording.
-		for( uint32_t commandIndex = 0; commandIndex < commandBufferCount; ++commandIndex )
-		{
-			ConstantBufferRecordingRanges& deferredRanges = submittedRanges[ commandIndex ];
-			ConstantBufferRecordingRanges& commandRanges = commandBuffers[ commandIndex ]->constantBufferRanges_;
-
-			deferredRanges.swap( commandRanges );
-		}
-
-		// The task owns these ranges across frames until the submission completes.
-		AddDeferredRelease( submission,
-			[ this, submittedRanges = std::move( submittedRanges ), commandBufferCount ]()
-			{
-				for( uint32_t commandIndex = 0; commandIndex < commandBufferCount; ++commandIndex )
-				{
-					const ConstantBufferRecordingRanges& commandRanges = submittedRanges[ commandIndex ];
-
-					for( uint32_t ringIndex = 0; ringIndex < commandRanges.size(); ++ringIndex )
-					{
-						ReleaseConstantBufferRanges( ringIndex, commandRanges[ ringIndex ] );
-					}
-				}
-			} );
+		// The deferred task owns this list until the GPU finishes the submission.
+		AddDeferredRelease( submission, [ this, submittedRanges = std::move( submittedRanges ) ]() { ReleaseConstantBufferRanges( submittedRanges ); } );
 	}
 
-	void DeviceManager::ReleaseConstantBufferRanges( uint32_t ringIndex, const std::deque<ConstantBufferInternalRange>& ranges ) noexcept
+	void DeviceManager::DiscardConstantBufferRanges( CommandBuffer& commandBuffer ) noexcept
 	{
-		assert( ringIndex < constantBufferRings_.size() );
+		ReleaseConstantBufferRanges( commandBuffer.constantBufferRanges_ );
+		commandBuffer.constantBufferRanges_.clear();
+	}
 
-		if( ranges.empty() )
+	void DeviceManager::ReleaseConstantBufferRanges( const std::list<ConstantBufferRange>& ranges ) noexcept
+	{
+		for( const ConstantBufferRange& completedRange : ranges )
 		{
-			return;
-		}
+			ConstantBufferRing& ring = constantBufferRings_[ completedRange.ringIndex_ ];
+			lockGuard lock( ring.mutex_ );
 
-		ConstantBufferRing& ring = constantBufferRings_[ ringIndex ];
-		lockGuard lock( ring.mutex_ );
-
-		for( const ConstantBufferInternalRange& completedRange : ranges )
-		{
 			ConstantBufferRing::RangeState* matchingRange = nullptr;
 
 			for( ConstantBufferRing::RangeState& ringRange : ring.ranges_ )
@@ -710,13 +697,13 @@ namespace ldx12
 			assert( matchingRange != nullptr );
 
 			matchingRange->completed_ = true;
-		}
 
-		// Reuse only the completed prefix; later completed ranges still wait for their predecessors.
-		while( !ring.ranges_.empty() && ring.ranges_.front().completed_ )
-		{
-			ring.tail_ = ring.ranges_.front().range_.end_;
-			ring.ranges_.pop_front();
+			// Reuse only the completed prefix; later completed ranges still wait for their predecessors.
+			while( !ring.ranges_.empty() && ring.ranges_.front().completed_ )
+			{
+				ring.tail_ = ring.ranges_.front().range_.end_;
+				ring.ranges_.pop_front();
+			}
 		}
 	}
 

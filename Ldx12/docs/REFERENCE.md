@@ -96,6 +96,10 @@ The root signature uses all 64 DWORDs: 62 application constants at `b0`, the exi
 
 ## Platform and scope
 
+### Migrating to 0.5.0
+
+- Replace `commands.SetConstantBuffer(data, ringIndex)` with `device.SetConstantBuffer(commands, data, ringIndex)`. The overload taking a data pointer and byte size also belongs to `RenderDevice`.
+
 ### Migrating to 0.4.0
 
 - Rebuild applications and shaders against the same version and resource profile. Buffers and textures now share the profile's resource capacity.

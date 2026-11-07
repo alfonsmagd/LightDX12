@@ -17,8 +17,11 @@ namespace ldx12
 		CommandBuffer& AcquireCommandBuffer( DeviceManager& manager );
 		void DiscardCommandBuffer( DeviceManager& manager, CommandBuffer& commandBuffer );
 		void ReleaseCommandBuffer( CommandBuffer& commandBuffer ) noexcept;
+		void RecycleSubmittedCommandBuffers( CommandBuffer* const* commandBuffers, uint32_t commandBufferCount );
 		void ReleaseAllCommandBuffers() noexcept;
 		CommandListWrapper& Acquire();
+		// Prepare state fixups and submit the native lists in recording order.
+		SubmitHandle SubmitCommandBuffers( CommandBuffer* const* commandBuffers, uint32_t commandBufferCount );
 		SubmitHandle Submit( CommandListWrapper& wrapper );
 		SubmitHandle SubmitBatch( CommandListWrapper* const* wrappers, uint32_t commandListCount );
 		SubmitHandle GetLastSubmitHandle() const noexcept;
@@ -41,6 +44,7 @@ namespace ldx12
 		SubmitHandle lastSubmitHandle_ = {};
 		SubmitHandle nextSubmitHandle_ = {};
 		uint32_t numAvailableCommandBuffers_ = 0;
+		uint64_t preparationId_ = 0;
 		uint32_t fenceCounter_ = 1;
 	};
 }

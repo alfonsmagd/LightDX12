@@ -60,6 +60,12 @@ namespace ldx12
 			DeviceManager::DeferredRelease::OnFailure releaseGate( [ &gate ]() noexcept { gate->Signal( 1 ); } );
 			tests::Require( SUCCEEDED( native.GetCommandQueue()->Wait( gate.Get(), 1 ) ), "Failed to pause the GPU queue." );
 
+			// A submission without constants must not create a range-release task.
+			CommandBuffer& empty = device.AcquireCommandBuffer();
+
+			device.Submit( empty );
+			tests::Require( manager.graphicsQueue_.deferredReleases_.empty(), "An empty recording added a range-release task." );
+
 			CommandBuffer* firstBatch[] = { &first, &last };
 			const SubmitHandle firstSubmission = SubmitRingBatch( manager, firstBatch, 2, lastBufferIndex );
 
@@ -105,6 +111,15 @@ namespace ldx12
 			tests::Require( ring0.ranges_.empty() && ring0.tail_ == ring0.head_, "Completed batches did not reclaim ring 0." );
 			tests::Require( ring1.ranges_.empty() && ring1.tail_ == ring1.head_, "Completed batches did not reclaim ring 1." );
 			std::cout << "[PASS] Deferred ring ranges survive cleanup passes, interleaved batches and command buffer reuse\n";
+
+			// Discard returns both rings' reservations without waiting for a GPU submission.
+			CommandBuffer& discarded = device.AcquireCommandBuffer();
+
+			device.SetConstantBuffer( discarded, value, 0 );
+			device.SetConstantBuffer( discarded, value, 1 );
+			device.Discard( discarded );
+			tests::Require( ring0.ranges_.empty() && ring0.tail_ == ring0.head_, "Discard did not reclaim ring 0." );
+			tests::Require( ring1.ranges_.empty() && ring1.tail_ == ring1.head_, "Discard did not reclaim ring 1." );
 
 			CommandBuffer& full = device.AcquireCommandBuffer();
 			const uint32_t fullBufferIndex = manager.graphicsQueue_.immediateCommands_->GetNextSubmitHandle().bufferIndex_;

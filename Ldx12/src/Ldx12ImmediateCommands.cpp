@@ -125,6 +125,18 @@ namespace ldx12
 		commandBuffer.Release();
 	}
 
+	void ImmediateCommands::RecycleSubmittedCommandBuffers( CommandBuffer* const* commandBuffers, uint32_t commandBufferCount )
+	{
+		for( uint32_t index = 0; index < commandBufferCount; ++index )
+		{
+			CommandBuffer& commandBuffer = *commandBuffers[ index ];
+
+			// Preserve the final resource states before clearing the recording for reuse.
+			commandBuffer.CommitSubmittedResourceStates();
+			ReleaseCommandBuffer( commandBuffer );
+		}
+	}
+
 	void ImmediateCommands::ReleaseAllCommandBuffers() noexcept
 	{
 		for( CommandBuffer& commandBuffer : commandBuffers_ )
@@ -170,6 +182,31 @@ namespace ldx12
 		nextSubmitHandle_ = current->handle_;
 		numAvailableCommandBuffers_--;
 		return *current;
+	}
+
+	SubmitHandle ImmediateCommands::SubmitCommandBuffers( CommandBuffer* const* commandBuffers, uint32_t commandBufferCount )
+	{
+		// A fresh ID also invalidates predicted states left by a failed preparation.
+		const uint64_t preparationId = ++preparationId_;
+		std::array<CommandListWrapper*, ourMaxCommandBufferBatch * 2> wrappers = {};
+		uint32_t wrapperCount = 0;
+
+		for( uint32_t index = 0; index < commandBufferCount; ++index )
+		{
+			CommandBuffer* commandBuffer = commandBuffers[ index ];
+
+			assert( commandBuffer != nullptr && commandBuffer->IsActive() && !commandBuffer->IsRendering() );
+
+			// Each fixup must run immediately before the recording whose initial states it restores.
+			if( CommandListWrapper* fixup = commandBuffer->BuildSubmitFixup( preparationId ) )
+			{
+				wrappers[ wrapperCount++ ] = fixup;
+			}
+
+			wrappers[ wrapperCount++ ] = &commandBuffer->Wrapper();
+		}
+
+		return SubmitBatch( wrappers.data(), wrapperCount );
 	}
 
 	SubmitHandle ImmediateCommands::Submit( CommandListWrapper& wrapper )

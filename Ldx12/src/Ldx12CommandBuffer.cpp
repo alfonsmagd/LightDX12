@@ -325,6 +325,10 @@ namespace ldx12
 	{
 		assert( active_ );
 		assert( !isRendering_ );
+
+		// Submitted ranges have already been transferred; any remaining ranges belong to a discarded recording.
+		manager_->DiscardConstantBufferRanges( *this );
+
 		manager_ = nullptr;
 		wrapper_ = nullptr;
 		active_ = false;
@@ -410,88 +414,59 @@ namespace ldx12
 		trackedBuffer.currentState_ = newState;
 	}
 
-	CommandListWrapper* CommandBuffer::BuildSubmitFixup( CommandBuffer* const* previousCommandBuffers, uint32_t previousCommandBufferCount )
+	CommandListWrapper* CommandBuffer::BuildSubmitFixup( uint64_t preparationId )
 	{
-		const auto getCurrentBufferState = [ this, previousCommandBuffers, previousCommandBufferCount ]( BufferHandle buffer )
-		{
-			for( uint32_t commandBufferIndex = previousCommandBufferCount; commandBufferIndex > 0; --commandBufferIndex )
-			{
-				assert( previousCommandBuffers != nullptr );
-				const CommandBuffer* previousCommandBuffer = previousCommandBuffers[ commandBufferIndex - 1 ];
-				assert( previousCommandBuffer != nullptr );
-				const TrackedBufferState* trackedBuffers = previousCommandBuffer->GetTrackedBuffers();
-				for( uint32_t bufferIndex = 0; bufferIndex < previousCommandBuffer->GetTrackedBufferCount(); ++bufferIndex )
-				{
-					if( trackedBuffers[ bufferIndex ].handle_ == buffer )
-					{
-						return trackedBuffers[ bufferIndex ].currentState_;
-					}
-				}
-			}
-
-			return manager_->GetBufferResource( buffer ).currentState_;
-		};
-
-		const auto getCurrentTextureState = [ this, previousCommandBuffers, previousCommandBufferCount ]( TextureHandle texture )
-		{
-			for( uint32_t commandBufferIndex = previousCommandBufferCount; commandBufferIndex > 0; --commandBufferIndex )
-			{
-				assert( previousCommandBuffers != nullptr );
-				const CommandBuffer* previousCommandBuffer = previousCommandBuffers[ commandBufferIndex - 1 ];
-				assert( previousCommandBuffer != nullptr );
-				const TrackedTextureState* trackedTextures = previousCommandBuffer->GetTrackedTextures();
-				for( uint32_t textureIndex = 0; textureIndex < previousCommandBuffer->GetTrackedTextureCount(); ++textureIndex )
-				{
-					if( trackedTextures[ textureIndex ].handle_ == texture )
-					{
-						return trackedTextures[ textureIndex ].currentState_;
-					}
-				}
-			}
-
-			return manager_->GetTextureResource( texture ).currentState_;
-		};
-
-		std::array<D3D12_RESOURCE_BARRIER, ourMaxTrackedBuffersPerCommandBuffer + ourMaxTrackedTexturesPerCommandBuffer> barriers{};
-		uint32_t barrierCount = 0;
+		// Record barriers directly and acquire a fixup list only when the first transition is needed.
+		CommandListWrapper* fixup = nullptr;
 
 		for( uint32_t index = 0; index < trackedBufferCount_; ++index )
 		{
 			const TrackedBufferState& trackedBuffer = trackedBuffers_[ index ];
-			const D3D12_RESOURCE_STATES currentState = getCurrentBufferState( trackedBuffer.handle_ );
-			if( currentState == trackedBuffer.initialState_ )
+			BufferResource& resource = manager_->GetBufferResource( trackedBuffer.handle_ );
+			const D3D12_RESOURCE_STATES currentState = resource.preparationId_ == preparationId ? resource.preparedState_ : resource.currentState_;
+
+			if( currentState != trackedBuffer.initialState_ )
 			{
-				continue;
+				if( fixup == nullptr )
+				{
+					fixup = &manager_->GetGraphicsQueueContext().immediateCommands_->Acquire();
+				}
+
+				const D3D12_RESOURCE_BARRIER barrier =
+					CD3DX12_RESOURCE_BARRIER::Transition( resource.resource_.Get(), currentState, trackedBuffer.initialState_ );
+
+				fixup->commandList_->ResourceBarrier( 1, &barrier );
 			}
 
-			const BufferResource& resource = manager_->GetBufferResource( trackedBuffer.handle_ );
-			barriers[ barrierCount++ ] =
-				CD3DX12_RESOURCE_BARRIER::Transition( resource.resource_.Get(), currentState, trackedBuffer.initialState_ );
+			// The next recording in this batch starts from this recording's final state.
+			resource.preparedState_ = trackedBuffer.currentState_;
+			resource.preparationId_ = preparationId;
 		}
 
 		for( uint32_t index = 0; index < trackedTextureCount_; ++index )
 		{
 			const TrackedTextureState& trackedTexture = trackedTextures_[ index ];
-			const D3D12_RESOURCE_STATES currentState = getCurrentTextureState( trackedTexture.handle_ );
-			if( currentState == trackedTexture.initialState_ )
+			TextureResource& resource = manager_->GetTextureResource( trackedTexture.handle_ );
+			const D3D12_RESOURCE_STATES currentState = resource.preparationId_ == preparationId ? resource.preparedState_ : resource.currentState_;
+
+			if( currentState != trackedTexture.initialState_ )
 			{
-				continue;
+				if( fixup == nullptr )
+				{
+					fixup = &manager_->GetGraphicsQueueContext().immediateCommands_->Acquire();
+				}
+
+				const D3D12_RESOURCE_BARRIER barrier =
+					CD3DX12_RESOURCE_BARRIER::Transition( resource.resource_.Get(), currentState, trackedTexture.initialState_ );
+
+				fixup->commandList_->ResourceBarrier( 1, &barrier );
 			}
 
-			const TextureResource& resource = manager_->GetTextureResource( trackedTexture.handle_ );
-			barriers[ barrierCount++ ] =
-				CD3DX12_RESOURCE_BARRIER::Transition( resource.resource_.Get(), currentState, trackedTexture.initialState_ );
+			resource.preparedState_ = trackedTexture.currentState_;
+			resource.preparationId_ = preparationId;
 		}
 
-		if( barrierCount == 0 )
-		{
-			return nullptr;
-		}
-
-		CommandListWrapper& fixup = manager_->GetGraphicsQueueContext().immediateCommands_->Acquire();
-		fixup.commandList_->ResourceBarrier( barrierCount, barriers.data() );
-
-		return &fixup;
+		return fixup;
 	}
 
 	void CommandBuffer::CommitSubmittedResourceStates()
@@ -827,26 +802,6 @@ namespace ldx12
 
 		wrapper_->commandList_->SetGraphicsRoot32BitConstants( 0, valueCount, data, offset32BitValues );
 		wrapper_->commandList_->SetComputeRoot32BitConstants( 0, valueCount, data, offset32BitValues );
-	}
-
-	void CommandBuffer::SetConstantBuffer( const void* data, uint32_t sizeBytes, uint32_t ringIndex )
-	{
-		assert( manager_ != nullptr && active_ );
-
-		const uint32_t offset = manager_->UploadConstantBuffer( *this, data, sizeBytes, ringIndex );
-
-		if( offset == UINT32_MAX )
-		{
-			return;
-		}
-
-		const uint32_t offsetShift = ringIndex * 16u;
-		const uint32_t offsetMask = 0xffffu << offsetShift;
-
-		constantBufferOffsets_ = ( constantBufferOffsets_ & ~offsetMask ) | ( offset << offsetShift );
-
-		wrapper_->commandList_->SetGraphicsRoot32BitConstant( 2, constantBufferOffsets_, 0 );
-		wrapper_->commandList_->SetComputeRoot32BitConstant( 2, constantBufferOffsets_, 0 );
 	}
 
 	void CommandBuffer::CmdPushDebugGroupLabel( const char* label, uint32_t color )
