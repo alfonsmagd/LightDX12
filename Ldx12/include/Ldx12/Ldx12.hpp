@@ -578,6 +578,8 @@ namespace ldx12
 		void CmdSetScissor( int32_t left, int32_t top, int32_t right, int32_t bottom );
 		void CmdTransitionBuffer( BufferHandle buffer, D3D12_RESOURCE_STATES newState );
 		void CmdUavBarrier( BufferHandle buffer );
+		// Orders dependent UAV accesses without changing the texture state.
+		void CmdUavBarrier( TextureHandle texture );
 		void CmdTransitionTexture( TextureHandle texture, D3D12_RESOURCE_STATES newState );
 		void CmdResolveTexture( TextureHandle source, TextureHandle destination );
 		void CmdBindRenderPipeline( const RenderPipelineState& pipeline );

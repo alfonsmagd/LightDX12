@@ -22,6 +22,13 @@ namespace ldx12::tests
 		targetDesc.usage = TextureUsage::RenderTarget;
 
 		const TextureHandle target = device.CreateTexture( targetDesc );
+
+		TextureDesc uavDesc{};
+		uavDesc.debugName = "Texture UAV barrier";
+		uavDesc.usage = TextureUsage::UnorderedAccess;
+
+		const TextureHandle uavTexture = device.CreateTexture( uavDesc );
+
 		Framebuffer framebuffer{};
 		framebuffer.color[ 0 ].texture = target;
 		RenderPass renderPass{};
@@ -39,6 +46,10 @@ namespace ldx12::tests
 		first.CmdBeginRendering( renderPass, framebuffer );
 		first.CmdEndRendering();
 		first.CmdTransitionTexture( target, D3D12_RESOURCE_STATE_COPY_SOURCE );
+
+		RequireThrows<std::runtime_error>( [ & ] { first.CmdUavBarrier( target ); }, "A UAV barrier accepted a texture without unordered access." );
+		first.CmdTransitionTexture( uavTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS );
+		first.CmdUavBarrier( uavTexture );
 
 		renderPass.color[ 0 ].clearColor = { 0.0f, 1.0f, 0.0f, 1.0f };
 		CommandBuffer& second = device.AcquireCommandBuffer();
@@ -84,6 +95,7 @@ namespace ldx12::tests
 		Require( pixels == expectedBlue, "Reordered recordings did not use the latest resource state across the empty recording." );
 
 		device.Destroy( target );
+		device.Destroy( uavTexture );
 		device.WaitIdle();
 	}
 }
