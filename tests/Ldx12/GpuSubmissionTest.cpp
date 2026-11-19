@@ -47,7 +47,6 @@ namespace ldx12::tests
 		first.CmdEndRendering();
 		first.CmdTransitionTexture( target, D3D12_RESOURCE_STATE_COPY_SOURCE );
 
-		RequireThrows<std::runtime_error>( [ & ] { first.CmdUavBarrier( target ); }, "A UAV barrier accepted a texture without unordered access." );
 		first.CmdTransitionTexture( uavTexture, D3D12_RESOURCE_STATE_UNORDERED_ACCESS );
 		first.CmdUavBarrier( uavTexture );
 

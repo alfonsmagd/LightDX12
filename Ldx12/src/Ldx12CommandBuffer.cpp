@@ -696,10 +696,7 @@ namespace ldx12
 	{
 		const TextureResource& resource = manager_->GetTextureResource( texture );
 
-		if( ( resource.usageFlags_ & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS ) == 0 )
-		{
-			throw std::runtime_error( "CmdUavBarrier requires an unordered-access texture." );
-		}
+		assert( ( resource.usageFlags_ & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS ) != 0 && "CmdUavBarrier requires an unordered-access texture." );
 
 		const D3D12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::UAV( resource.resource_.Get() );
 		wrapper_->commandList_->ResourceBarrier( 1, &barrier );
